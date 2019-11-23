@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <screen.cpp>
 
 /**********************************************************************************
 **
@@ -214,7 +213,7 @@ void printBar(byte p){
 }
 
 // 4x4 charset
-const uint8_t cc0[8] = {    // Custom Character 0
+uint8_t cc0[8] = {    // Custom Character 0
   B00000,
   B00000,
   B00000,
@@ -225,7 +224,7 @@ const uint8_t cc0[8] = {    // Custom Character 0
   B11111
 };
 
-const uint8_t cc1[8] = {    // Custom Character 1
+uint8_t cc1[8] = {    // Custom Character 1
   B10000,
   B11000,
   B11100,
@@ -236,7 +235,7 @@ const uint8_t cc1[8] = {    // Custom Character 1
   B11111
 };
 
-const uint8_t cc2[8] = {    // Custom Character 2
+uint8_t cc2[8] = {    // Custom Character 2
   B11111,
   B11111,
   B11111,
@@ -247,7 +246,7 @@ const uint8_t cc2[8] = {    // Custom Character 2
   B00000
 };
 
-const uint8_t cc3[8] = {    // Custom Character 3
+uint8_t cc3[8] = {    // Custom Character 3
   B00000,
   B00000,
   B00000,
@@ -258,7 +257,7 @@ const uint8_t cc3[8] = {    // Custom Character 3
   B11111
 };
 
-const uint8_t cc4[8] = {    // Custom Character 4
+uint8_t cc4[8] = {    // Custom Character 4
   B11111,
   B11111,
   B11111,
@@ -269,7 +268,7 @@ const uint8_t cc4[8] = {    // Custom Character 4
   B00001
 };
 
-const uint8_t cc5[8] = {    // Custom Character 5
+uint8_t cc5[8] = {    // Custom Character 5
   B00001,
   B00011,
   B00111,
@@ -280,7 +279,7 @@ const uint8_t cc5[8] = {    // Custom Character 5
   B11111
 };
 
-const uint8_t cc6[8] = {    // Custom Character 6
+uint8_t cc6[8] = {    // Custom Character 6
   B00000,
   B00000,
   B00000,
@@ -404,6 +403,9 @@ unsigned long mil_delta;
 
 byte relayMap[6] = { PIN_EXT_R1, PIN_EXT_R2, PIN_EXT_R3, PIN_EXT_R4, PIN_EXT_R5, PIN_EXT_R6};
 
+///////////////////////////////////////////////////////////////////////////////////////
+//  volume
+
 void setMute(byte volume) {
   isMuted = volume == 0;
 
@@ -411,6 +413,21 @@ void setMute(byte volume) {
 
   printTwoNumber(VOLCOL, volume);
 }
+
+/******* set LDRs to current volume *******/
+void setVolume(byte vol) {
+
+  if (ENABLEHTPASSTHROUGH && chan_in == HTPASSTHROUGHINPUT)
+    vol = HTPASSTHROUGHVOLUME; // Volume is fixed on the selected input
+
+  // CODE TO SET VOLUME ON MUSES HERE
+  printTwoNumber(VOLCOL, vol);
+
+  if (isMuted == vol || (isMuted && vol))
+      setMute(vol);
+}
+
+
 
 void setInput() {
   bool wasMuted = isMuted;
@@ -423,11 +440,14 @@ void setInput() {
 
     mil_onInput = millis();
   }
-  if (isMuted && !wasMuted)
-    if (ENABLEHTPASSTHROUGH && chan_in == HTPASSTHROUGHINPUT)
+  if (isMuted && !wasMuted) {
+    if (ENABLEHTPASSTHROUGH && chan_in == HTPASSTHROUGHINPUT) {
       setVolume(HTPASSTHROUGHVOLUME); // Volume is fixed on the selected input
-    else
+    }
+    else {
       setVolume(volume);
+    }
+  }
 }
 
 
@@ -594,37 +614,23 @@ void toRunState() {
   if (state != STATE_INPUT_SELECT) {
     lcd.clear();
     setVolume(volume);
-#if INPUTCOUNT > 0
-lcd.setCursor(1, ROW_IN);
-lcd.print(inputName[chan_in]);
-#endif
-}
 
-#if INPUTCOUNT > 0
-lcd.setCursor(0, ROW_IN);
-lcd.write(INPUTCHAR);
-#endif
-
-    mil_onAction = millis();
-    state = STATE_RUN;
+    #if INPUTCOUNT > 0
+    lcd.setCursor(1, ROW_IN);
+    lcd.print(inputName[chan_in]);
+    #endif
   }
 
-  ///////////////////////////////////////////////////////////////////////////////////////
-  //  volume
+  #if INPUTCOUNT > 0
+  lcd.setCursor(0, ROW_IN);
+  lcd.write(INPUTCHAR);
+  #endif
 
-  /******* set LDRs to current volume *******/
-  void setVolume(byte vol) {
-
-    if (ENABLEHTPASSTHROUGH && chan_in == HTPASSTHROUGHINPUT)
-      vol = HTPASSTHROUGHVOLUME; // Volume is fixed on the selected input
-
-    // CODE TO SET VOLUME ON MUSES HERE
-
-  printTwoNumber(VOLCOL, vol);
-
-  if (isMuted == vol || (isMuted && vol))
-    setMute(vol);
+  mil_onAction = millis();
+  state = STATE_RUN;
 }
+
+
 
 void toggleMute() {
   if (isMuted)
