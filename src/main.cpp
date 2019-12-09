@@ -2,9 +2,9 @@
 
 /**********************************************************************************
 **
-**    VxD optical volume / preamp controller firmware
+**    Mezmerize B1 Buffer
 **
-**    v1.0 07.2015
+**    v1.0 12.2019
 **
 **
 **    Uses code from: Malpartida (LCD lib), Hifiduino (IR remote), Adafruit (port expander), GreyGnome (PinChange)
@@ -33,12 +33,14 @@
 // Set I/O configuration here.
 #define INPUTCOUNT 6    //** number of inputs, 0 to 6. If 0, comment out the next line.
 char* inputName[INPUTCOUNT] = { "INPUT 1", "INPUT 2", "INPUT 3", "INPUT 4", "INPUT 5", "INPUT 6" }; //** each name maximum 9 characters. There must be exactly INPUTCOUNT names in the list.
-#define ENABLEHTPASSTHROUGH false // Defines if Home Theather Pass Through is enabled. If true then the volume for a single input will be set to a fixed value (see below)
-#define HTPASSTHROUGHINPUT 3 // Remember: The inputs are numbered from 0.
-#define HTPASSTHROUGHVOLUME 20 // Must not be set to a number larger than VOL_MAX_STEP
+
+//** #define ENABLEHTPASSTHROUGH false // Defines if Home Theather Pass Through is enabled. If true then the volume for a single input will be set to a fixed value (see below)
+//** #define HTPASSTHROUGHINPUT 3 // Remember: The inputs are numbered from 0.
+//** #define HTPASSTHROUGHVOLUME 20 // Must not be set to a number larger than VOL_MAX_STEP
 
 // Specify the LCD size here
 // Only 20x4 are supported
+// For a better design this could be implemented by a LCD claas
 #define LCDCOLUMNS 20
 #define LCDROWS 4
 
