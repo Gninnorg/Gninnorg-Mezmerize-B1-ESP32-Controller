@@ -18,12 +18,12 @@ public:
 	typedef uint8_t input_t;
 	typedef boolean trigger_t;
 	
-	RelayController(input_t numOfInputs=NUM_OF_INPUTS, trigger_t triggerType=TRIGGER_12V);
+	RelayController(input_t inputs=NUM_OF_INPUTS, trigger_t trigger=TRIGGER_12V);
 
 	void begin();
 
-	boolean setInput(input_t inputNmbr);
-	boolean setInputName(input_t inputNmbr, char* inputName);
+	void setInput(input_t inputNmbr);
+	void setInputName(input_t inputNmbr, char* inputName);
 	
 	input_t getInput();
 	char* getInputName(input_t inputNmbr);
@@ -31,7 +31,9 @@ public:
 	void mute(boolean on);
 
 private:
-	byte selectedInput;
-	Adafruit_MCP23008 mcp;
+	input_t				selectedInput;
+	input_t				numOfInputs;
+	Adafruit_MCP23008 	mcp;
+	trigger_t 			triggerType;
 };
 

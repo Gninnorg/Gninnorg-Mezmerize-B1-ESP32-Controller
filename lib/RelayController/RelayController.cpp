@@ -5,8 +5,11 @@
 #include "RelayController.h"
 #include <Wire.h>
 
-RelayController::RelayController(input_t numOfInputs=NUM_OF_INPUTS, trigger_t triggerType=TRIGGER_12V) 
-{}
+RelayController::RelayController(input_t inputs=NUM_OF_INPUTS, trigger_t trigger=TRIGGER_12V) 
+{
+    numOfInputs = inputs;
+    triggerType = trigger;
+}
 
 void RelayController::begin()
 {
@@ -19,17 +22,19 @@ void RelayController::begin()
     }
 }
 
-boolean RelayController::setInput(input_t inputNmbr)
+void RelayController::setInput(input_t inputNmbr)
 {
-    for (byte pin = 0; pin < NUM_OF_INPUTS; pin++) 
+    for (byte pin = 0; pin < numOfInputs; pin++) 
     {
         mcp.digitalWrite(pin, (inputNmbr == pin));
         selectedInput = inputNmbr;
     }
 }
 
-boolean RelayController::setInputName(input_t inputNmbr, char* inputName)
-{}
+void RelayController::setInputName(input_t inputNmbr, char* inputName)
+{
+
+}
 
 uint8_t RelayController::getInput()
 {
