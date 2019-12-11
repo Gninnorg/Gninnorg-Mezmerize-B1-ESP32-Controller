@@ -50,7 +50,7 @@ void RelayController::setStandardTrigger()
     standardTrigger = true;
 }
 
-void RelayController::setTriggerOn()
+boolean RelayController::setTriggerOn()
 {
     if (standardTrigger) {
         mcp.digitalWrite(1,HIGH);

@@ -25,7 +25,7 @@ public:
 	void setInputName(input_t inputNmbr, char* inputName);
 	void setAlternateTrigger(uint8_t inputRight, uint8_t inputLeft);
 	void setStandardTrigger();
-	void setTriggerOn();
+	boolean setTriggerOn();
 	void SetTrifferOff();
 	
 	input_t getInput();
