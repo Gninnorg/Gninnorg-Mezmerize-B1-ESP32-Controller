@@ -1,14 +1,22 @@
 /*
- 
+**
+** Relay controller for MezmerizeB1Buffer
+**
+** Copyright (c) 2020 Carsten Grønning, Jan Abkjer Tofft
+**
+** Version 0.1
+**
+** PIN1 & PIN2 : Used for controlling amplifier triggers relays
+** PIN3 - PIN8 : Used for controlling input relays
+**                     
 */
 
 #include "RelayController.h"
 #include <Wire.h>
 
-RelayController::RelayController(input_t inputs=NUM_OF_INPUTS) 
+RelayController::RelayController() 
 {
-    numOfInputs = inputs;
-    setStandardTrigger();
+     setStandardTrigger();
 }
 
 void RelayController::begin()
@@ -22,7 +30,7 @@ void RelayController::begin()
     }
 }
 
-void RelayController::setInput(input_t inputNmbr)
+void RelayController::setInput(uint8_t inputNmbr)
 {
     for (byte pin = 3; pin < (numOfInputs + 2); pin++) 
     {
@@ -31,7 +39,7 @@ void RelayController::setInput(input_t inputNmbr)
     }
 }
 
-void RelayController::setInputName(input_t inputNmbr, char* inputName)
+void RelayController::setInputName(uint8_t inputNmbr, char* inputName)
 {
 
 }
@@ -76,8 +84,9 @@ uint8_t RelayController::getInput()
     return selectedInput;
 }
 
-char*  RelayController::getInputName(input_t inputNmbr)
+char*  RelayController::getInputName(uint8_t inputNmbr)
 {
+    return inputName[selectedInput];
 }
 
 void RelayController::mute(boolean on)

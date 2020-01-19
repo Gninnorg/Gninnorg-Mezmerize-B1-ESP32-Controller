@@ -22,7 +22,7 @@ public:
 		void sendCommand(unsigned char command);
 		void sendString(const char *String, uint8_t col, uint8_t row);
 		void print(const char *String);
-    void print(byte value);
+    	void print(byte value);
 		void sendFloat(float digit, uint8_t dec, uint8_t nad, uint8_t col, uint8_t row);
 		void sendData(unsigned char data);
 		void write(unsigned char data);
