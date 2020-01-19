@@ -9,3 +9,9 @@
 **
 */
 #include <Arduino.h>
+#include <RelayController.h>
+
+RelayController rc;
+
+void setup () {}
+void loop () {}
