@@ -36,8 +36,8 @@ public:
 	// Either use standard trigger 12 V or the alternate trigger, which uses pins to sense if amplifier is turned on
 	void setAlternateTrigger(uint8_t inputRight, uint8_t inputLeft);
 	void setStandardTrigger();
-	boolean setTriggerOn();
-	void SetTrifferOff();
+	void setTriggerOn();
+	void SetTriggerOff();
 	
 private:
 	Adafruit_MCP23008 	mcp;

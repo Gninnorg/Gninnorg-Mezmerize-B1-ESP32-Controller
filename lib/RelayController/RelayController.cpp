@@ -11,8 +11,7 @@
 **                     
 */
 
-#include "RelayController.h"
-#include <Wire.h>
+#include <RelayController.h>
 
 RelayController::RelayController() 
 {
@@ -21,18 +20,18 @@ RelayController::RelayController()
 
 void RelayController::begin()
 {
-    Wire.begin();
     mcp.begin();
-    for (byte pin = 1; pin <= 8; pin++) 
+    for (byte pin = 0; pin <= 7; pin++) 
     {
         mcp.pinMode(pin, OUTPUT);
-        mcp.digitalWrite(pin, LOW);
     }
+    Serial.println("started!");
+    
 }
 
 void RelayController::setInput(uint8_t inputNmbr)
 {
-    for (byte pin = 3; pin < (numOfInputs + 2); pin++) 
+    for (byte pin = 0; pin < (numOfInputs - 1 ); pin++) 
     {
         mcp.digitalWrite(pin, (inputNmbr == pin));
         selectedInput = inputNmbr;
@@ -58,21 +57,23 @@ void RelayController::setStandardTrigger()
     standardTrigger = true;
 }
 
-boolean RelayController::setTriggerOn()
+void RelayController::setTriggerOn()
 {
     if (standardTrigger) {
-        mcp.digitalWrite(1,HIGH);
-        mcp.digitalWrite(2, HIGH);
+        delay(3000);
+        Serial.println("SetTrigger:Standard");
+        mcp.digitalWrite(6, HIGH);
+        mcp.digitalWrite(7, HIGH);
     } else {
         // Add logic to handle alternative trigger here
     }
 }
 
-void RelayController::SetTrifferOff()
+void RelayController::SetTriggerOff()
 {
     if (standardTrigger) {
-        mcp.digitalWrite(1,LOW);
-        mcp.digitalWrite(2, LOW);
+        mcp.digitalWrite(6,LOW);
+        mcp.digitalWrite(7, LOW);
     } else {
         // Add logic to handle alternative trigger here
     }
@@ -86,7 +87,7 @@ uint8_t RelayController::getInput()
 
 char*  RelayController::getInputName(uint8_t inputNmbr)
 {
-    return inputName[selectedInput];
+    return inputName[selectedInput-1];
 }
 
 void RelayController::mute(boolean on)
