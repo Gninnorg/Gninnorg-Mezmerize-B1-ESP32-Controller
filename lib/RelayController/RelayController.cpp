@@ -31,29 +31,52 @@ void RelayController::begin()
 
 void RelayController::setInput(uint8_t inputNmbr)
 {
-    for (byte pin = 0; pin < (numOfInputs - 1 ); pin++) 
-    {
-        mcp.digitalWrite(pin, (inputNmbr == pin));
-        selectedInput = inputNmbr;
+    inputNmbr --;
+    if (inputNmbr != selectedInput) {
+        for (byte pin = 0; pin < (numOfInputs); pin++) 
+        {
+            mcp.digitalWrite(pin, (inputNmbr == pin));
+            selectedInput = inputNmbr;
+        }
     }
 }
 
-void RelayController::setInputName(uint8_t inputNmbr, char* inputName)
+void RelayController::setInputName(uint8_t inputNmbr, String name)
 {
-
+    switch (inputNmbr)
+    {
+    case 1:
+        input1 = name;
+        break;
+    case 2:
+        input2 = name;
+        break;
+    case 3:
+        input3 = name;
+        break;
+    case 4:
+        input4 = name;
+        break;
+    case 5:
+        input5 = name;
+        break;
+    case 6:
+        input6 = name;
+        break;
+    default:
+        break;
+    }
 }
 
-void RelayController::setAlternateTrigger(uint8_t inputRight, uint8_t inputLeft)
+/*void RelayController::setAlternateTrigger(uint8_t inputRight, uint8_t inputLeft)
 {
     sensorRight = inputRight;
     sensorLeft = inputLeft;
     standardTrigger = false;
-}
+}*/
 
 void RelayController::setStandardTrigger()
 {
-    sensorRight = 0;
-    sensorLeft = 0;
     standardTrigger = true;
 }
 
@@ -82,12 +105,35 @@ void RelayController::SetTriggerOff()
 
 uint8_t RelayController::getInput()
 {
-    return selectedInput;
+    return selectedInput+1;
 }
 
-char*  RelayController::getInputName(uint8_t inputNmbr)
+String RelayController::getInputName(uint8_t inputNmbr)
 {
-    return inputName[selectedInput-1];
+    switch (inputNmbr)
+    {
+    case 1:
+        return input1;
+        break;
+    case 2:
+        return input2;
+        break;
+    case 3:
+        return input3;
+        break;
+    case 4:
+        return input4;
+        break;
+    case 5:
+        return input5;
+        break;
+    case 6:
+        return input6;
+        break;
+    default:
+        return "";
+        break;
+    }
 }
 
 void RelayController::mute(boolean on)

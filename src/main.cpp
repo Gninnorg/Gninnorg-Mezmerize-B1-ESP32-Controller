@@ -10,9 +10,9 @@
 */
 
 #include <Arduino.h>
-#include <RelayController.h>
-#include <ClickEncoder.h>
-#include <TimerOne.h>
+#include "RelayController.h"
+#include "ClickEncoder.h"
+#include "TimerOne.h"
 
 RelayController rc;
 
@@ -27,10 +27,25 @@ void timerIsr() {
 
 void setup () {
     Serial.begin(9600);
-    Serial.println("Setup()");
+    Serial.println(F("Setup()"));
     rc.begin();
     rc.setTriggerOn();
-    //Serial.println(rc.getInputName(rc.getInput()));
+    rc.setInput(1);
+    rc.setInputName(1, F("DAC"));
+    Serial.println(rc.getInputName(rc.getInput()));
+    delay(5000);
+    rc.setInput(2);
+    rc.setInputName(2, F("DAC2"));
+    Serial.println(rc.getInputName(rc.getInput()));
+    delay(1000);
+    rc.setInput(3);
+    delay(1000);
+    rc.setInput(4);
+    delay(1000);
+    rc.setInput(5);
+    delay(1000);
+    rc.setInput(6);
+    Serial.println(rc.getInputName(rc.getInput()));
     Timer1.initialize(1000);
     Timer1.attachInterrupt(timerIsr); 
 }
