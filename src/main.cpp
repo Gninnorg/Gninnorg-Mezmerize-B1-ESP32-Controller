@@ -48,7 +48,7 @@ ClickEncoder *encoder1 = new ClickEncoder(5, 4, 3, 4);
 ClickEncoder::Button button1;
 int16_t e1last, e1value;
 
-ClickEncoder *encoder2 = new ClickEncoder(5, 4, 3, 4);
+ClickEncoder *encoder2 = new ClickEncoder(8, 7, 6, 4);
 ClickEncoder::Button button2;
 int16_t e2last, e2value;
 
@@ -76,7 +76,7 @@ void setupIR() {
 // Setup arduino nano ---------------------------------------------------------
 void setup () {
    while (!Serial);
-  Serial.begin(115200);
+  Serial.begin(9600);
   Serial.println(F("Startup"));
   //setupMuses72320();
   setupRotaryEncoders();
