@@ -31,31 +31,28 @@ void RelayController::begin()
 
 void RelayController::setRelayOn(uint8_t Nmbr)
 {
-    Serial.print("Relay ");
-    Serial.print(Nmbr);
-    Serial.println(" is ON");
+    Serial.print("Relay "); Serial.print(Nmbr); Serial.println(" is ON");
     mcp.digitalWrite(Nmbr, HIGH);
 }
 
 void RelayController::setRelayOff(uint8_t Nmbr)
 {
-    Serial.print("Relay ");
-    Serial.print(Nmbr);
-    Serial.println(" is OFF");
+    Serial.print("Relay "); Serial.print(Nmbr); Serial.println(" is OFF");
     mcp.digitalWrite(Nmbr, LOW);
 }
 
 
-void RelayController::setInput(uint8_t inputNmbr)
+void RelayController::setInput(uint8_t inputNmbr) // Input number from 1 to numOfInputs accepted
 {
     inputNmbr --;
-    if (inputNmbr != selectedInput) {
-        for (byte pin = 0; pin < (numOfInputs); pin++) 
-        {
-            mcp.digitalWrite(pin, (inputNmbr == pin));
-            selectedInput = inputNmbr;
-        }
-    }
+    if ((inputNmbr < numOfInputs) && (inputNmbr != selectedInput)) {
+        // Turn all inputs off
+        for (byte pin = 0; pin < numOfInputs; pin++) setRelayOff(pin);
+            
+        // Turn selected input on
+        setRelayOn(inputNmbr);
+        selectedInput = inputNmbr;
+     }
 }
 
 void RelayController::setInputName(uint8_t inputNmbr, String name)
@@ -92,29 +89,60 @@ void RelayController::setInputName(uint8_t inputNmbr, String name)
     standardTrigger = false;
 }*/
 
+// <TO DO: Should we have separate functions to call for the two relays?>
+// standardTrigger is when the 12V trigger circuit is used
 void RelayController::setStandardTrigger()
 {
     standardTrigger = true;
 }
 
+// <TO DO: Should we have separate functions to call for the two relays?>
 void RelayController::setTriggerOn()
 {
     if (standardTrigger) {
-        Serial.println("SetTrigger:Standard");
-        mcp.digitalWrite(6, HIGH);
-        mcp.digitalWrite(7, HIGH);
+        Serial.println("SetTrigger: Standard");
+        setRelayOn(6);
+        setRelayOn(7); 
     } else {
+        Serial.println("SetTrigger: Alternative");
         // Add logic to handle alternative trigger here
+        // Measure NTC and LDR for one channel
+        // If NTC > 100000 Ohms then the amp is off, so try to turn it on:
+                setRelayOn(6);
+                delay(100);
+                setRelayOff(6);
+        //      Measure NTC and LDR again
+        //      If NTC is still > 100000 then the amplifier is still off = probably not connected to mains (display error and wait for the user to turn the power on and click on the encoder. Then try again)
+        // else do nothing (the amp is already turned on)
+        
+        // Repeat the code above for the other channel
+        setRelayOn(7);
+        delay(100);
+        setRelayOff(7);
     }
 }
 
+// <TO DO: Should we have separate functions to call for the two relays?>
 void RelayController::SetTriggerOff()
 {
     if (standardTrigger) {
-        mcp.digitalWrite(6, LOW);
-        mcp.digitalWrite(7, LOW);
+        Serial.println("SetTriggerOff: Standard");
+        setRelayOff(6);
+        setRelayOff(7); 
     } else {
+         Serial.println("SetTriggerOff: Alternative");
         // Add logic to handle alternative trigger here
+        // Measure NTC and LDR for one channel
+        // If NTC < 100000 Ohms then the amp is on, so turn if off:
+                setRelayOff(6);
+                delay(100);
+                setRelayOff(6);
+        // else the amplifier is already off so do nothing
+        
+        // Repeat the code above for the other channel
+        setRelayOff(7);
+        delay(100);
+        setRelayOff(7);
     }
 }
 

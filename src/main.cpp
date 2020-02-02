@@ -124,13 +124,15 @@ void setup () {
   setupMuses72320();
   setupRotaryEncoders();
   setupIR();
-
-  for (int i=0; i<9; i++)
-  {
+  rc.begin();
+ 
+  
+// Test the relays
+  for (int i=0; i<8; i++) {
     rc.setRelayOn(i);
-    delay(500);
+    delay(1000);
     rc.setRelayOff(i);
-    delay(500);
+    delay(1000);
   }
 }
 
