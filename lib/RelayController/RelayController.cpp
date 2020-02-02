@@ -8,6 +8,7 @@
 **
 ** PIN1 & PIN2 : Used for controlling amplifier triggers relays
 ** PIN3 - PIN8 : Used for controlling input relays
+** PIN8 --> INPUT1 (8 - INPUT + 1)
 **                     
 */
 
@@ -31,6 +32,10 @@ void RelayController::begin()
 
 void RelayController::setInput(uint8_t inputNmbr)
 {
+    // Mute MUSES
+    // Mute all INPUT
+    // Set selected INPUT = HIGH
+    // Set MUSES level to select level for input
     inputNmbr --;
     if (inputNmbr != selectedInput) {
         for (byte pin = 0; pin < (numOfInputs); pin++) 
