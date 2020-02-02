@@ -15,6 +15,7 @@
 #include "TimerOne.h"
 #include "Muses72320.h"
 #include "IRLremote.h"
+#include "Wire.h"
 
 // Setup Muses72320
 // The address wired into the muses chip (usually 0).
@@ -76,11 +77,61 @@ void setupIR() {
 // Setup arduino nano ---------------------------------------------------------
 void setup () {
    while (!Serial);
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println(F("Startup"));
-  //setupMuses72320();
+  
+  byte error, address;
+  int nDevices;
+
+  Serial.println("Scanning I2C bus...");
+  Wire.begin();
+  nDevices = 0;
+  for(address = 1; address < 127; address++ ) 
+  {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0)
+    {
+      Serial.print(" 0x");
+      if (address<16) 
+        Serial.print("0");
+      Serial.print(address,HEX);
+      nDevices++;
+    }
+    else if (error==4) 
+    {
+      Serial.print("Unknown error at address 0x");
+      if (address<16) 
+        Serial.print("0");
+      Serial.println(address,HEX);
+    }
+    else
+    {
+      Serial.print(" ----");
+    }
+    if (address % 16 == 0) Serial.println();
+  }
+  Serial.println();
+  if (nDevices == 0)
+    Serial.println("No I2C devices found\n");
+  else
+    Serial.println("Done\n");
+
+  setupMuses72320();
   setupRotaryEncoders();
   setupIR();
+
+  for (int i=0; i<9; i++)
+  {
+    rc.setRelayOn(i);
+    delay(500);
+    rc.setRelayOff(i);
+    delay(500);
+  }
 }
 
 
@@ -92,8 +143,8 @@ void loop () {
   if (e1value != e1last) {
     e1last = e1value;
     Serial.print("Encoder 1 - value : "); Serial.println(e1value);
-    //Muses.setVolume(value);
-    //delay(10);
+    Muses.setVolume(e1value);
+    delay(10);
   }
 
   e2value += encoder2->getValue();
@@ -115,13 +166,12 @@ void loop () {
   
   button2 = encoder2->getButton();
   switch (button2) {
-    case ClickEncoder::Open : break;
-    VERBOSECASE(ClickEncoder::Closed);
-    VERBOSECASE(ClickEncoder::Pressed);
-    VERBOSECASE(ClickEncoder::Held);
-    VERBOSECASE(ClickEncoder::Clicked);
-    VERBOSECASE(ClickEncoder::Released);
-    VERBOSECASE(ClickEncoder::DoubleClicked);
+    case ClickEncoder::Released:
+      rc.setTriggerOn();
+      break;
+    case ClickEncoder::Clicked:
+      rc.SetTriggerOff();
+      break;
   }
 
   if (IRLremote.available())

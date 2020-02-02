@@ -29,6 +29,23 @@ void RelayController::begin()
     
 }
 
+void RelayController::setRelayOn(uint8_t Nmbr)
+{
+    Serial.print("Relay ");
+    Serial.print(Nmbr);
+    Serial.println(" is ON");
+    mcp.digitalWrite(Nmbr, HIGH);
+}
+
+void RelayController::setRelayOff(uint8_t Nmbr)
+{
+    Serial.print("Relay ");
+    Serial.print(Nmbr);
+    Serial.println(" is OFF");
+    mcp.digitalWrite(Nmbr, LOW);
+}
+
+
 void RelayController::setInput(uint8_t inputNmbr)
 {
     inputNmbr --;
@@ -83,7 +100,6 @@ void RelayController::setStandardTrigger()
 void RelayController::setTriggerOn()
 {
     if (standardTrigger) {
-        delay(3000);
         Serial.println("SetTrigger:Standard");
         mcp.digitalWrite(6, HIGH);
         mcp.digitalWrite(7, HIGH);
@@ -95,7 +111,7 @@ void RelayController::setTriggerOn()
 void RelayController::SetTriggerOff()
 {
     if (standardTrigger) {
-        mcp.digitalWrite(6,LOW);
+        mcp.digitalWrite(6, LOW);
         mcp.digitalWrite(7, LOW);
     } else {
         // Add logic to handle alternative trigger here
