@@ -20,52 +20,35 @@ RelayController::RelayController()
 
 void RelayController::begin()
 {
+    // Start communication to MCP
     mcp.begin();
+
+    // Defines all pins to OUTPUT and disable all relay 
     for (byte pin = 0; pin <= 7; pin++) 
     {
         mcp.pinMode(pin, OUTPUT);
+        mcp.digitalWrite(pin, LOW);
     }
-    Serial.println("started!");
-    
 }
 
 void RelayController::setInput(uint8_t inputNmbr)
 {
-    inputNmbr --;
-    if (inputNmbr != selectedInput) {
-        for (byte pin = 0; pin < (numOfInputs); pin++) 
-        {
-            mcp.digitalWrite(pin, (inputNmbr == pin));
-            selectedInput = inputNmbr;
-        }
-    }
+    //Remap selected input til MCP pin
+    uint8_t pin_sel = 8 - inputNmbr + 1;
+    uint8_t pin_unsel = 8 - selectedInput + 1;
+    
+    //Unselect previous input relay
+    mcp.digitalWrite(pin_unsel, LOW);
+
+    //Select neew input and save the selected input relay
+    mcp.digitalWrite(pin_sel, HIGH);
+    selectedInput = pin_sel;
 }
 
 void RelayController::setInputName(uint8_t inputNmbr, String name)
 {
-    switch (inputNmbr)
-    {
-    case 1:
-        input1 = name;
-        break;
-    case 2:
-        input2 = name;
-        break;
-    case 3:
-        input3 = name;
-        break;
-    case 4:
-        input4 = name;
-        break;
-    case 5:
-        input5 = name;
-        break;
-    case 6:
-        input6 = name;
-        break;
-    default:
-        break;
-    }
+    //Update name of input
+    if (inputNmbr >= 1 && inputNmbr <= 6) inputName[inputNmbr] = name;
 }
 
 /*void RelayController::setAlternateTrigger(uint8_t inputRight, uint8_t inputLeft)
@@ -85,8 +68,8 @@ void RelayController::setTriggerOn()
     if (standardTrigger) {
         delay(3000);
         Serial.println("SetTrigger:Standard");
-        mcp.digitalWrite(6, HIGH);
-        mcp.digitalWrite(7, HIGH);
+        mcp.digitalWrite(1, HIGH);
+        mcp.digitalWrite(2, HIGH);
     } else {
         // Add logic to handle alternative trigger here
     }
@@ -95,8 +78,8 @@ void RelayController::setTriggerOn()
 void RelayController::SetTriggerOff()
 {
     if (standardTrigger) {
-        mcp.digitalWrite(6,LOW);
-        mcp.digitalWrite(7, LOW);
+        mcp.digitalWrite(1,LOW);
+        mcp.digitalWrite(2,LOW);
     } else {
         // Add logic to handle alternative trigger here
     }
@@ -105,35 +88,14 @@ void RelayController::SetTriggerOff()
 
 uint8_t RelayController::getInput()
 {
-    return selectedInput+1;
+    return selectedInput;
 }
 
 String RelayController::getInputName(uint8_t inputNmbr)
 {
-    switch (inputNmbr)
-    {
-    case 1:
-        return input1;
-        break;
-    case 2:
-        return input2;
-        break;
-    case 3:
-        return input3;
-        break;
-    case 4:
-        return input4;
-        break;
-    case 5:
-        return input5;
-        break;
-    case 6:
-        return input6;
-        break;
-    default:
-        return "";
-        break;
-    }
+    if (inputNmbr >= 1 && inputNmbr <= 6) {
+        return inputName[inputNmbr];
+    } else return "";
 }
 
 void RelayController::mute(boolean on)

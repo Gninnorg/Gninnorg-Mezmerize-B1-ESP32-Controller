@@ -48,11 +48,6 @@ private:
 
 	// Change number of inputs used (max=6) and input names below.
 	uint8_t				numOfInputs = NUM_OF_INPUTS;
-	String				input1 = "INPUT 1";
-	String				input2 = "INPUT 2";
-	String				input3 = "INPUT 3";
-	String				input4 = "INPUT 4";
-	String				input5 = "INPUT 5";
-	String				input6 = "INPUT 6";
+	String              inputName[6] = {"Input 1","Input 2","Input 3","Input 4","Input 5","Input 6"};
 };
 
