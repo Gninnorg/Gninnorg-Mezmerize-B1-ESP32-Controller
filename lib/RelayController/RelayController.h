@@ -25,6 +25,8 @@ public:
 	void begin();
 
 	// Controlling input relays
+	void setRelayOn(uint8_t Nmbr);
+	void setRelayOff(uint8_t Nmbr);
 	void setInput(uint8_t inputNmbr);
 	void setInputName(uint8_t inputNmbr, String name);
     uint8_t getInput();
@@ -33,7 +35,8 @@ public:
 
 
     // Controlling triggers for amplifier.
-	// Either use standard trigger 12 V or the alternate trigger, which uses pins to sense if amplifier is turned on
+	// <TO DO maybe we could have five options for the trigger circuit: "12V trigger latching", "12V trigger momentary", "momentary switch", "latching switch" and "custom" = my setup with the NTCs and LDRs ?>
+	// Either use standard trigger 12 V or the alternate trigger, which uses NTCs and LDRs to sense if amplifier is turned on
 	//void setAlternateTrigger(uint8_t inputRight = A2, uint8_t inputLeft = A3);
 	void setStandardTrigger();
 	void setTriggerOn();
