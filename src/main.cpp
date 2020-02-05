@@ -134,6 +134,47 @@ void setup () {
     delay(1000);
     delay(1000);
   }
+
+
+  const int sensorPin = A1;  // Analog input pin that senses Vout
+  int sensorValue = 0;       // sensorPin default value
+  float Vin = 5;             // Input voltage
+  float Vout = 0;            // Vout default value
+  float Rref = 4700;          // Reference resistor's value in ohms (you can give this value in kiloohms or megaohms - the resistance of the tested resistor will be given in the same units)
+  float R = 0;               // Tested resistors default value
+  float Temp = 0;
+  
+  sensorValue = analogRead(sensorPin);  // Read Vout on analog input pin A0 (Arduino can sense from 0-1023, 1023 is 5V)
+  Vout = (Vin * sensorValue) / 1023;    // Convert Vout to volts
+  R = Rref * (1 / ((Vin / Vout) - 1));  // Formula to calculate tested resistor's value
+  Temp = (-25.37 * log(R)) + 239.43;
+  Serial.print("R: ");                  
+  Serial.print(R);                    // Give calculated resistance in Serial Monitor
+  Serial.print(" = Temp: ");
+  Serial.println(Temp);
+   
+  rc.setRelayOn(7);
+  delay(5000);                          // Delay in milliseconds between reeds
+  sensorValue = analogRead(sensorPin);  // Read Vout on analog input pin A0 (Arduino can sense from 0-1023, 1023 is 5V)
+  Vout = (Vin * sensorValue) / 1023;    // Convert Vout to volts
+  R = Rref * (1 / ((Vin / Vout) - 1));  // Formula to calculate tested resistor's value
+  Temp = (-25.37 * log(R)) + 239.43;
+  Serial.print("R: ");                  
+  Serial.print(R);                    // Give calculated resistance in Serial Monitor
+  Serial.print(" = Temp: ");
+  Serial.println(Temp);
+  
+  rc.setRelayOff(7);
+  delay(5000);
+  sensorValue = analogRead(sensorPin);  // Read Vout on analog input pin A0 (Arduino can sense from 0-1023, 1023 is 5V)
+  Vout = (Vin * sensorValue) / 1023;    // Convert Vout to volts
+  R = Rref * (1 / ((Vin / Vout) - 1));  // Formula to calculate tested resistor's value
+  Temp = (-25.37 * log(R)) + 239.43;
+  Serial.print("R: ");                  
+  Serial.print(R);                    // Give calculated resistance in Serial Monitor
+  Serial.print(" = Temp: ");
+  Serial.println(Temp);
+  
 }
 
 
