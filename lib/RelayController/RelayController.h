@@ -26,7 +26,6 @@ public:
 
 	// Controlling input relays
 	void setRelayOn(uint8_t Nmbr);
-	void setRelayOff(uint8_t Nmbr);
 	void setInput(uint8_t inputNmbr);
 	void setInputName(uint8_t inputNmbr, String name);
     uint8_t getInput();

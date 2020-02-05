@@ -27,6 +27,8 @@ static Muses72320::volume_t CurrentVolume = -20;
 // Setup relay controller -----------------------------------------------------
 RelayController rc;
 
+
+// Setup Muses potentiometer -----------------------------------------------------
 void setupMuses72320() {
   
   // Initialize muses (SPI, pin modes)...
@@ -71,7 +73,6 @@ void setupIR() {
   if (!IRLremote.begin(pinIR))
     Serial.println(F("You did not choose a valid pin."));
 }
-
 
 
 // Setup arduino nano ---------------------------------------------------------
@@ -127,11 +128,10 @@ void setup () {
   rc.begin();
  
   
-// Test the relays
-  for (int i=0; i<8; i++) {
+  //Test the relays
+  for (uint8_t i=0; i<8; i++) {
     rc.setRelayOn(i);
     delay(1000);
-    rc.setRelayOff(i);
     delay(1000);
   }
 }
@@ -166,6 +166,7 @@ void loop () {
     VERBOSECASE(ClickEncoder::DoubleClicked);
   }
   
+  /*
   button2 = encoder2->getButton();
   switch (button2) {
     case ClickEncoder::Released:
@@ -174,7 +175,7 @@ void loop () {
     case ClickEncoder::Clicked:
       rc.SetTriggerOff();
       break;
-  }
+  }*/
 
   if (IRLremote.available())
   {
