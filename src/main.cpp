@@ -91,6 +91,15 @@ void setupDisplay()
   lcd.noCursor();
   lcd.setBacklight(255);
   lcd.defineCustomChar();
+  lcd.printTwoNumber(10, 0);
+  lcd.setCursor(0, 0);
+  lcd.print("Enc1:");
+  lcd.setCursor(0, 1);
+  lcd.print(0);
+  lcd.setCursor(0, 2);
+  lcd.print("Enc2:");
+  lcd.setCursor(0, 3);
+  lcd.print(0);
 }
 
 // Setup arduino nano ---------------------------------------------------------
