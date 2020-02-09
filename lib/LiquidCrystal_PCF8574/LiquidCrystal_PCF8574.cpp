@@ -201,13 +201,12 @@ void LiquidCrystal_PCF8574::setBacklight(int brightness)
 
 // Allows us to fill the first 8 CGRAM locations
 // with custom characters
-void LiquidCrystal_PCF8574::createChar(uint8_t location, uint8_t charmap[])
+void LiquidCrystal_PCF8574::createChar(int location, int charmap[])
 {
   location &= 0x7; // we only have 8 locations 0-7
   // Set CGRAM address
   _send(0x40 | (location << 3));
-  for (int i = 0; i < 8; i++)
-  {
+  for (int i = 0; i < 8; i++) {
     write(charmap[i]);
   }
 } // createChar()
@@ -264,146 +263,154 @@ void LiquidCrystal_PCF8574::printTwoNumber(uint8_t column, uint8_t number)
   uint8_t seconddigit = (number % 10) * 4;
 
   //                    0                1                2                3                4                5                6                7                8                9
-  const uint8_t bn1[] = {  5,  2,  2,  1,  32,  5, 31, 32,   5,  2,  2,  1,   2,  2,  2,  1,  31, 32, 32, 31,  31,  2,  2,  2,   5,  2,  2,  2,   2,  2,  2, 31,   5,  2,  2,  1,   5,  2,  2,  1 };
-  const uint8_t bn2[] = { 31, 32, 32, 31,  32, 32, 31, 32,   0,  3,  3,  7,  32,  3,  3, 31,   4,  3,  3, 31,   4,  3,  3,  6,  31,  3,  3,  6,  32, 32,  0,  7,  31,  3,  3, 31,   4,  3,  3, 31 };
-  const uint8_t bn3[] = { 31, 32, 32, 31,  32, 32, 31, 32,  31, 32, 32, 32,  32, 32, 32, 31,  32, 32, 32, 31,  32, 32, 32, 31,  31, 32, 32, 31,  32, 32, 31, 32,  31, 32, 32, 31,  32, 32, 32, 31 };
-  const uint8_t bn4[] = {  4,  3,  3,  7,  32,  3, 31,  3,   4,  3,  3,  3,   4,  3,  3,  7,  32, 32, 32, 31,   4,  3,  3,  7,   4,  3,  3,  7,  32, 32, 31, 32,   4,  3,  3,  7,   4,  3,  3,  7 };
+  const uint8_t bn1[] = {  5,  2,  2,  1,  32,  5, 255, 32,   5,  2,  2,  1,   2,  2,  2,  1,  255, 32, 32, 255,  255,  2,  2,  2,   5,  2,  2,  2,   2,  2,  2, 255,   5,  2,  2,  1,   5,  2,  2,  1 };
+  const uint8_t bn2[] = { 255, 32, 32, 255,  32, 32, 255, 32,   0,  3,  3,  7,  32,  3,  3, 255,   4,  3,  3, 255,   4,  3,  3,  6,  255,  3,  3,  6,  32, 32,  0,  7,  255,  3,  3, 255,   4,  3,  3, 255 };
+  const uint8_t bn3[] = { 255, 32, 32, 255,  32, 32, 255, 32,  255, 32, 32, 32,  32, 32, 32, 255,  32, 32, 32, 255,  32, 32, 32, 255,  255, 32, 32, 255,  32, 32, 255, 32,  255, 32, 32, 255,  32, 32, 32, 255 };
+  const uint8_t bn4[] = {  4,  3,  3,  7,  32,  3, 255,  3,   4,  3,  3,  3,   4,  3,  3,  7,  32, 32, 32, 255,   4,  3,  3,  7,   4,  3,  3,  7,  32, 32, 255, 32,   4,  3,  3,  7,   4,  3,  3,  7 };
 
   setCursor(column, 0);
-  _send(bn1[firstdigit], true);
-  _send(bn1[firstdigit + 1], true);
-  _send(bn1[firstdigit + 2], true);
-  _send(bn1[firstdigit + 3], true);
-  _send(32, true); // Blank
-  _send(bn1[seconddigit], true);
-  _send(bn1[seconddigit + 1], true);
-  _send(bn1[seconddigit + 2], true);
-  _send(bn1[seconddigit + 3], true);
+  print(char(bn1[firstdigit]));
+  print(char(bn1[firstdigit + 1]));
+  print(char(bn1[firstdigit + 2]));
+  print(char(bn1[firstdigit + 3]));
+  print(char(32)); // Blank
+  print(char(bn1[seconddigit]));
+  print(char(bn1[seconddigit + 1]));
+  print(char(bn1[seconddigit + 2]));
+  print(char(bn1[seconddigit + 3]));
 
   setCursor(column, 1);
-  _send(bn2[firstdigit], true);
-  _send(bn2[firstdigit + 1], true);
-  _send(bn2[firstdigit + 2], true);
-  _send(bn2[firstdigit + 3], true);
-  _send(32, true); // Blank
-  _send(bn2[seconddigit], true);
-  _send(bn2[seconddigit + 1], true);
-  _send(bn2[seconddigit + 2], true);
-  _send(bn2[seconddigit + 3], true);
+  print(char(bn2[firstdigit]));
+  print(char(bn2[firstdigit + 1]));
+  print(char(bn2[firstdigit + 2]));
+  print(char(bn2[firstdigit + 3]));
+  print(char(32)); // Blank
+  print(char(bn2[seconddigit]));
+  print(char(bn2[seconddigit + 1]));
+  print(char(bn2[seconddigit + 2]));
+  print(char(bn2[seconddigit + 3]));
 
   setCursor(column, 2);
-  _send(bn3[firstdigit], true);
-  _send(bn3[firstdigit + 1], true);
-  _send(bn3[firstdigit + 2], true);
-  _send(bn3[firstdigit + 3], true);
-  _send(32, true); // Blank
-  _send(bn3[seconddigit], true);
-  _send(bn3[seconddigit + 1], true);
-  _send(bn3[seconddigit + 2], true);
-  _send(bn3[seconddigit + 3], true);
+  print(char(bn3[firstdigit]));
+  print(char(bn3[firstdigit + 1]));
+  print(char(bn3[firstdigit + 2]));
+  print(char(bn3[firstdigit + 3]));
+  print(char(32)); // Blank
+  print(char(bn3[seconddigit]));
+  print(char(bn3[seconddigit + 1]));
+  print(char(bn3[seconddigit + 2]));
+  print(char(bn3[seconddigit + 3]));
 
   setCursor(column, 3);
-  _send(bn4[firstdigit], true);
-  _send(bn4[firstdigit + 1], true);
-  _send(bn4[firstdigit + 2], true);
-  _send(bn4[firstdigit + 3], true);
-  _send(32, true); // Blank
-  _send(bn4[seconddigit], true);
-  _send(bn4[seconddigit + 1], true);
-  _send(bn4[seconddigit + 2], true);
-  _send(bn4[seconddigit + 3], true);
+  print(char(bn4[firstdigit]));
+  print(char(bn4[firstdigit + 1]));
+  print(char(bn4[firstdigit + 2]));
+  print(char(bn4[firstdigit + 3]));
+  print(char(32)); // Blank
+  print(char(bn4[seconddigit]));
+  print(char(bn4[seconddigit + 1]));
+  print(char(bn4[seconddigit + 2]));
+  print(char(bn4[seconddigit + 3]));
 }
 
 void LiquidCrystal_PCF8574::defineCustomChar()
 {
   // 4x4 charset
-  uint8_t cc0[8] = {// Custom Character 0
-                    B00000,
-                    B00000,
-                    B00000,
-                    B00001,
-                    B00011,
-                    B00111,
-                    B01111,
-                    B11111};
+ int cc0[8] = {    // Custom Character 0
+  B00000,
+  B00000,
+  B00000,
+  B00001,
+  B00011,
+  B00111,
+  B01111,
+  B11111
+  };
 
-  uint8_t cc1[8] = {// Custom Character 1
-                    B10000,
-                    B11000,
-                    B11100,
-                    B11110,
-                    B11111,
-                    B11111,
-                    B11111,
-                    B11111};
+int cc1[8] = {    // Custom Character 1
+  B10000,
+  B11000,
+  B11100,
+  B11110,
+  B11111,
+  B11111,
+  B11111,
+  B11111
+};
 
-  uint8_t cc2[8] = {// Custom Character 2
-                    B11111,
-                    B11111,
-                    B11111,
-                    B11111,
-                    B11111,
-                    B00000,
-                    B00000,
-                    B00000};
+int cc2[8] = {    // Custom Character 2
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B00000,
+  B00000,
+  B00000
+};
 
-  uint8_t cc3[8] = {// Custom Character 3
-                    B00000,
-                    B00000,
-                    B00000,
-                    B11111,
-                    B11111,
-                    B11111,
-                    B11111,
-                    B11111};
+int cc3[8] = {    // Custom Character 3
+  B00000,
+  B00000,
+  B00000,
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B11111
+};
 
-  uint8_t cc4[8] = {// Custom Character 4
-                    B11111,
-                    B11111,
-                    B11111,
-                    B11111,
-                    B01111,
-                    B00111,
-                    B00011,
-                    B00001};
+int cc4[8] = {    // Custom Character 4
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B01111,
+  B00111,
+  B00011,
+  B00001
+};
 
-  uint8_t cc5[8] = {// Custom Character 5
-                    B00001,
-                    B00011,
-                    B00111,
-                    B01111,
-                    B11111,
-                    B11111,
-                    B11111,
-                    B11111};
+int cc5[8] = {    // Custom Character 5
+  B00001,
+  B00011,
+  B00111,
+  B01111,
+  B11111,
+  B11111,
+  B11111,
+  B11111
+};
 
-  uint8_t cc6[8] = {// Custom Character 6
-                    B00000,
-                    B00000,
-                    B00000,
-                    B10000,
-                    B11000,
-                    B11100,
-                    B11110,
-                    B11111};
+int cc6[8] = {    // Custom Character 6
+  B00000,
+  B00000,
+  B00000,
+  B10000,
+  B11000,
+  B11100,
+  B11110,
+  B11111
+};
 
-  uint8_t cc7[8] = {// Custom Character 7
-                    B11111,
-                    B11111,
-                    B11111,
-                    B11111,
-                    B11110,
-                    B11100,
-                    B11000,
-                    B10000};
-  createChar(0, cc0);
-  createChar(1, cc1);
-  createChar(2, cc2);
-  createChar(3, cc3);
-  createChar(4, cc4);
-  createChar(5, cc5);
-  createChar(6, cc6);
-  createChar(7, cc7);
+int cc7[8] = {    // Custom Character 7
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B11110,
+  B11100,
+  B11000,
+  B10000
+};
+  createChar(0, cc0);  
+  createChar(1, cc1);  
+  createChar(2, cc2);  
+  createChar(3, cc3);  
+  createChar(4, cc4);  
+  createChar(5, cc5);  
+  createChar(6, cc6);  
+  createChar(7, cc7);  
 }
 
 // The End.

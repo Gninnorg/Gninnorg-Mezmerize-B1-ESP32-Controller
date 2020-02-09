@@ -90,6 +90,7 @@ void setupDisplay()
   lcd.clear();
   lcd.noCursor();
   lcd.setBacklight(255);
+  lcd.defineCustomChar();
 }
 
 // Setup arduino nano ---------------------------------------------------------
@@ -171,11 +172,12 @@ void loop()
     e1last = e1value;
     Serial.print("Encoder 1 - value : ");
     Serial.println(e1value);
-    //lcd.printTwoNumber(10, e1value*-1);
+    lcd.printTwoNumber(10, e1value*-1);
     lcd.setCursor(0, 0);
-    lcd.print("               ");
-    lcd.setCursor(0, 0);
-    lcd.print("Enc1: ");
+    lcd.print("Enc1:");
+    lcd.setCursor(0, 1);
+    lcd.print("     ");
+    lcd.setCursor(0, 1);
     lcd.print(e1value);
     Muses.setVolume(e1value);
     delay(10);
@@ -187,10 +189,11 @@ void loop()
     e2last = e2value;
     Serial.print("Encoder 2 - value : ");
     Serial.println(e2value);
+    lcd.setCursor(0, 2);
+    lcd.print("Enc2:");
     lcd.setCursor(0, 3);
-    lcd.print("               ");
+    lcd.print("     ");
     lcd.setCursor(0, 3);
-    lcd.print("Enc2: ");
     lcd.print(e2value);
   }
 
