@@ -26,6 +26,7 @@ public:
 
 	// Controlling input relays
 	void setRelayOn(uint8_t Nmbr);
+	void setRelayOff(uint8_t Nmbr);
 	void setInput(uint8_t inputNmbr);
 	void setInputName(uint8_t inputNmbr, String name);
     uint8_t getInput();
@@ -40,6 +41,7 @@ public:
 	void setStandardTrigger();
 	void setTriggerOn();
 	void SetTriggerOff();
+	float getTemperature(uint8_t pinNmbr);
 	
 private:
 	Adafruit_MCP23008 	mcp;
