@@ -193,13 +193,18 @@ void loop()
   }
 
   e2value += encoder2->getValue();
+  if (e2value < 0)
+    e2value = 0;
+  else if (e2value > 5)
+    e2value = 5;
   if (e2value != e2last)
   {
+    rc.setInput(e2value);
     e2last = e2value;
     Serial.print("Encoder 2 - value : ");
     Serial.println(e2value);
     lcd.setCursor(0, 2);
-    lcd.print("Enc2:");
+    lcd.print("Input:");
     lcd.setCursor(0, 3);
     lcd.print("     ");
     lcd.setCursor(0, 3);

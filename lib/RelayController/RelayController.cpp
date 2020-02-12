@@ -45,8 +45,8 @@ void RelayController::setRelayOff(uint8_t Nmbr)
 void RelayController::setInput(uint8_t inputNmbr)
 {
     //Remap selected input til MCP pin
-    uint8_t pin_sel = 8 - inputNmbr + 1;
-    uint8_t pin_unsel = 8 - selectedInput + 1;
+    uint8_t pin_sel = inputNmbr;
+    uint8_t pin_unsel = selectedInput;
 
     //Unselect previous input relay
     mcp.digitalWrite(pin_unsel, LOW);
