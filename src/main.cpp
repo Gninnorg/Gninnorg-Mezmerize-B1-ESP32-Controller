@@ -15,8 +15,8 @@
 #include "TimerOne.h"
 #include "Muses72320.h"
 #include "IRLremote.h"
-//#include "OLedI2C.h"
-#include "LiquidCrystal_PCF8574.h"
+#include "OLedI2C.h"
+//#include "LiquidCrystal_PCF8574.h"
 #include "Wire.h"
 
 // Setup Muses72320
@@ -81,17 +81,18 @@ void setupIR()
 }
 
 // Setup Display
-// OLedI2C lcd;
-LiquidCrystal_PCF8574 lcd(0x3F);
+OLedI2C lcd;
+//LiquidCrystal_PCF8574 lcd(0x3F);
 
 void setupDisplay()
 {
-  lcd.begin(20, 4);
+  //lcd.begin(20, 4);
+  lcd.begin();
   lcd.clear();
-  lcd.noCursor();
-  lcd.setBacklight(255);
+  //lcd.noCursor();
+  //lcd.setBacklight(255);
   lcd.defineCustomChar();
-  lcd.printTwoNumber(10, 0);
+  lcd.printTwoNumber(11, 0);
   lcd.setCursor(0, 0);
   lcd.print("Enc1:");
   lcd.setCursor(0, 1);
@@ -181,7 +182,7 @@ void loop()
     e1last = e1value;
     Serial.print("Encoder 1 - value : ");
     Serial.println(e1value);
-    lcd.printTwoNumber(10, e1value*-1);
+    lcd.printTwoNumber(11, e1value*-1);
     lcd.setCursor(0, 0);
     lcd.print("Enc1:");
     lcd.setCursor(0, 1);
