@@ -98,7 +98,7 @@ void setupDisplay()
   lcd.setCursor(0, 1);
   lcd.print(0);
   lcd.setCursor(0, 2);
-  lcd.print("Enc2:");
+  lcd.print("Input:");
   lcd.setCursor(0, 3);
   lcd.print(0);
 }
@@ -158,14 +158,6 @@ void setup()
   setupIR();
   rc.begin();
   setupDisplay();
-
-  /*  //Test the relays
-  for (uint8_t i=0; i<8; i++) {
-    rc.setRelayOn(i);
-    delay(1000);
-    delay(1000);
-  }
-*/
 }
 
 void loop()
