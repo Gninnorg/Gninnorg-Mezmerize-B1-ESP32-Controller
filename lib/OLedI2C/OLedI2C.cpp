@@ -8,6 +8,8 @@ and the work of Phil Grant, 2013, www.gadjet.co.uk
 
 Adapted and expanded by Jan Tofft, jan@tofft.dk, 2017
 Inheritance of Print functions added, jan@tofft.dk, 2020
+Possibility to flip the display added (search for "Set Entry Mode (invert)" in OLedI2C.cpp), jan@tofft.dk, 2020
+BlinkingCursorOn/Off added, jan@tofft.dk, 2020
 */
 
 #include "OLedI2C.h"
@@ -43,6 +45,16 @@ void OLedI2C::lcdOff()
 void OLedI2C::lcdOn()
 {
   sendCommand(0x0C); // **** Turn On
+}
+
+void OLedI2C::BlinkingCursorOn()
+{
+  sendCommand(0x0F);
+}
+
+void OLedI2C::BlinkingCursorOff()
+{
+  sendCommand(0x0C); // Same as lcdOn :-)
 }
 
 void OLedI2C::FadeOut()
@@ -119,8 +131,10 @@ void OLedI2C::PowerUp()
   // Set Display Mode
   sendCommand(0x09); // Extended Function Set = Set 5-dot width -> 3 or 4 line(0x09), 1 or 2 line(0x08)
 
-  // Set Re-Map
-  sendCommand(0x06); // Set Com31-->Com0  Seg0-->Seg99
+  // Flip display with these two lines, comment out the 0x06 write below
+  //sendCommand(0x2A);
+  //sendCommand(0x05);   // Set Entry Mode (invert)
+  sendCommand(0x06); // Set Entry Mode (normal)
 
   // CGROM/CGRAM Management
   sendCommand(0x72); // Function Selection B
@@ -279,17 +293,18 @@ void OLedI2C::sendData(uint8_t data)
 }
 
 // Functions for printing two 4x4 digits. Works from 00-99
-void OLedI2C::printTwoNumber(uint8_t column, uint8_t number) {
+void OLedI2C::printTwoNumber(uint8_t column, uint8_t number)
+{
   uint8_t firstdigit = (number / 10) * 4;
   uint8_t seconddigit = (number % 10) * 4;
-  
-  //                    0                1                2                3                4                5                6                7                8                9
-  const uint8_t bn1[] = {  5,  2,  2,  1,  32,  5, 31, 32,   5,  2,  2,  1,   2,  2,  2,  1,  31, 32, 32, 31,  31,  2,  2,  2,   5,  2,  2,  2,   2,  2,  2, 31,   5,  2,  2,  1,   5,  2,  2,  1 };
-  const uint8_t bn2[] = { 31, 32, 32, 31,  32, 32, 31, 32,   0,  3,  3,  7,  32,  3,  3, 31,   4,  3,  3, 31,   4,  3,  3,  6,  31,  3,  3,  6,  32, 32,  0,  7,  31,  3,  3, 31,   4,  3,  3, 31 };
-  const uint8_t bn3[] = { 31, 32, 32, 31,  32, 32, 31, 32,  31, 32, 32, 32,  32, 32, 32, 31,  32, 32, 32, 31,  32, 32, 32, 31,  31, 32, 32, 31,  32, 32, 31, 32,  31, 32, 32, 31,  32, 32, 32, 31 };
-  const uint8_t bn4[] = {  4,  3,  3,  7,  32,  3, 31,  3,   4,  3,  3,  3,   4,  3,  3,  7,  32, 32, 32, 31,   4,  3,  3,  7,   4,  3,  3,  7,  32, 32, 31, 32,   4,  3,  3,  7,   4,  3,  3,  7 };
 
-  setCursor(column, 0); 
+  //                    0                1                2                3                4                5                6                7                8                9
+  const uint8_t bn1[] = {5, 2, 2, 1, 32, 5, 31, 32, 5, 2, 2, 1, 2, 2, 2, 1, 31, 32, 32, 31, 31, 2, 2, 2, 5, 2, 2, 2, 2, 2, 2, 31, 5, 2, 2, 1, 5, 2, 2, 1};
+  const uint8_t bn2[] = {31, 32, 32, 31, 32, 32, 31, 32, 0, 3, 3, 7, 32, 3, 3, 31, 4, 3, 3, 31, 4, 3, 3, 6, 31, 3, 3, 6, 32, 32, 0, 7, 31, 3, 3, 31, 4, 3, 3, 31};
+  const uint8_t bn3[] = {31, 32, 32, 31, 32, 32, 31, 32, 31, 32, 32, 32, 32, 32, 32, 31, 32, 32, 32, 31, 32, 32, 32, 31, 31, 32, 32, 31, 32, 32, 31, 32, 31, 32, 32, 31, 32, 32, 32, 31};
+  const uint8_t bn4[] = {4, 3, 3, 7, 32, 3, 31, 3, 4, 3, 3, 3, 4, 3, 3, 7, 32, 32, 32, 31, 4, 3, 3, 7, 4, 3, 3, 7, 32, 32, 31, 32, 4, 3, 3, 7, 4, 3, 3, 7};
+
+  setCursor(column, 0);
   sendData(bn1[firstdigit]);
   sendData(bn1[firstdigit + 1]);
   sendData(bn1[firstdigit + 2]);
@@ -300,7 +315,7 @@ void OLedI2C::printTwoNumber(uint8_t column, uint8_t number) {
   sendData(bn1[seconddigit + 2]);
   sendData(bn1[seconddigit + 3]);
 
-  setCursor(column, 1); 
+  setCursor(column, 1);
   sendData(bn2[firstdigit]);
   sendData(bn2[firstdigit + 1]);
   sendData(bn2[firstdigit + 2]);
@@ -311,7 +326,7 @@ void OLedI2C::printTwoNumber(uint8_t column, uint8_t number) {
   sendData(bn2[seconddigit + 2]);
   sendData(bn2[seconddigit + 3]);
 
-  setCursor(column, 2); 
+  setCursor(column, 2);
   sendData(bn3[firstdigit]);
   sendData(bn3[firstdigit + 1]);
   sendData(bn3[firstdigit + 2]);
@@ -322,7 +337,7 @@ void OLedI2C::printTwoNumber(uint8_t column, uint8_t number) {
   sendData(bn3[seconddigit + 2]);
   sendData(bn3[seconddigit + 3]);
 
-  setCursor(column, 3); 
+  setCursor(column, 3);
   sendData(bn4[firstdigit]);
   sendData(bn4[firstdigit + 1]);
   sendData(bn4[firstdigit + 2]);
@@ -334,101 +349,94 @@ void OLedI2C::printTwoNumber(uint8_t column, uint8_t number) {
   sendData(bn4[seconddigit + 3]);
 }
 
-void OLedI2C::defineCustomChar() {
+void OLedI2C::defineCustomChar()
+{
   // 4x4 charset
-  uint8_t cc0[8] = {    // Custom Character 0
-  B00000,
-  B00000,
-  B00000,
-  B00001,
-  B00011,
-  B00111,
-  B01111,
-  B11111
-  };
+  uint8_t cc0[8] = {// Custom Character 0
+                    B00000,
+                    B00000,
+                    B00000,
+                    B00001,
+                    B00011,
+                    B00111,
+                    B01111,
+                    B11111};
 
-uint8_t cc1[8] = {    // Custom Character 1
-  B10000,
-  B11000,
-  B11100,
-  B11110,
-  B11111,
-  B11111,
-  B11111,
-  B11111
-};
+  uint8_t cc1[8] = {// Custom Character 1
+                    B10000,
+                    B11000,
+                    B11100,
+                    B11110,
+                    B11111,
+                    B11111,
+                    B11111,
+                    B11111};
 
-uint8_t cc2[8] = {    // Custom Character 2
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-  B00000,
-  B00000,
-  B00000
-};
+  uint8_t cc2[8] = {// Custom Character 2
+                    B11111,
+                    B11111,
+                    B11111,
+                    B11111,
+                    B11111,
+                    B00000,
+                    B00000,
+                    B00000};
 
-uint8_t cc3[8] = {    // Custom Character 3
-  B00000,
-  B00000,
-  B00000,
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-  B11111
-};
+  uint8_t cc3[8] = {// Custom Character 3
+                    B00000,
+                    B00000,
+                    B00000,
+                    B11111,
+                    B11111,
+                    B11111,
+                    B11111,
+                    B11111};
 
-uint8_t cc4[8] = {    // Custom Character 4
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-  B01111,
-  B00111,
-  B00011,
-  B00001
-};
+  uint8_t cc4[8] = {// Custom Character 4
+                    B11111,
+                    B11111,
+                    B11111,
+                    B11111,
+                    B01111,
+                    B00111,
+                    B00011,
+                    B00001};
 
-uint8_t cc5[8] = {    // Custom Character 5
-  B00001,
-  B00011,
-  B00111,
-  B01111,
-  B11111,
-  B11111,
-  B11111,
-  B11111
-};
+  uint8_t cc5[8] = {// Custom Character 5
+                    B00001,
+                    B00011,
+                    B00111,
+                    B01111,
+                    B11111,
+                    B11111,
+                    B11111,
+                    B11111};
 
-uint8_t cc6[8] = {    // Custom Character 6
-  B00000,
-  B00000,
-  B00000,
-  B10000,
-  B11000,
-  B11100,
-  B11110,
-  B11111
-};
+  uint8_t cc6[8] = {// Custom Character 6
+                    B00000,
+                    B00000,
+                    B00000,
+                    B10000,
+                    B11000,
+                    B11100,
+                    B11110,
+                    B11111};
 
-uint8_t cc7[8] = {    // Custom Character 7
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-  B11110,
-  B11100,
-  B11000,
-  B10000
-};
-  createChar(0, cc0);  
-  createChar(1, cc1);  
-  createChar(2, cc2);  
-  createChar(3, cc3);  
-  createChar(4, cc4);  
-  createChar(5, cc5);  
-  createChar(6, cc6);  
-  createChar(7, cc7);  
+  uint8_t cc7[8] = {// Custom Character 7
+                    B11111,
+                    B11111,
+                    B11111,
+                    B11111,
+                    B11110,
+                    B11100,
+                    B11000,
+                    B10000};
+  createChar(0, cc0);
+  createChar(1, cc1);
+  createChar(2, cc2);
+  createChar(3, cc3);
+  createChar(4, cc4);
+  createChar(5, cc5);
+  createChar(6, cc6);
+  createChar(7, cc7);
 }

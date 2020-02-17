@@ -8,6 +8,8 @@ and the work of Phil Grant, 2013, www.gadjet.co.uk
 
 Adapted and expanded by Jan Tofft, jan@tofft.dk, 2017
 Inheritance of Print functions added, jan@tofft.dk, 2020
+Possibility to flip the display added (search for "Set Entry Mode (invert)" in OLedI2C.cpp), jan@tofft.dk, 2020
+BlinkingCursorOn/Off added, jan@tofft.dk, 2020
 */
 #ifndef OLedI2C_h
 #define OLedI2C_h
@@ -16,6 +18,13 @@ Inheritance of Print functions added, jan@tofft.dk, 2020
 #include <stddef.h>
 #include <stdint.h>
 #include "Wire.h"
+#include <stdarg.h>
+
+#define LCD_ROWS  4
+#define LCD_COLS  20
+
+// Apply right padding to string.
+extern char *rpad (char *dest, const char *str, char chr = ' ', unsigned char width = LCD_COLS);
 
 class OLedI2C : public Print
 {
@@ -30,6 +39,8 @@ public:
 	void setCursor(uint8_t, uint8_t); // Column, Row
 	void lcdOff();
 	void lcdOn();
+	void BlinkingCursorOn();
+    void BlinkingCursorOff();
 	void FadeOut();
 	void FadeOutCancel();
 	void PowerDown();
@@ -39,7 +50,6 @@ public:
 	void backlight(uint8_t contrast); // contrast should be the hex value between 0x00 and 0xFF
 	void printTwoNumber(uint8_t column, uint8_t number); // prints large number
 	void defineCustomChar();
-
 
 	// support of Print class
 	virtual size_t write(uint8_t ch);
