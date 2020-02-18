@@ -376,6 +376,9 @@ void DisplayTemperature(float Temp, float MaxTemp, byte ColumnForDegrees, byte S
 
 void setup()
 {
+  pinMode(A0, INPUT_PULLUP);
+  pinMode(A1, INPUT_PULLUP);
+
   Serial.begin(115200);
   Wire.begin();
   setupRotaryEncoders();
@@ -406,9 +409,9 @@ void setup()
       lcd.print(CurrentSettings.Input[CurrentInput].Name);
     }
     if (CurrentSettings.DisplayTemperature1)
-      DisplayTemperature(relayControl.getTemperature(A1), CurrentSettings.Trigger1Temp, 0, 3, 0, 2);
+      DisplayTemperature(relayControl.getTemperature(A0), CurrentSettings.Trigger1Temp, 0, 3, 0, 2);
     if (CurrentSettings.DisplayTemperature2)
-      DisplayTemperature(relayControl.getTemperature(A2), CurrentSettings.Trigger2Temp, 5, 3, 5, 2);
+      DisplayTemperature(relayControl.getTemperature(A1), CurrentSettings.Trigger2Temp, 5, 3, 5, 2);
     Serial.println(F("Ready"));
   }
 }
