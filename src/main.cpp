@@ -141,9 +141,10 @@ void writeDefaultSettingsToEEPROM(void);
 
 // Setup Display
 OLedI2C lcd;
-bool ScreenSaverIsOn = false; // Used to indicate whether the screen saver is running or not
-long mil_onAction;            // Used to keep track of the time of the last user interaction (part of the screen saver timing)
-//LiquidCrystal_PCF8574 lcd(0x3F);
+bool ScreenSaverIsOn = false;         // Used to indicate whether the screen saver is running or not
+long mil_onAction;                    // Used to keep track of the time of the last user interaction (part of the screen saver timing)
+long mil_onRefreshTemperatureDisplay; // Used to time how often the display of temperatures is updated
+#define TEMP_REFRESH_INTERVAL 30000   // Update the display of temperatures every 30 seconds
 
 void setupDisplay()
 {
@@ -412,6 +413,7 @@ void setup()
       DisplayTemperature(relayControl.getTemperature(A0), CurrentSettings.Trigger1Temp, 0, 3, 0, 2);
     if (CurrentSettings.DisplayTemperature2)
       DisplayTemperature(relayControl.getTemperature(A1), CurrentSettings.Trigger2Temp, 5, 3, 5, 2);
+    mil_onRefreshTemperatureDisplay = millis();
     Serial.println(F("Ready"));
   }
 }
@@ -470,6 +472,14 @@ void loop()
   switch (appMode)
   {
   case APP_NORMAL_MODE:
+    if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
+    {
+      mil_onRefreshTemperatureDisplay = millis();
+      if (CurrentSettings.DisplayTemperature1)
+        DisplayTemperature(relayControl.getTemperature(A0), CurrentSettings.Trigger1Temp, 0, 3, 0, 2);
+      if (CurrentSettings.DisplayTemperature2)
+        DisplayTemperature(relayControl.getTemperature(A1), CurrentSettings.Trigger2Temp, 5, 3, 5, 2);
+    }
 
     switch (UIkey)
     {
@@ -686,6 +696,11 @@ void loop()
       lcd.setCursor(0, 0);
       if (CurrentSettings.DisplaySelectedInput)
         lcd.print(CurrentSettings.Input[CurrentInput].Name); // TO DO Need to add padding with spaces to delete earlier displayed input name
+      mil_onRefreshTemperatureDisplay = millis();
+      if (CurrentSettings.DisplayTemperature1)
+        DisplayTemperature(relayControl.getTemperature(A0), CurrentSettings.Trigger1Temp, 0, 3, 0, 2);
+      if (CurrentSettings.DisplayTemperature2)
+        DisplayTemperature(relayControl.getTemperature(A1), CurrentSettings.Trigger2Temp, 5, 3, 5, 2);
 
       appMode = APP_NORMAL_MODE;
     }
@@ -1113,7 +1128,7 @@ void refreshMenuDisplay(byte refreshMode)
 // Called when an input name is to be edited
 void startEditInputName(uint8_t InputNumber)
 {
-  // TO DO Reset used variables
+  // TO DO Maybe replace / character with symbol to allow for switching between upper and lower case letters?
   arrowX = 3;              // text edit arrow starts out at 'W'
   arrowPointingUpDown = 1; // text edit arrow starts out pointing down == 1; up == 0
   newInputName = "XXXXXXXXXX";
