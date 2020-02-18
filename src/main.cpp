@@ -125,6 +125,13 @@ void setupIR()
     Serial.println(F("You did not choose a valid pin."));
 }
 
+// Setup Relay Controller------------------------------------------------------
+RelayController relayControl;
+void setupRelayController()
+{
+  relayControl.begin();
+}
+
 // Setup EEPROM ---------------------------------------------------------------
 #define EEPROM_Address 0x50
 extEEPROM eeprom(kbits_64, 1, 32); // Set to use 24C64 Eeprom - if you use another type look in the datasheet for capacity in kbits and page size
@@ -364,27 +371,93 @@ byte getUserInput()
   return (receivedInput);
 }
 
+void reboot(void);
+void DisplayTemperature(float Temp, float MaxTemp, byte ColumnForDegrees, byte StartRowForDegrees, byte ColumnForBar, byte StartRowForBar);
+
 void setup()
 {
   Serial.begin(115200);
   Wire.begin();
   setupRotaryEncoders();
   setupIR();
+  setupDisplay();
+  setupRelayController();
   readSettingsFromEEPROM();
   if (CurrentSettings.Version != VERSION)
   {
-    // TO DO writeDefaultSettingsToEEPROM() instead of setCurrentSettingsToDefault
-    setCurrentSettingsToDefault();
     Serial.println(F("ERROR: Settings read from EEPROM are not ok"));
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(F("Restoring default"));
+    lcd.setCursor(0, 1);
+    lcd.print(F("settings..."));
+    delay(2000);
+    lcd.clear();
+    writeDefaultSettingsToEEPROM();
+    reboot();
   }
   else
+  {
     Serial.println(F("Settings read from EEPROM are ok"));
-  setupDisplay();
-  lcd.printTwoNumber(11, CurrentVolume);
-  lcd.setCursor(0, 0);
-  if (CurrentSettings.DisplaySelectedInput)
-    lcd.print(CurrentSettings.Input[CurrentInput].Name);
-  Serial.println(F("Ready"));
+    lcd.printTwoNumber(11, CurrentVolume);
+    if (CurrentSettings.DisplaySelectedInput)
+    {
+      lcd.setCursor(0, 0);
+      lcd.print(CurrentSettings.Input[CurrentInput].Name);
+    }
+    if (CurrentSettings.DisplayTemperature1)
+      DisplayTemperature(relayControl.getTemperature(A1), CurrentSettings.Trigger1Temp, 0, 3, 0, 2);
+    if (CurrentSettings.DisplayTemperature2)
+      DisplayTemperature(relayControl.getTemperature(A2), CurrentSettings.Trigger2Temp, 5, 3, 5, 2);
+    Serial.println(F("Ready"));
+  }
+}
+
+void DisplayTemperature(float Temp, float MaxTemp, byte ColumnForDegrees, byte StartRowForDegrees, byte ColumnForBar, byte StartRowForBar)
+{
+  lcd.setCursor(ColumnForDegrees, StartRowForDegrees);
+  if (Temp < 0)
+  {
+    lcd.print("OFF ");
+    lcd.setCursor(ColumnForBar, StartRowForBar);
+    lcd.print("AMP ");
+  }
+  else if (Temp > MaxTemp)
+  {
+    lcd.print("TEMP");
+    lcd.setCursor(ColumnForBar, StartRowForBar);
+    lcd.print("HIGH");
+  }
+  else
+  {
+    lcd.print(int(Temp));
+    lcd.write(128); // Degree symbol
+
+    // Map the range (0c ~ max temperature) to the range of the bar (0 to Number of characters to show the bar * Number of possible values per character )
+    byte nb_columns = map(Temp, 0, MaxTemp, 0, 4 * 5);
+
+    // Draw each character of the line
+    lcd.setCursor(ColumnForBar, StartRowForBar);
+    for (byte i = 0; i < 4; ++i) // Number of characters to show the bar = 4
+    {
+
+      // Write character depending on number of columns remaining to display
+      if (nb_columns == 0)
+      { // Case empty
+        lcd.write(' ');
+      }
+      else if (nb_columns >= 5)
+      {                 // Full box
+        lcd.write(208); // Full box symbol
+        nb_columns -= 5;
+      }
+      else
+      {                                             // Partial box
+        lcd.write(map(nb_columns, 1, 4, 212, 209)); // Map the remaining nb_columns (case between 1 and 4) to the corresponding character number symbols : 212 = 1 bar, 211 = 2 bars, 210 = 3 bars, 209 = 4 bars
+        nb_columns = 0;
+      }
+    }
+  }
 }
 
 void loop()
@@ -974,12 +1047,7 @@ byte processMenuCommand(byte cmdId)
   case mnuCmdRESET_NOW:
     // TO DO Maybe we need an extra confirmation from the user?
     writeDefaultSettingsToEEPROM();
-    lcd.clear();
-    lcd.setCursor(0, 2);
-    lcd.print("REBOOTING...");
-    delay(2000);
-    lcd.clear();
-    asm volatile("  jmp 0"); // Restarts the sketch
+    reboot();
     break;
   }
 
@@ -1109,11 +1177,6 @@ bool selectionInEditInputName(uint8_t InputNumber)
         lcd.setCursor(9 + newInputName.length() - 1, 0);
         lcd.print(" "); // Print to clear the deleted character on the display
         newInputName = newInputName.substring(0, newInputName.length() - 1);
-        Serial.println("After backspace");
-        Serial.print("newInputName: ");
-        Serial.print(newInputName);
-        Serial.print(" Length: ");
-        Serial.println(newInputName.length());
 
         lcd.setCursor(9 + newInputName.length(), 0);
       }
@@ -1276,9 +1339,23 @@ void writeDefaultSettingsToEEPROM()
   writeSettingsToEEPROM();
 }
 
+// Read CurrentSettings from EEPROM
 void readSettingsFromEEPROM()
 {
   // Read settings from EEPROM
   eeprom.begin(extEEPROM::twiClock400kHz);
   eeprom.read(0, CurrentSettings.data, sizeof(CurrentSettings));
+}
+
+// Reboots the sketch - used after restoring default settings
+void reboot()
+{
+  // TO DO Unselect all inputs (unless all inputs are deactivated by the MCP23008 during reboot - has to be tested)
+  // TO DO Mute volume control)
+  lcd.clear();
+  lcd.setCursor(0, 2);
+  lcd.print("REBOOTING...");
+  delay(2000);
+  lcd.clear();
+  asm volatile("  jmp 0"); // Restarts the sketch
 }
