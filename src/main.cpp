@@ -78,8 +78,8 @@ typedef union {
     byte DisplayDimLevel;          // the contrast level of the display when screen saver is active. If DisplayOnLevel = 0xFF and DisplayDimLevel = 0x00 the display will be turned off when the screen saver is active (to reduce electrical noise)
     byte DisplayTimeout;           // number of seconds before the screen saver is activated.
     bool DisplaySelectedInput;     // false = the name of the active input is not shown on the display (ie. if only one input is used), true = the name of the selected input is shown on the display
-    byte DisplayTemperature1;      // 0 = do not display the temperature measured by NTC 1, 1 = display in degrees Celcious, 2 = display as graphical representation
-    byte DisplayTemperature2;      // 0 = do not display the temperature measured by NTC 2, 1 = display in degrees Celcious, 2 = display as graphical representation
+    byte DisplayTemperature1;      // 0 = do not display the temperature measured by NTC 1, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
+    byte DisplayTemperature2;      // 0 = do not display the temperature measured by NTC 2, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
     float Version;                 // used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is nessecary and they must be written to the EEPROM
   };
   byte data[]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
@@ -134,17 +134,17 @@ void setupRelayController()
 
 // Setup EEPROM ---------------------------------------------------------------
 #define EEPROM_Address 0x50
-extEEPROM eeprom(kbits_64, 1, 32); // Set to use 24C64 Eeprom - if you use another type look in the datasheet for capacity in kbits and page size
+extEEPROM eeprom(kbits_64, 1, 32); // Set to use 24C64 Eeprom - if you use another type look in the datasheet for capacity in kbits (kbits_64) and page size in bytes (32)
 void readSettingsFromEEPROM(void);
 void writeSettingsToEEPROM(void);
 void writeDefaultSettingsToEEPROM(void);
 
 // Setup Display
 OLedI2C lcd;
-bool ScreenSaverIsOn = false;         // Used to indicate whether the screen saver is running or not
-long mil_onAction;                    // Used to keep track of the time of the last user interaction (part of the screen saver timing)
-long mil_onRefreshTemperatureDisplay; // Used to time how often the display of temperatures is updated
-#define TEMP_REFRESH_INTERVAL 30000   // Update the display of temperatures every 30 seconds
+bool ScreenSaverIsOn = false;                  // Used to indicate whether the screen saver is running or not
+unsigned long mil_onAction;                    // Used to keep track of the time of the last user interaction (part of the screen saver timing)
+unsigned long mil_onRefreshTemperatureDisplay; // Used to time how often the display of temperatures is updated
+#define TEMP_REFRESH_INTERVAL 30000            // Update the display of temperatures every 30 seconds
 
 void setupDisplay()
 {
@@ -175,13 +175,15 @@ void moveArrowEditInputName(int Direction);
 bool selectionInEditInputName(uint8_t InputNumber);
 void endEditInputName();
 
-char strbuf[LCD_COLS + 1]; // one line of lcd display
+void notImplementedYet(); // TO DO :-)
 
+void drawMenu();
 void refreshMenuDisplay(byte refreshMode);
+byte menuIndex = 0;
 byte processMenuCommand(byte cmdId);
 byte getNavAction();
 
-// ----------------------------------------------------------------------------------------------------
+// Return null terminated string containing a specific number (count) of specified character (chr) ---
 char *padc(char chr, unsigned char count)
 {
   static char strbuf[LCD_COLS + 1];
@@ -198,7 +200,7 @@ char *padc(char chr, unsigned char count)
   return strbuf;
 }
 
-// ----------------------------------------------------------------------------------------------------
+// Return a string (*dest) that contains the contents of *str padded with a specific character up to a specific length (width but with a maximum of LCD_COLS)
 char *rpad(char *dest, const char *str, char chr, unsigned char width)
 {
   unsigned char len = strlen(str);
@@ -420,6 +422,8 @@ void setup()
 
 void DisplayTemperature(float Temp, float MaxTemp, byte ColumnForDegrees, byte StartRowForDegrees, byte ColumnForBar, byte StartRowForBar)
 {
+  // TO DO Implement CurrentSettings.displayTemp options (numerical, graphical, both)
+
   lcd.setCursor(ColumnForDegrees, StartRowForDegrees);
   if (Temp < 0)
   {
@@ -487,6 +491,7 @@ void loop()
       break;
     case KEY_BACK:
       appMode = APP_MENU_MODE;
+      menuIndex = 0;
       refreshMenuDisplay(REFRESH_DESCEND);
       break;
     case KEY_UP:
@@ -685,7 +690,7 @@ void loop()
     break;
 
   case APP_MENU_MODE:
-
+  { // Brackets to avoid warning: "jump to case label [-fpermissive]"
     byte menuMode = Menu1.handleNavigation(getNavAction, refreshMenuDisplay);
 
     if (menuMode == MENU_EXIT)
@@ -709,7 +714,7 @@ void loop()
       appMode = APP_PROCESS_MENU_CMD;
     }
     break;
-
+  }
   case APP_PROCESS_MENU_CMD:
 
     byte processingComplete = processMenuCommand(Menu1.getCurrentItemCmdId());
@@ -717,14 +722,7 @@ void loop()
     if (processingComplete)
     {
       appMode = APP_MENU_MODE;
-      refreshMenuDisplay(REFRESH_DESCEND);
-      /*
-      // clear forward arrow
-      lcd.setCursor(0, 1);
-      strbuf[0] = ' '; // clear forward arrow
-      strbuf[1] = 0;
-      lcd.print(strbuf);
-      */
+      drawMenu();
     }
     break;
   }
@@ -776,83 +774,103 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdMIN_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdMAX_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdMAX_START_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdMUTE_LVL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdSTORE_LVL:
     // TO DO
     // bool = getBool(currvalue, "Description1", "Description2", "Description3")
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_UP:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_DOWN:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_LEFT:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_RIGHT:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_SELECT:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_BACK:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_MUTE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_PREV:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_1:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_2:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_3:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_4:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_5:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdIR_6:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT1_ACTIVE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT1_NAME:
@@ -861,10 +879,10 @@ byte processMenuCommand(byte cmdId)
     {
       switch (getUserInput())
       {
-      case KEY_UP:
+      case KEY_RIGHT:
         moveArrowEditInputName(+1);
         break;
-      case KEY_DOWN:
+      case KEY_LEFT:
         moveArrowEditInputName(-1);
         break;
       case KEY_SELECT:
@@ -883,166 +901,207 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdINPUT1_MAX_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT1_MIN_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT2_ACTIVE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT2_NAME:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT2_MAX_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT2_MIN_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT3_ACTIVE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT3_NAME:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT3_MAX_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT3_MIN_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT4_ACTIVE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT4_NAME:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT4_MAX_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT4_MIN_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT5_ACTIVE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT5_NAME:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT5_MAX_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT5_MIN_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT6_ACTIVE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT6_NAME:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT6_MAX_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT6_MIN_VOL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER1_ACTIVE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER1_TYPE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER1_MODE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER1_ON_DELAY:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER1_INACT_TIMER:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER1_TEMP:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER2_ACTIVE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER2_TYPE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER2_MODE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER2_ON_DELAY:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER2_INACT_TIMER:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER2_TEMP:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdDISP_SAVER_ACTIVE:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdDISP_ON_LEVEL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdDISP_DIM_LEVEL:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdDISP_DIM_TIMEOUT:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdDISP_INPUT:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdDISP_TEMP1:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdDISP_TEMP2:
     // TO DO
+    notImplementedYet();
     complete = true;
     break;
   case mnuCmdABOUT:
@@ -1078,9 +1137,9 @@ byte getNavAction()
 {
   byte navAction = 0;
 
-  if (UIkey == KEY_DOWN)
+  if (UIkey == KEY_LEFT)
     navAction = MENU_ITEM_PREV;
-  else if (UIkey == KEY_UP)
+  else if (UIkey == KEY_RIGHT)
     navAction = MENU_ITEM_NEXT;
   else if (UIkey == KEY_SELECT)
     navAction = MENU_ITEM_SELECT;
@@ -1089,40 +1148,146 @@ byte getNavAction()
   return navAction;
 }
 
-//----------------------------------------------------------------------
-const char EmptyStr[] = "";
+void drawMenu()
+{
+  char strbuf[LCD_COLS + 1]; // one line of lcd display
+  char nameBuf[LCD_COLS - 3];
+
+  // Display the name of the menu
+  lcd.setCursor(0, 0);
+  if (Menu1.currentMenuHasParent())
+  {
+    rpad(strbuf, Menu1.getParentItemName(nameBuf));
+    lcd.print(strbuf);
+  }
+  else
+    lcd.print(F("Main menu           "));
+
+  lcd.setCursor(0,1); lcd.print("   ");
+  lcd.setCursor(0,2); lcd.print("   ");
+  lcd.setCursor(0,3); lcd.print("   ");
+
+  // Display the name of the currently active menu item on the row set by menuIndex (+1 because row 0 is used to display the name of the menu)
+  lcd.setCursor(2, menuIndex + 1);
+  lcd.write(16);  // Mark with an arrow that this is the menu item that will be activated if the user press select
+  rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
+  lcd.print(strbuf);
+
+  switch (menuIndex)
+  {
+  case 0: // The current menu item was displayed on row 0 - see if there is items to display on row 1 and 2
+    if (Menu1.getCurrentItemIndex() < Menu1.getMenuItemCount())
+    {
+      Menu1.moveToNextItem();
+      rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
+      lcd.setCursor(3, menuIndex + 2);
+      lcd.print(strbuf);
+      if (Menu1.getCurrentItemIndex() < Menu1.getMenuItemCount() + 1)
+      {
+        Menu1.moveToNextItem();
+        rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
+        lcd.setCursor(3, menuIndex + 3);
+        lcd.print(strbuf);
+        Menu1.moveToPreviousItem();
+      }
+      else
+      {
+        /* clear line at menuIndex + 3 */
+        rpad(strbuf, " ", ' ', 17);
+        lcd.setCursor(3, menuIndex + 3);
+        lcd.print(strbuf);
+      }
+      Menu1.moveToPreviousItem();
+    }
+    else
+    {
+      /* clear line at menuIndex + 2 */
+      rpad(strbuf, " ", ' ', 17);
+        lcd.setCursor(3, menuIndex + 2);
+        lcd.print(strbuf);
+    }
+
+    break;
+  case 1: // The current menu item was displayed on row 1 - display item on row 0 and see if there is an item to display on row 2
+    Menu1.moveToPreviousItem();
+    rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
+    lcd.setCursor(3, menuIndex);
+    lcd.print(strbuf);
+    Menu1.moveToNextItem();
+    if (Menu1.getCurrentItemIndex() < Menu1.getMenuItemCount())
+    {
+      Menu1.moveToNextItem();
+      rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
+      lcd.setCursor(3, menuIndex + 2);
+      lcd.print(strbuf);
+      Menu1.moveToPreviousItem();
+    }
+    else
+    {
+      /* clear line at menuIndex + 2 */
+      rpad(strbuf, " ", ' ', 17);
+        lcd.setCursor(3, menuIndex + 2);
+        lcd.print(strbuf);
+    }
+    break;
+  case 2: // The current menu item was displayed on row 2 - display items on row 0 and 1
+    Menu1.moveToPreviousItem();
+    rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
+    lcd.setCursor(3, menuIndex);
+    lcd.print(strbuf);
+    Menu1.moveToPreviousItem();
+    rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
+    lcd.setCursor(3, menuIndex - 1);
+    lcd.print(strbuf);
+    Menu1.moveToNextItem();
+    Menu1.moveToNextItem();
+    break;
+  }
+}
 
 // Callback to refresh display during menu navigation, using parameter of type enum DisplayRefreshMode.
 void refreshMenuDisplay(byte refreshMode)
 {
-  char nameBuf[LCD_COLS + 1];
-
-  lcd.setCursor(0, 0);
-  lcd.print("--------MENU--------");
-  lcd.print("                    ");
-  if (Menu1.currentItemHasChildren())
+  // Display first line of the menu
+  switch (refreshMode)
   {
-    rpad(strbuf, Menu1.getCurrentItemName(nameBuf));
-    strbuf[LCD_COLS - 1] = char(16); // Display forward arrow if this menu item has children.
-    lcd.print(strbuf);
-  }
-  else
-  {
-    byte cmdId;
-    rpad(strbuf, Menu1.getCurrentItemName(nameBuf));
-
-    if ((cmdId = Menu1.getCurrentItemCmdId()) == 0)
-    {
-      strbuf[LCD_COLS - 1] = char(17); // Display back arrow if this menu item ascends to parent.
-      lcd.print(strbuf);
-    }
+  case REFRESH_MOVE_PREV: // user has navigated to previous menu item.
+    if (menuIndex == 0) 
+      drawMenu();
     else
     {
-      lcd.print(strbuf);
+      lcd.setCursor(2, menuIndex + 1);
+      lcd.print(' ');  // Delete the arrow previously set
+      menuIndex--;
+      // Redraw indication of what menu item is selected
+      lcd.setCursor(2, menuIndex + 1);
+      lcd.write(16);  // Mark with an arrow that this is the menu item that will be activated if the user press select
+
     }
+    break;
+  case REFRESH_MOVE_NEXT: // user has navigated to next menu item.
+    if (menuIndex == 2) 
+      drawMenu();
+    else
+    {
+      lcd.setCursor(2, menuIndex + 1);
+      lcd.print(' ');  // Delete the arrow previously set
+      menuIndex++;
+      // Redraw indication of what menu item is selected
+      lcd.setCursor(2, menuIndex + 1);
+      lcd.write(16);  // Mark with an arrow that this is the menu item that will be activated if the user press select
+    }
+    break;
+  case REFRESH_ASCEND: // user has navigated to parent menu.
+    menuIndex = 0;
+    drawMenu();
+    break;
+  case REFRESH_DESCEND: // user has navigated to child menu.
+    menuIndex = 0;
+    drawMenu();
+    break;
   }
-  lcd.setCursor(0, 3);
-  lcd.print("                    ");
+
 }
 
 // Called when an input name is to be edited
@@ -1245,8 +1410,22 @@ bool selectionInEditInputName(uint8_t InputNumber)
 // Called when an input name has been edited
 void endEditInputName()
 {
+  // TO DO Blinking cursor in EditInputName
   lcd.BlinkingCursorOff();
   lcd.clear();
+}
+
+void notImplementedYet()
+{
+  lcd.clear();
+  lcd.print("This function is");
+  lcd.setCursor(0, 1);
+  lcd.print("not implemented yet.");
+  lcd.setCursor(0, 2);
+  lcd.print("Press SELECT to");
+  lcd.setCursor(0, 3);
+  lcd.print("continue...");
+  while (getUserInput() != KEY_SELECT) {};
 }
 
 // Loads default settings into CurrentSettings - this is only done when the EEPROM does not contain valid settings or when reset is chosen by user in the menu
@@ -1331,12 +1510,12 @@ void setCurrentSettingsToDefault()
   CurrentSettings.Trigger2InactTimer = 0;
   CurrentSettings.Trigger2Temp = 60;
   CurrentSettings.ScreenSaverActive = true;
-  CurrentSettings.DisplayOnLevel = 0x8F;
+  CurrentSettings.DisplayOnLevel = 0xFF;
   CurrentSettings.DisplayDimLevel = 0x00;
   CurrentSettings.DisplayTimeout = 30;
   CurrentSettings.DisplaySelectedInput = true;
-  CurrentSettings.DisplayTemperature1 = 1;
-  CurrentSettings.DisplayTemperature2 = 1;
+  CurrentSettings.DisplayTemperature1 = 3;
+  CurrentSettings.DisplayTemperature2 = 3;
   CurrentSettings.Version = VERSION;
 }
 
