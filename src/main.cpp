@@ -1151,42 +1151,45 @@ byte getNavAction()
 void drawMenu()
 {
   char strbuf[LCD_COLS + 1]; // one line of lcd display
-  char nameBuf[LCD_COLS - 3];
+  char nameBuf[LCD_COLS - 2];
 
   // Display the name of the menu
   lcd.setCursor(0, 0);
   if (Menu1.currentMenuHasParent())
   {
-    rpad(strbuf, Menu1.getParentItemName(nameBuf));
+    rpad(strbuf, Menu1.getParentItemName(nameBuf), ' ', 18);
     lcd.print(strbuf);
   }
   else
     lcd.print(F("Main menu           "));
 
-  lcd.setCursor(0,1); lcd.print("   ");
-  lcd.setCursor(0,2); lcd.print("   ");
-  lcd.setCursor(0,3); lcd.print("   ");
+  // Clear any previously displayed arrow
+  for (int i = 1; i < 4; i++)
+  {
+    lcd.setCursor(0, i);
+    lcd.print("  ");
+  }
 
   // Display the name of the currently active menu item on the row set by menuIndex (+1 because row 0 is used to display the name of the menu)
-  lcd.setCursor(2, menuIndex + 1);
-  lcd.write(16);  // Mark with an arrow that this is the menu item that will be activated if the user press select
-  rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
+  lcd.setCursor(1, menuIndex + 1);
+  lcd.write(16); // Mark with an arrow that this is the menu item that will be activated if the user press select
+  rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
   lcd.print(strbuf);
 
   switch (menuIndex)
   {
-  case 0: // The current menu item was displayed on row 0 - see if there is items to display on row 1 and 2
-    if (Menu1.getCurrentItemIndex() < Menu1.getMenuItemCount())
+  case 0:                                                            // The current menu item was displayed on row 0 - see if there is items to display on row 1 and 2
+    if (Menu1.getCurrentItemIndex() + 1 <= Menu1.getMenuItemCount()) // Check if there is more menu items to display
     {
       Menu1.moveToNextItem();
-      rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
-      lcd.setCursor(3, menuIndex + 2);
+      rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
+      lcd.setCursor(2, menuIndex + 2);
       lcd.print(strbuf);
-      if (Menu1.getCurrentItemIndex() < Menu1.getMenuItemCount() + 1)
+      if (Menu1.getCurrentItemIndex() + 2 <= Menu1.getMenuItemCount())
       {
         Menu1.moveToNextItem();
-        rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
-        lcd.setCursor(3, menuIndex + 3);
+        rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
+        lcd.setCursor(2, menuIndex + 3);
         lcd.print(strbuf);
         Menu1.moveToPreviousItem();
       }
@@ -1194,53 +1197,55 @@ void drawMenu()
       {
         /* clear line at menuIndex + 3 */
         rpad(strbuf, " ", ' ', 17);
-        lcd.setCursor(3, menuIndex + 3);
+        lcd.setCursor(2, menuIndex + 3);
         lcd.print(strbuf);
       }
       Menu1.moveToPreviousItem();
     }
-    else
+    else // No more items in the menu - make sure we clear up any previously displayed info from the display
     {
-      /* clear line at menuIndex + 2 */
+      /* clear line at menuIndex + 2 and menuIndex + 3*/
       rpad(strbuf, " ", ' ', 17);
-        lcd.setCursor(3, menuIndex + 2);
-        lcd.print(strbuf);
+      lcd.setCursor(2, menuIndex + 2);
+      lcd.print(strbuf);
+      lcd.setCursor(2, menuIndex + 3);
+      lcd.print(strbuf);
     }
 
     break;
-  case 1: // The current menu item was displayed on row 1 - display item on row 0 and see if there is an item to display on row 2
-    Menu1.moveToPreviousItem();
-    rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
-    lcd.setCursor(3, menuIndex);
+  case 1:                       // The current menu item was displayed on row 1 - display item on row 0 and see if there is an item to display on row 2
+    Menu1.moveToPreviousItem(); // Move one item up in the menu to find the name of the item to be displayed one the line just before the current one
+    rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
+    lcd.setCursor(2, menuIndex);
     lcd.print(strbuf);
-    Menu1.moveToNextItem();
-    if (Menu1.getCurrentItemIndex() < Menu1.getMenuItemCount())
+    Menu1.moveToNextItem(); // Move to next menu item to get back to current one
+    if (Menu1.getCurrentItemIndex() + 1 <= Menu1.getMenuItemCount())
     {
-      Menu1.moveToNextItem();
-      rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
-      lcd.setCursor(3, menuIndex + 2);
+      Menu1.moveToNextItem(); // Move to next menu item to find the name of the item after the current one
+      rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
+      lcd.setCursor(2, menuIndex + 2);
       lcd.print(strbuf);
-      Menu1.moveToPreviousItem();
+      Menu1.moveToPreviousItem(); // Move to previous menu item to get back to current one
     }
-    else
+    else // No more items in the menu - make sure we clear up any previously displayed info from the display
     {
       /* clear line at menuIndex + 2 */
       rpad(strbuf, " ", ' ', 17);
-        lcd.setCursor(3, menuIndex + 2);
-        lcd.print(strbuf);
+      lcd.setCursor(2, menuIndex + 2);
+      lcd.print(strbuf);
     }
     break;
-  case 2: // The current menu item was displayed on row 2 - display items on row 0 and 1
-    Menu1.moveToPreviousItem();
-    rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
-    lcd.setCursor(3, menuIndex);
+  case 2:                       // The current menu item was displayed on row 2 - display items on row 0 and 1
+    Menu1.moveToPreviousItem(); // Move one item up in the menu to find the name of the item to be displayed one the line just before the current one
+    rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
+    lcd.setCursor(2, menuIndex);
     lcd.print(strbuf);
-    Menu1.moveToPreviousItem();
-    rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 17);
-    lcd.setCursor(3, menuIndex - 1);
+    Menu1.moveToPreviousItem(); // Once again we move one item up in the menu to find the name of the item to be displayed as the first one
+    rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
+    lcd.setCursor(2, menuIndex - 1);
     lcd.print(strbuf);
-    Menu1.moveToNextItem();
-    Menu1.moveToNextItem();
+    Menu1.moveToNextItem(); // Move to next menu item
+    Menu1.moveToNextItem(); // Move to next menu item to get back to current one
     break;
   }
 }
@@ -1252,30 +1257,29 @@ void refreshMenuDisplay(byte refreshMode)
   switch (refreshMode)
   {
   case REFRESH_MOVE_PREV: // user has navigated to previous menu item.
-    if (menuIndex == 0) 
+    if (menuIndex == 0)
       drawMenu();
     else
     {
-      lcd.setCursor(2, menuIndex + 1);
-      lcd.print(' ');  // Delete the arrow previously set
+      lcd.setCursor(1, menuIndex + 1);
+      lcd.print(' '); // Delete the arrow previously set
       menuIndex--;
       // Redraw indication of what menu item is selected
-      lcd.setCursor(2, menuIndex + 1);
-      lcd.write(16);  // Mark with an arrow that this is the menu item that will be activated if the user press select
-
+      lcd.setCursor(1, menuIndex + 1);
+      lcd.write(16); // Mark with an arrow that this is the menu item that will be activated if the user press select
     }
     break;
   case REFRESH_MOVE_NEXT: // user has navigated to next menu item.
-    if (menuIndex == 2) 
+    if (menuIndex == 2)
       drawMenu();
     else
     {
-      lcd.setCursor(2, menuIndex + 1);
-      lcd.print(' ');  // Delete the arrow previously set
+      lcd.setCursor(1, menuIndex + 1);
+      lcd.print(' '); // Delete the arrow previously set
       menuIndex++;
       // Redraw indication of what menu item is selected
-      lcd.setCursor(2, menuIndex + 1);
-      lcd.write(16);  // Mark with an arrow that this is the menu item that will be activated if the user press select
+      lcd.setCursor(1, menuIndex + 1);
+      lcd.write(16); // Mark with an arrow that this is the menu item that will be activated if the user press select
     }
     break;
   case REFRESH_ASCEND: // user has navigated to parent menu.
@@ -1287,7 +1291,6 @@ void refreshMenuDisplay(byte refreshMode)
     drawMenu();
     break;
   }
-
 }
 
 // Called when an input name is to be edited
@@ -1425,7 +1428,9 @@ void notImplementedYet()
   lcd.print("Press SELECT to");
   lcd.setCursor(0, 3);
   lcd.print("continue...");
-  while (getUserInput() != KEY_SELECT) {};
+  while (getUserInput() != KEY_SELECT)
+  {
+  };
 }
 
 // Loads default settings into CurrentSettings - this is only done when the EEPROM does not contain valid settings or when reset is chosen by user in the menu
