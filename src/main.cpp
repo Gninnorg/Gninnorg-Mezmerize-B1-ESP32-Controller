@@ -166,14 +166,7 @@ byte appMode = APP_NORMAL_MODE;
 
 MenuManager Menu1(ctlMenu_Root, menuCount(ctlMenu_Root));
 
-// Variables and predeclarations for editing Input names in menu
-int arrowX;              // text edit arrow start X position on selection line
-int arrowPointingUpDown; // text edit arrow start direction: up == 0, down == 1
-String newInputName = "XXXXXXXXXX";
-void startEditInputName(uint8_t InputNumber);
-void moveArrowEditInputName(uint8_t Direction);
-bool selectionInEditInputName(uint8_t InputNumber);
-void endEditInputName();
+void editInputName(uint8_t InputNumber);
 
 void notImplementedYet(); // TO DO :-)
 
@@ -888,30 +881,8 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT1_NAME:
-    startEditInputName(0);
-    while (!complete)
-    {
-      switch (getUserInput())
-      {
-      case KEY_RIGHT:
-        moveArrowEditInputName(KEY_RIGHT);
-        break;
-      case KEY_LEFT:
-        moveArrowEditInputName(KEY_LEFT);
-        break;
-      case KEY_SELECT:
-        if (selectionInEditInputName(0)) // Editing is done
-          complete = true;
-        break;
-      case KEY_BACK:
-        // Exit without saving new value
-        complete = true;
-        break;
-      default:
-        break;
-      }
-    }
-    endEditInputName();
+    editInputName(0);
+    complete = true;
     break;
   case mnuCmdINPUT1_MAX_VOL:
     // TO DO
@@ -929,30 +900,8 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT2_NAME:
-    startEditInputName(1);
-    while (!complete)
-    {
-      switch (getUserInput())
-      {
-      case KEY_RIGHT:
-        moveArrowEditInputName(KEY_RIGHT);
-        break;
-      case KEY_LEFT:
-        moveArrowEditInputName(KEY_LEFT);
-        break;
-      case KEY_SELECT:
-        if (selectionInEditInputName(1)) // Editing is done
-          complete = true;
-        break;
-      case KEY_BACK:
-        // Exit without saving new value
-        complete = true;
-        break;
-      default:
-        break;
-      }
-    }
-    endEditInputName();
+    editInputName(1);
+    complete = true;
     break;
   case mnuCmdINPUT2_MAX_VOL:
     // TO DO
@@ -970,8 +919,7 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT3_NAME:
-    // TO DO
-    notImplementedYet();
+    editInputName(2);
     complete = true;
     break;
   case mnuCmdINPUT3_MAX_VOL:
@@ -990,8 +938,7 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT4_NAME:
-    // TO DO
-    notImplementedYet();
+    editInputName(3);
     complete = true;
     break;
   case mnuCmdINPUT4_MAX_VOL:
@@ -1010,8 +957,7 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT5_NAME:
-    // TO DO
-    notImplementedYet();
+    editInputName(4);
     complete = true;
     break;
   case mnuCmdINPUT5_MAX_VOL:
@@ -1030,8 +976,7 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT6_NAME:
-    // TO DO
-    notImplementedYet();
+    editInputName(5);
     complete = true;
     break;
   case mnuCmdINPUT6_MAX_VOL:
@@ -1328,13 +1273,14 @@ void refreshMenuDisplay(byte refreshMode)
   }
 }
 
-// Called when an input name is to be edited
-void startEditInputName(uint8_t InputNumber)
+void editInputName(uint8_t InputNumber)
 {
+  bool complete = false;
   // TO DO Maybe replace / character with symbol to allow for switching between upper and lower case letters?
-  arrowX = 1;              // text edit arrow starts out at 'W'
-  arrowPointingUpDown = 0; // text edit arrow starts out pointing down == 1; up == 0
-  newInputName = "XXXXXXXXXX";
+  int arrowX = 1;              // text edit arrow start X position on selection line
+  int arrowPointingUpDown = 0; // text edit arrow start direction: up == 0, down == 1
+  String newInputName = "XXXXXXXXXX";
+  // Display the screen
   lcd.clear();
   lcd.print("Input ");
   lcd.print(InputNumber + 1);
@@ -1358,102 +1304,108 @@ void startEditInputName(uint8_t InputNumber)
   lcd.setCursor(9, 0);
   lcd.print(newInputName);
   lcd.setCursor(9 + newInputName.length(), 0);
-}
-
-void moveArrowEditInputName(uint8_t Direction)
-{
-  // Clear current arrow
-  lcd.setCursor(arrowX, 2);
-  lcd.write(' ');
-
-  // Decide if position or direction of arrow must be changed
-  if (arrowPointingUpDown == 0 && Direction == KEY_RIGHT)       // The arrow points up and the user input is "turn to the right"
-    arrowPointingUpDown = 1;                            // Set the arrow to point down but don't change position of ArrowX
-  else if (arrowPointingUpDown == 0 && Direction == KEY_LEFT) // The arrow points up and the user input is "turn to the left"
+  lcd.BlinkingCursorOn();
+  while (!complete)
   {
-    if (arrowX > 0)
-      arrowX--; // Move arrow one postion to the left
-  }
-  else if (arrowPointingUpDown == 1 && Direction == KEY_RIGHT) // The arrow points down and the user input is "turn to the right"
-  {
-    if (arrowX < 19)
-      arrowX++; // Move arrow one postion to the right
-  }
-  else if (arrowPointingUpDown == 1 && Direction == KEY_LEFT) // The arrow points down and the user input is "turn to the left"
-    arrowPointingUpDown = 0;                            // Set the arrow to point up but don't change position of ArrowX
-
-  // Display arrow
-  lcd.setCursor(arrowX, 2);
-  if (arrowPointingUpDown == 1) // if arrow == 1, then print arrow that points down; if arrow == 0, then print arrow that points up
-    lcd.write(27);
-  else
-    lcd.write(26);
-  lcd.setCursor(9 + newInputName.length(), 0);
-}
-
-// Called when the user selects a character or action like backspace while editing an Input name
-bool selectionInEditInputName(uint8_t InputNumber)
-{
-  if (arrowPointingUpDown == 1) // If arrow points down
-  {
-    if (arrowX == 18) // Back Space (the Backspace icon has been selected)
+    switch (byte UserInput = getUserInput())
     {
-      if (newInputName.length() > 0) // Make sure there is a character to delete!
+    case KEY_RIGHT:
+    case KEY_LEFT:
+      lcd.BlinkingCursorOff();
+      // Clear current arrow
+      lcd.setCursor(arrowX, 2);
+      lcd.write(' ');
+
+      // Decide if position or direction of arrow must be changed
+      if (arrowPointingUpDown == 0 && UserInput == KEY_RIGHT)     // The arrow points up and the user input is "turn to the right"
+        arrowPointingUpDown = 1;                                  // Set the arrow to point down but don't change position of ArrowX
+      else if (arrowPointingUpDown == 0 && UserInput == KEY_LEFT) // The arrow points up and the user input is "turn to the left"
       {
-        lcd.setCursor(9 + newInputName.length() - 1, 0);
-        lcd.print(" "); // Print to clear the deleted character on the display
-        newInputName = newInputName.substring(0, newInputName.length() - 1);
-
-        lcd.setCursor(9 + newInputName.length(), 0);
+        if (arrowX > 0)
+          arrowX--; // Move arrow one postion to the left
       }
-      return 0;
-    }
-    if (arrowX == 19) // Done editing (the Enter icon has been selected)
-    {
-      newInputName.trim();
-      if (newInputName == "") // If no characters in new name then reset to original name
-        newInputName = CurrentSettings.Input[InputNumber].Name;
+      else if (arrowPointingUpDown == 1 && UserInput == KEY_RIGHT) // The arrow points down and the user input is "turn to the right"
+      {
+        if (arrowX < 19)
+          arrowX++; // Move arrow one postion to the right
+      }
+      else if (arrowPointingUpDown == 1 && UserInput == KEY_LEFT) // The arrow points down and the user input is "turn to the left"
+        arrowPointingUpDown = 0;                                  // Set the arrow to point up but don't change position of ArrowX
+
+      // Display arrow
+      lcd.setCursor(arrowX, 2);
+      if (arrowPointingUpDown == 1) // if arrow == 1, then print arrow that points down; if arrow == 0, then print arrow that points up
+        lcd.write(27);
       else
+        lcd.write(26);
+      lcd.setCursor(9 + newInputName.length(), 0);
+      lcd.BlinkingCursorOn();
+      break;
+    case KEY_SELECT:
+      lcd.BlinkingCursorOff();
+      if (arrowPointingUpDown == 1) // If arrow points down
       {
-        // Save new name to CurrentSettings
-        for (uint8_t i = 0; i < newInputName.length(); i++)
-          CurrentSettings.Input[InputNumber].Name[i] = newInputName.charAt(i);
-        // Pad Name with spaces - makes it easier to display
-        for (uint8_t i = newInputName.length(); i < 10; i++)
-          CurrentSettings.Input[InputNumber].Name[i] = ' ';
-        CurrentSettings.Input[InputNumber].Name[10] = '\0';
-        // Save to EEPROM
-        writeSettingsToEEPROM();
+        if (arrowX == 18) // Back Space (the Backspace icon has been selected)
+        {
+          if (newInputName.length() > 0) // Make sure there is a character to delete!
+          {
+            lcd.setCursor(9 + newInputName.length() - 1, 0);
+            lcd.print(" "); // Print to clear the deleted character on the display
+            newInputName = newInputName.substring(0, newInputName.length() - 1);
+          }
+        }
+        else if (arrowX == 19) // Done editing (the Enter icon has been selected)
+        {
+          newInputName.trim();
+          if (newInputName == "") // If no characters in new name then reset to original name
+            newInputName = CurrentSettings.Input[InputNumber].Name;
+          else
+          {
+            // Save new name to CurrentSettings
+            for (uint8_t i = 0; i < newInputName.length(); i++)
+              CurrentSettings.Input[InputNumber].Name[i] = newInputName.charAt(i);
+            // Pad Name with spaces - makes it easier to display
+            for (uint8_t i = newInputName.length(); i < 10; i++)
+              CurrentSettings.Input[InputNumber].Name[i] = ' ';
+            CurrentSettings.Input[InputNumber].Name[10] = '\0';
+            // Save to EEPROM
+            writeSettingsToEEPROM();
+          }
+          complete = true;
+        }
+        else if (newInputName.length() < 10) // Only allow up to 10 characters
+        {
+          byte v = 84;
+          if (arrowX > 6)
+            v = 40;
+          newInputName = newInputName + (char(arrowX + v));
+        }
       }
-      return 1;
-    }
-    if (newInputName.length() < 10) // Only allow up to 10 characters
-    {
-      byte v = 84;
-      if (arrowX > 5)
-        v = 40;
-      newInputName = newInputName + (char(arrowX + v));
+      else // Arrow points up
+      {
+        if (newInputName.length() < 10) // Only allow up to 10 characters
+        {
+          if (arrowX == 0) // Space character has been selected (though it is shown as underscore)
+            newInputName = newInputName + " ";
+          else // A character between A-S has been selected, so add it to the string
+            newInputName = newInputName + (char(arrowX + 64));
+        }
+      }
+      if (!complete)
+      {
+        lcd.setCursor(9, 0);
+        lcd.print(newInputName);
+        lcd.BlinkingCursorOn();
+      }
+      break;
+    case KEY_BACK:
+      // Exit without saving new value
+      complete = true;
+      break;
+    default:
+      break;
     }
   }
-  else // Arrow points down
-  {
-    if (newInputName.length() < 10) // Only allow up to 10 characters
-    {
-      if (arrowX == 0) // Space character has been selected (though it is shown as underscore)
-        newInputName = newInputName + " ";
-      else // A character between A-S has been selected, so add it to the string
-        newInputName = newInputName + (char(arrowX + 64));
-    }
-  }
-  lcd.setCursor(9, 0);
-  lcd.print(newInputName);
-  return 0;
-}
-
-// Called when an input name has been edited
-void endEditInputName()
-{
-  // TO DO Blinking cursor in EditInputName
   lcd.BlinkingCursorOff();
   lcd.clear();
 }

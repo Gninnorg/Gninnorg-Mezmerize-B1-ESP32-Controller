@@ -49,7 +49,7 @@ void OLedI2C::lcdOn()
 
 void OLedI2C::BlinkingCursorOn()
 {
-  sendCommand(0x0F);
+  sendCommand(0x0D);
 }
 
 void OLedI2C::BlinkingCursorOff()
