@@ -167,11 +167,11 @@ byte appMode = APP_NORMAL_MODE;
 MenuManager Menu1(ctlMenu_Root, menuCount(ctlMenu_Root));
 
 // Variables and predeclarations for editing Input names in menu
-int arrowX = 3;              // text edit arrow starts out at 'W'
-int arrowPointingUpDown = 1; // text edit arrow starts out pointing down == 1; up == 0
+int arrowX;              // text edit arrow start X position on selection line
+int arrowPointingUpDown; // text edit arrow start direction: up == 0, down == 1
 String newInputName = "XXXXXXXXXX";
 void startEditInputName(uint8_t InputNumber);
-void moveArrowEditInputName(int Direction);
+void moveArrowEditInputName(uint8_t Direction);
 bool selectionInEditInputName(uint8_t InputNumber);
 void endEditInputName();
 
@@ -484,7 +484,6 @@ void loop()
       if (CurrentSettings.DisplayTemperature2)
         DisplayTemperature(relayControl.getTemperature(A1), CurrentSettings.Trigger2Temp, 5, 3, 5, 2);
     }
-
     switch (UIkey)
     {
     case KEY_NONE:
@@ -743,24 +742,38 @@ byte processMenuCommand(byte cmdId)
   switch (cmdId)
   {
   case mnuCmdVOL_STEPS:
+  {
     // byte getByteNumber(currValue, min, max, "Description1", "Description2", "Description3")
+    byte newVolSteps = CurrentSettings.VolumeSteps;
     lcd.clear();
+    lcd.print("Volume");
+    lcd.setCursor(0, 1);
+    lcd.print("steps");
+    lcd.printTwoNumber(11, newVolSteps);
     while (!complete)
     {
       switch (getUserInput())
       {
       case KEY_UP:
         // Increase volume steps
-        // TO DO - just to show something we print 88 for now
-        lcd.printTwoNumber(11, 88);
+        if (newVolSteps < 99)
+        {
+          newVolSteps++;
+          lcd.printTwoNumber(11, newVolSteps);
+        }
         break;
       case KEY_DOWN:
         // Decrease volume steps
-        // TO DO - just to show something we print 11 for now
-        lcd.printTwoNumber(11, 11);
+        if (newVolSteps > 1)
+        {
+          newVolSteps--;
+          lcd.printTwoNumber(11, newVolSteps);
+        }
         break;
       case KEY_SELECT:
         // Save new value
+        CurrentSettings.VolumeSteps = newVolSteps;
+        writeSettingsToEEPROM();
         complete = true;
         break;
       case KEY_BACK:
@@ -772,6 +785,7 @@ byte processMenuCommand(byte cmdId)
       }
     }
     break;
+  }
   case mnuCmdMIN_VOL:
     // TO DO
     notImplementedYet();
@@ -880,10 +894,10 @@ byte processMenuCommand(byte cmdId)
       switch (getUserInput())
       {
       case KEY_RIGHT:
-        moveArrowEditInputName(+1);
+        moveArrowEditInputName(KEY_RIGHT);
         break;
       case KEY_LEFT:
-        moveArrowEditInputName(-1);
+        moveArrowEditInputName(KEY_LEFT);
         break;
       case KEY_SELECT:
         if (selectionInEditInputName(0)) // Editing is done
@@ -915,9 +929,30 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT2_NAME:
-    // TO DO
-    notImplementedYet();
-    complete = true;
+    startEditInputName(1);
+    while (!complete)
+    {
+      switch (getUserInput())
+      {
+      case KEY_RIGHT:
+        moveArrowEditInputName(KEY_RIGHT);
+        break;
+      case KEY_LEFT:
+        moveArrowEditInputName(KEY_LEFT);
+        break;
+      case KEY_SELECT:
+        if (selectionInEditInputName(1)) // Editing is done
+          complete = true;
+        break;
+      case KEY_BACK:
+        // Exit without saving new value
+        complete = true;
+        break;
+      default:
+        break;
+      }
+    }
+    endEditInputName();
     break;
   case mnuCmdINPUT2_MAX_VOL:
     // TO DO
@@ -1157,7 +1192,7 @@ void drawMenu()
   lcd.setCursor(0, 0);
   if (Menu1.currentMenuHasParent())
   {
-    rpad(strbuf, Menu1.getParentItemName(nameBuf), ' ', 18);
+    rpad(strbuf, Menu1.getParentItemName(nameBuf), ' ', 20);
     lcd.print(strbuf);
   }
   else
@@ -1297,8 +1332,8 @@ void refreshMenuDisplay(byte refreshMode)
 void startEditInputName(uint8_t InputNumber)
 {
   // TO DO Maybe replace / character with symbol to allow for switching between upper and lower case letters?
-  arrowX = 3;              // text edit arrow starts out at 'W'
-  arrowPointingUpDown = 1; // text edit arrow starts out pointing down == 1; up == 0
+  arrowX = 1;              // text edit arrow starts out at 'W'
+  arrowPointingUpDown = 0; // text edit arrow starts out pointing down == 1; up == 0
   newInputName = "XXXXXXXXXX";
   lcd.clear();
   lcd.print("Input ");
@@ -1325,26 +1360,31 @@ void startEditInputName(uint8_t InputNumber)
   lcd.setCursor(9 + newInputName.length(), 0);
 }
 
-void moveArrowEditInputName(int Direction)
+void moveArrowEditInputName(uint8_t Direction)
 {
+  // Clear current arrow
   lcd.setCursor(arrowX, 2);
   lcd.write(' ');
-  arrowX = arrowX + Direction; // Direction = -1 if KEY_DOWN, +1 if KEY_UP
-  if (arrowX > 19)
-    arrowX = 19;
-  if (arrowX < 0)
-    arrowX = 0;
-  byte flipArrow = 0;
-  flipArrow = flipArrow + arrowPointingUpDown;
-  flipArrow <<= 1;
-  arrowPointingUpDown = (Direction > 0); // TO DO This and next line: if KEY_UP then flipArrow++;
-  flipArrow = flipArrow + arrowPointingUpDown;
-  if (flipArrow == 1)
-    arrowX--;
-  if (flipArrow == 2)
-    arrowX++;
+
+  // Decide if position or direction of arrow must be changed
+  if (arrowPointingUpDown == 0 && Direction == KEY_RIGHT)       // The arrow points up and the user input is "turn to the right"
+    arrowPointingUpDown = 1;                            // Set the arrow to point down but don't change position of ArrowX
+  else if (arrowPointingUpDown == 0 && Direction == KEY_LEFT) // The arrow points up and the user input is "turn to the left"
+  {
+    if (arrowX > 0)
+      arrowX--; // Move arrow one postion to the left
+  }
+  else if (arrowPointingUpDown == 1 && Direction == KEY_RIGHT) // The arrow points down and the user input is "turn to the right"
+  {
+    if (arrowX < 19)
+      arrowX++; // Move arrow one postion to the right
+  }
+  else if (arrowPointingUpDown == 1 && Direction == KEY_LEFT) // The arrow points down and the user input is "turn to the left"
+    arrowPointingUpDown = 0;                            // Set the arrow to point up but don't change position of ArrowX
+
+  // Display arrow
   lcd.setCursor(arrowX, 2);
-  if (arrowPointingUpDown == 1) // if arrow == 1, then print arrow down; if arrow == 0, then print arrow up
+  if (arrowPointingUpDown == 1) // if arrow == 1, then print arrow that points down; if arrow == 0, then print arrow that points up
     lcd.write(27);
   else
     lcd.write(26);
@@ -1377,11 +1417,11 @@ bool selectionInEditInputName(uint8_t InputNumber)
       {
         // Save new name to CurrentSettings
         for (uint8_t i = 0; i < newInputName.length(); i++)
-          CurrentSettings.Input[0].Name[i] = newInputName.charAt(i);
+          CurrentSettings.Input[InputNumber].Name[i] = newInputName.charAt(i);
         // Pad Name with spaces - makes it easier to display
         for (uint8_t i = newInputName.length(); i < 10; i++)
-          CurrentSettings.Input[0].Name[i] = ' ';
-        CurrentSettings.Input[0].Name[10] = '\0';
+          CurrentSettings.Input[InputNumber].Name[i] = ' ';
+        CurrentSettings.Input[InputNumber].Name[10] = '\0';
         // Save to EEPROM
         writeSettingsToEEPROM();
       }
