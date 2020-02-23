@@ -13,27 +13,6 @@
                 <Item Id="STORE_LVL" Name="Vol. memory"/>
             </MenuItems>
         </Item>
-        <Item Id="IR_MENU" Name="Learn IR">
-            <MenuItems>
-                <Item Id="IR_ONOFF" Name="On/Off"/>
-                <Item Id="IR_UP" Name="Up"/>
-                <Item Id="IR_UP_REPEAT" Name="Up (repeat)"/>
-                <Item Id="IR_DOWN" Name="Down"/>
-                <Item Id="IR_DOWN_REPEAT" Name="Down (repeat)"/>
-                <Item Id="IR_LEFT" Name="Left"/>
-                <Item Id="IR_RIGHT" Name="Right"/>
-                <Item Id="IR_SELECT" Name="Select"/>
-                <Item Id="IR_BACK" Name="Back"/>
-                <Item Id="IR_MUTE" Name="Mute"/>
-                <Item Id="IR_PREV" Name="Previous"/>
-                <Item Id="IR_1" Name="1"/>
-                <Item Id="IR_2" Name="2"/>
-                <Item Id="IR_3" Name="3"/>
-                <Item Id="IR_4" Name="4"/>
-                <Item Id="IR_5" Name="5"/>
-                <Item Id="IR_6" Name="6"/>
-            </MenuItems>
-        </Item>
         <Item Id="INPUT_MENU" Name="Inputs">
             <MenuItems>
                 <Item Id="INPUT1_MENU" Name="Input 1">
@@ -84,6 +63,26 @@
                         <Item Id="INPUT6_MIN_VOL" Name="Min. volume"/>
                     </MenuItems>
                 </Item>
+            </MenuItems>
+        </Item>
+        <Item Id="IR_MENU" Name="Learn IR">
+            <MenuItems>
+                <Item Id="IR_ONOFF" Name="On/Off"/>
+                <Item Id="IR_UP" Name="Up"/>
+                <Item Id="IR_DOWN" Name="Down"/>
+                <Item Id="IR_REPEAT" Name="Repeat"/>
+                <Item Id="IR_LEFT" Name="Left"/>
+                <Item Id="IR_RIGHT" Name="Right"/>
+                <Item Id="IR_SELECT" Name="Select"/>
+                <Item Id="IR_BACK" Name="Back"/>
+                <Item Id="IR_MUTE" Name="Mute"/>
+                <Item Id="IR_PREV" Name="Previous"/>
+                <Item Id="IR_1" Name="1"/>
+                <Item Id="IR_2" Name="2"/>
+                <Item Id="IR_3" Name="3"/>
+                <Item Id="IR_4" Name="4"/>
+                <Item Id="IR_5" Name="5"/>
+                <Item Id="IR_6" Name="6"/>
             </MenuItems>
         </Item>
         <Item Id="PWR_CTL_MENU" Name="Triggers">

@@ -47,14 +47,14 @@ typedef union {
     byte RecallSetLevel;           // Remember/store the volume level for each separate input
     HashIR_data_t IR_ONOFF;        // IR data to be interpreted as ON/OFF - switch between running and suspend mode (and turn triggers off)
     HashIR_data_t IR_UP;           // IR data to be interpreted as UP
-    HashIR_data_t IR_UP_REPEAT;    // IR data to be interpreted as UP (if different code is sent when the UP key on the remote is held down)
     HashIR_data_t IR_DOWN;         // IR data to be interpreted as DOWN
-    HashIR_data_t IR_DOWN_REPEAT;  // IR data to be interpreted as DOWN (if different code is sent when the DOWN key on the remote is held down)
+    HashIR_data_t IR_REPEAT;       // IR data to be interpreted as REPEAT (ie Apple remotes sends a specific code, if a key is held down to indicate repeat of the previously sent code
     HashIR_data_t IR_LEFT;         // IR data to be interpreted as LEFT
     HashIR_data_t IR_RIGHT;        // IR data to be interpreted as RIGHT
     HashIR_data_t IR_SELECT;       // IR data to be interpreted as SELECT
     HashIR_data_t IR_BACK;         // IR data to be interpreted as BACK
     HashIR_data_t IR_MUTE;         // IR data to be interpreted as MUTE
+    HashIR_data_t IR_PREVIOUS;     // IR data to be interpreted as "switch to previous selected input"
     HashIR_data_t IR_1;            // IR data to be interpreted as 1 (to select input 1 directly)
     HashIR_data_t IR_2;            // IR data to be interpreted as 2
     HashIR_data_t IR_3;            // IR data to be interpreted as 3
@@ -150,12 +150,16 @@ void writeDefaultSettingsToEEPROM(void);
 void readRuntimeSettingsFromEEPROM(void);
 void writeRuntimeSettingsToEEPROM(void);
 
-// Setup Display
+// Setup Display ---------------------------------------------------------------
 OLedI2C lcd;
-bool ScreenSaverIsOn = false;                  // Used to indicate whether the screen saver is running or not
-unsigned long mil_LastUserInput;               // Used to keep track of the time of the last user interaction (part of the screen saver timing)
-unsigned long mil_onRefreshTemperatureDisplay; // Used to time how often the display of temperatures is updated
-#define TEMP_REFRESH_INTERVAL 30000            // Update the display of temperatures every 30 seconds
+// Used to indicate whether the screen saver is running or not
+bool ScreenSaverIsOn = false;
+// Used to keep track of the time of the last user interaction (part of the screen saver timing)
+unsigned long mil_LastUserInput = millis();
+// Used to time how often the display of temperatures is updated
+unsigned long mil_onRefreshTemperatureDisplay;
+// Update interval for the display of temperatures
+#define TEMP_REFRESH_INTERVAL 5000
 
 void setupDisplay()
 {
@@ -182,9 +186,7 @@ MenuManager Menu1(ctlMenu_Root, menuCount(ctlMenu_Root));
 void editInputName(uint8_t InputNumber);
 bool editNumericValue(byte &Value, byte MinValue, byte MaxValue);
 bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const char Option2[9], const char Option3[9], const char Option4[9]);
-
-void notImplementedYet(); // TO DO :-)
-
+bool editIRCode(HashIR_data_t &Value);
 void drawMenu();
 void refreshMenuDisplay(byte refreshMode);
 byte menuIndex = 0;
@@ -230,26 +232,27 @@ char *rpad(char *dest, const char *str, char chr, unsigned char width)
 // Enumerated set of possible inputs from the user
 enum UserInput
 {
-  KEY_NONE,        // No input
-  KEY_UP,          // Rotary 1 turned CW or IR
-  KEY_UP_REPEAT,   // IR
-  KEY_DOWN,        // Rotary 1 turned CCW or IR
-  KEY_DOWN_REPEAT, // IR
-  KEY_SELECT,      // Rotary 1 switch pressed or IR
-  KEY_RIGHT,       // Rotary 2 turned CW or IR
-  KEY_LEFT,        // Rotary 2 turned CCW or IR
-  KEY_BACK,        // Rotary 2 switch pressed or IR
-  KEY_1,           // IR
-  KEY_2,           // IR
-  KEY_3,           // IR
-  KEY_4,           // IR
-  KEY_5,           // IR
-  KEY_6,           // IR
-  KEY_MUTE,        // IR
-  KEY_ONOFF        // IR
+  KEY_NONE,    // No input
+  KEY_UP,      // Rotary 1 turned CW or IR
+  KEY_DOWN,    // Rotary 1 turned CCW or IR
+  KEY_REPEAT,  // IR
+  KEY_SELECT,  // Rotary 1 switch pressed or IR
+  KEY_RIGHT,   // Rotary 2 turned CW or IR
+  KEY_LEFT,    // Rotary 2 turned CCW or IR
+  KEY_BACK,    // Rotary 2 switch pressed or IR
+  KEY_1,       // IR
+  KEY_2,       // IR
+  KEY_3,       // IR
+  KEY_4,       // IR
+  KEY_5,       // IR
+  KEY_6,       // IR
+  KEY_MUTE,    // IR
+  KEY_ONOFF,   // IR
+  KEY_PREVIOUS // IR
 };
 
-byte UIkey;                              // holds the last received user input (from rotary encoders or IR)
+byte UIkey; // holds the last received user input (from rotary encoders or IR)
+byte lastReceivedInput = KEY_NONE;
 unsigned long last_KEY_ONOFF = millis(); // Used to ensure that fast repetition of KEY_ONOFF is not accepted
 void toStandbyMode(void);
 
@@ -314,19 +317,15 @@ byte getUserInput()
     // Get the new data from the remote
     auto data = IRLremote.read();
 
-    Serial.print(F("Address: 0x"));
-    Serial.println(data.address, HEX);
-    Serial.print(F("Command: 0x"));
-    Serial.println(data.command, HEX);
+    //Serial.print(F("Address: 0x"));
+    //Serial.println(data.address, HEX);
+    //Serial.print(F("Command: 0x"));
+    //Serial.println(data.command, HEX);
 
     // Map the received IR input to UserInput values
     if (data.address == CurrentSettings.IR_UP.address && data.command == CurrentSettings.IR_UP.command)
       receivedInput = KEY_UP;
-    else if (data.address == CurrentSettings.IR_UP_REPEAT.address && data.command == CurrentSettings.IR_UP_REPEAT.command)
-      receivedInput = KEY_UP;
     else if (data.address == CurrentSettings.IR_DOWN.address && data.command == CurrentSettings.IR_DOWN.command)
-      receivedInput = KEY_DOWN;
-    else if (data.address == CurrentSettings.IR_DOWN_REPEAT.address && data.command == CurrentSettings.IR_DOWN_REPEAT.command)
       receivedInput = KEY_DOWN;
     else if (data.address == CurrentSettings.IR_LEFT.address && data.command == CurrentSettings.IR_LEFT.command)
       receivedInput = KEY_LEFT;
@@ -352,6 +351,15 @@ byte getUserInput()
       receivedInput = KEY_5;
     else if (data.address == CurrentSettings.IR_6.address && data.command == CurrentSettings.IR_6.command)
       receivedInput = KEY_6;
+    else if (data.address == CurrentSettings.IR_REPEAT.address && data.command == CurrentSettings.IR_REPEAT.command)
+    {
+      receivedInput = KEY_REPEAT;
+      if (lastReceivedInput == KEY_UP)
+        receivedInput = KEY_UP;
+      else if (lastReceivedInput == KEY_DOWN)
+        receivedInput = KEY_DOWN;
+    }
+    lastReceivedInput = receivedInput;
   }
 
   // Cancel received KEY_ONOFF if it has been received before within the last 5 seconds
@@ -397,8 +405,8 @@ byte getUserInput()
     }
   }
 
-  // If inactivity timer is set, go to standby if the set number of hours have passed since power on (or reboot)
-  if ((appMode != APP_STANDBY_MODE) && (CurrentSettings.TriggerInactOffTimer > 0) && ((mil_On + CurrentSettings.TriggerInactOffTimer * 3600000) < millis()))
+  // If inactivity timer is set, go to standby if the set number of hours have passed since last user input
+  if ((appMode != APP_STANDBY_MODE) && (CurrentSettings.TriggerInactOffTimer > 0) && ((mil_LastUserInput + CurrentSettings.TriggerInactOffTimer * 3600000) < millis()))
   {
     appMode = APP_STANDBY_MODE;
     toStandbyMode();
@@ -408,7 +416,7 @@ byte getUserInput()
 }
 
 void reboot(void);
-void DisplayTemperature(float Temp, float MaxTemp, byte ColumnForDegrees, byte StartRowForDegrees, byte ColumnForBar, byte StartRowForBar);
+void DisplayTemperatures(void);
 
 void setup()
 {
@@ -439,68 +447,166 @@ void setup()
   else
   {
     Serial.println(F("Settings read from EEPROM are ok"));
+    // TO DO if triggers are active then wait for the set number of seconds (if > 0) and turn them on with the chosen method
+    // TO DO Select input relay
+    // TO DO Set volume
     lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
     if (CurrentSettings.DisplaySelectedInput)
     {
       lcd.setCursor(0, 0);
       lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
     }
-    if (CurrentSettings.DisplayTemperature1)
-      DisplayTemperature(relayControl.getTemperature(A0), CurrentSettings.Trigger1Temp, 0, 3, 0, 2);
-    if (CurrentSettings.DisplayTemperature2)
-      DisplayTemperature(relayControl.getTemperature(A1), CurrentSettings.Trigger2Temp, 5, 3, 5, 2);
-    mil_onRefreshTemperatureDisplay = millis();
+    DisplayTemperatures();
     Serial.println(F("Ready"));
   }
 }
 
-void DisplayTemperature(float Temp, float MaxTemp, byte ColumnForDegrees, byte StartRowForDegrees, byte ColumnForBar, byte StartRowForBar)
+void DisplayTemperatures()
 {
-  // TO DO Implement CurrentSettings.displayTemp options (none, numerical, graphical, both)
-
-  lcd.setCursor(ColumnForDegrees, StartRowForDegrees);
-  if (Temp < 0)
+  if (CurrentSettings.DisplayTemperature1)
   {
-    lcd.print("OFF ");
-    lcd.setCursor(ColumnForBar, StartRowForBar);
-    lcd.print("AMP ");
-  }
-  else if (Temp > MaxTemp)
-  {
-    lcd.print("TEMP");
-    lcd.setCursor(ColumnForBar, StartRowForBar);
-    lcd.print("HIGH");
-  }
-  else
-  {
-    lcd.print(int(Temp));
-    lcd.write(128); // Degree symbol
-
-    // Map the range (0c ~ max temperature) to the range of the bar (0 to Number of characters to show the bar * Number of possible values per character )
-    byte nb_columns = map(Temp, 0, MaxTemp, 0, 4 * 5);
-
-    // Draw each character of the line
-    lcd.setCursor(ColumnForBar, StartRowForBar);
-    for (byte i = 0; i < 4; ++i) // Number of characters to show the bar = 4
+    float Temp = relayControl.getTemperature(A0);
+    float MaxTemp;
+    if (CurrentSettings.Trigger1Temp == 0)
+      MaxTemp = 60;
+    else
+      MaxTemp = CurrentSettings.Trigger1Temp;
+    lcd.setCursor(0, 3);
+    if (Temp < 0)
     {
+      lcd.print("OFF ");
+      if (CurrentSettings.DisplayTemperature1 == 3)
+      {
+        lcd.setCursor(0, 2);
+        lcd.print("AMP ");
+      }
+    }
+    else if (Temp > MaxTemp)
+    {
+      lcd.setCursor(0, 3);
+      lcd.print("HIGH");
+      if (CurrentSettings.DisplayTemperature1 == 3)
+      {
+        lcd.setCursor(0, 2);
+        lcd.print("TEMP");
+      }
+    }
+    else
+    {
+      if (CurrentSettings.DisplayTemperature1 == 1 || CurrentSettings.DisplayTemperature1 == 3)
+      {
+        lcd.setCursor(0, 3);
+        lcd.print(int(Temp));
+        lcd.write(128); // Degree symbol
+      }
+      if (CurrentSettings.DisplayTemperature1 == 2 || CurrentSettings.DisplayTemperature1 == 3)
+      {
+        if (CurrentSettings.DisplayTemperature1 == 2)
+          lcd.setCursor(0, 3);
+        else
+          lcd.setCursor(0, 2);
 
-      // Write character depending on number of columns remaining to display
-      if (nb_columns == 0)
-      { // Case empty
-        lcd.write(' ');
-      }
-      else if (nb_columns >= 5) // Full box
-      {
-        lcd.write(208); // Full box symbol
-        nb_columns -= 5;
-      }
-      else // Partial box
-      {
-        lcd.write(map(nb_columns, 1, 4, 212, 209)); // Map the remaining nb_columns (case between 1 and 4) to the corresponding character number symbols : 212 = 1 bar, 211 = 2 bars, 210 = 3 bars, 209 = 4 bars
-        nb_columns = 0;
+        // Map the range (0c ~ max temperature) to the range of the bar (0 to Number of characters to show the bar * Number of possible values per character )
+        byte nb_columns = map(Temp, 0, MaxTemp, 0, 4 * 5);
+
+        for (byte i = 0; i < 4; ++i) // Number of characters to show the bar = 4
+        {
+
+          // Write character depending on number of columns remaining to display
+          if (nb_columns == 0)
+          { // Case empty
+            lcd.write(' ');
+          }
+          else if (nb_columns >= 5) // Full box
+          {
+            lcd.write(208); // Full box symbol
+            nb_columns -= 5;
+          }
+          else // Partial box
+          {
+            lcd.write(map(nb_columns, 1, 4, 212, 209)); // Map the remaining nb_columns (case between 1 and 4) to the corresponding character number symbols : 212 = 1 bar, 211 = 2 bars, 210 = 3 bars, 209 = 4 bars
+            nb_columns = 0;
+          }
+        }
       }
     }
   }
+
+  if (CurrentSettings.DisplayTemperature2)
+  {
+    float Temp = relayControl.getTemperature(A1);
+    float MaxTemp;
+    if (CurrentSettings.Trigger2Temp == 0)
+      MaxTemp = 60;
+    else
+      MaxTemp = CurrentSettings.Trigger2Temp;
+    byte Col;
+    if (CurrentSettings.DisplayTemperature1)
+      Col = 5;
+    else
+      Col = 0;
+    lcd.setCursor(Col, 3);
+    if (Temp < 0)
+    {
+      lcd.print("OFF ");
+      if (CurrentSettings.DisplayTemperature2 == 3)
+      {
+        lcd.setCursor(Col, 2);
+        lcd.print("AMP ");
+      }
+    }
+    else if (Temp > MaxTemp)
+    {
+      lcd.setCursor(Col, 3);
+      lcd.print("HIGH");
+      if (CurrentSettings.DisplayTemperature2 == 3)
+      {
+        lcd.setCursor(Col, 2);
+        lcd.print("TEMP");
+      }
+    }
+    else
+    {
+      if (CurrentSettings.DisplayTemperature2 == 1 || CurrentSettings.DisplayTemperature2 == 3)
+      {
+        lcd.setCursor(Col, 3);
+        lcd.print(int(Temp));
+        lcd.write(128); // Degree symbol
+      }
+      if (CurrentSettings.DisplayTemperature2 == 2 || CurrentSettings.DisplayTemperature2 == 3)
+      {
+        if (CurrentSettings.DisplayTemperature2 == 2)
+          lcd.setCursor(Col, 3);
+        else
+          lcd.setCursor(Col, 2);
+
+        // Map the range (0c ~ max temperature) to the range of the bar (0 to Number of characters to show the bar * Number of possible values per character )
+        byte nb_columns = map(Temp, 0, MaxTemp, 0, 4 * 5);
+
+        for (byte i = 0; i < 4; ++i) // Number of characters to show the bar = 4
+        {
+
+          // Write character depending on number of columns remaining to display
+          if (nb_columns == 0)
+          { // Case empty
+            lcd.write(' ');
+          }
+          else if (nb_columns >= 5) // Full box
+          {
+            lcd.write(208); // Full box symbol
+            nb_columns -= 5;
+          }
+          else // Partial box
+          {
+            lcd.write(map(nb_columns, 1, 4, 212, 209)); // Map the remaining nb_columns (case between 1 and 4) to the corresponding character number symbols : 212 = 1 bar, 211 = 2 bars, 210 = 3 bars, 209 = 4 bars
+            nb_columns = 0;
+          }
+        }
+      }
+    }
+  }
+
+  mil_onRefreshTemperatureDisplay = millis();
 }
 
 void loop()
@@ -508,6 +614,9 @@ void loop()
   UIkey = getUserInput();
 
   // Detect power off
+  // If low power is detected the RuntimeSettings are written to EEPROM. We only write these data when power down is detected to avoid to write to the EEPROM every time the volume or input is changed (an EEPROM has a limited lifetime of about 100000 write cycles)
+  // TO DO This could be moved to getUserInput() to ensure it is always checked - maybe also set appMode to APP_STANDBY_MODE to ensure the possibility to wake up again with ONOFF if the power drop is only very brief (and not a total loss of power)
+  // TO DO The downside to checking this in getUserInput() is that it slows down but maybe it doesn't matter in practice.
   if (appMode != APP_OFF_STATE)
   {
     long vcc;
@@ -531,13 +640,8 @@ void loop()
   {
   case APP_NORMAL_MODE:
     if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
-    {
-      mil_onRefreshTemperatureDisplay = millis();
-      if (CurrentSettings.DisplayTemperature1)
-        DisplayTemperature(relayControl.getTemperature(A0), CurrentSettings.Trigger1Temp, 0, 3, 0, 2);
-      if (CurrentSettings.DisplayTemperature2)
-        DisplayTemperature(relayControl.getTemperature(A1), CurrentSettings.Trigger2Temp, 5, 3, 5, 2);
-    }
+      DisplayTemperatures();
+
     switch (UIkey)
     {
     case KEY_NONE:
@@ -629,6 +733,7 @@ void loop()
     case KEY_6:
     {
       byte inputNumber;
+      // TO DO The switch below can be replaced by inputNumber = UIkey - KEY_1 but it is not quite as readable?
       switch (UIkey)
       {
       case KEY_1:
@@ -674,6 +779,9 @@ void loop()
       }
     }
     break;
+    case KEY_PREVIOUS:
+      // TO DO Switch to previous selected input
+      break;
     case KEY_MUTE:
       // toggle mute
       if (CurrentRuntimeSettings.Muted)
@@ -714,11 +822,7 @@ void loop()
       lcd.setCursor(0, 0);
       if (CurrentSettings.DisplaySelectedInput)
         lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
-      mil_onRefreshTemperatureDisplay = millis();
-      if (CurrentSettings.DisplayTemperature1)
-        DisplayTemperature(relayControl.getTemperature(A0), CurrentSettings.Trigger1Temp, 0, 3, 0, 2);
-      if (CurrentSettings.DisplayTemperature2)
-        DisplayTemperature(relayControl.getTemperature(A1), CurrentSettings.Trigger2Temp, 5, 3, 5, 2);
+      DisplayTemperatures();
 
       appMode = APP_NORMAL_MODE;
     }
@@ -766,8 +870,8 @@ void toStandbyMode()
   lcd.print(F("Going to sleep!"));
   lcd.setCursor(0, 3);
   lcd.print(F("           ...zzzZZZ"));
-  // Mute output
-  // Turn of triggers
+  // TO DO Mute output
+  // TO DO Turn of triggers
   delay(2000);
   lcd.PowerDown();
   while (getUserInput() != KEY_ONOFF)
@@ -791,6 +895,7 @@ byte processMenuCommand(byte cmdId)
   case mnuCmdVOL_STEPS:
   {
     editNumericValue(CurrentSettings.VolumeSteps, 0, 99);
+    // TO DO Validate if VolumeSteps < Max_Volume (both global and for each input) - if so, they must be changed. Also if Max vol's are changed then maybe min. vol's needs to be changed also. Same goes for max start vol and mute lvl
     complete = true;
     break;
   }
@@ -812,91 +917,6 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdSTORE_LVL:
     editOptionValue(CurrentSettings.RecallSetLevel, 2, "No", "Yes", "", "");
-    complete = true;
-    break;
-  case mnuCmdIR_ONOFF:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_UP:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_UP_REPEAT:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_DOWN:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_DOWN_REPEAT:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_LEFT:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_RIGHT:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_SELECT:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_BACK:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_MUTE:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_PREV:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_1:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_2:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_3:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_4:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_5:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
-  case mnuCmdIR_6:
-    // TO DO
-    notImplementedYet();
     complete = true;
     break;
   case mnuCmdINPUT1_ACTIVE:
@@ -993,6 +1013,70 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdINPUT6_MIN_VOL:
     editNumericValue(CurrentSettings.Input[5].MinVol, CurrentSettings.MinVolume, CurrentSettings.Input[5].MaxVol);
+    complete = true;
+    break;
+  case mnuCmdIR_ONOFF:
+    editIRCode(CurrentSettings.IR_ONOFF);
+    complete = true;
+    break;
+  case mnuCmdIR_UP:
+    editIRCode(CurrentSettings.IR_UP);
+    complete = true;
+    break;
+  case mnuCmdIR_DOWN:
+    editIRCode(CurrentSettings.IR_DOWN);
+    complete = true;
+    break;
+  case mnuCmdIR_REPEAT:
+    editIRCode(CurrentSettings.IR_REPEAT);
+    complete = true;
+    break;
+  case mnuCmdIR_LEFT:
+    editIRCode(CurrentSettings.IR_LEFT);
+    complete = true;
+    break;
+  case mnuCmdIR_RIGHT:
+    editIRCode(CurrentSettings.IR_RIGHT);
+    complete = true;
+    break;
+  case mnuCmdIR_SELECT:
+    editIRCode(CurrentSettings.IR_SELECT);
+    complete = true;
+    break;
+  case mnuCmdIR_BACK:
+    editIRCode(CurrentSettings.IR_BACK);
+    complete = true;
+    break;
+  case mnuCmdIR_MUTE:
+    editIRCode(CurrentSettings.IR_MUTE);
+    complete = true;
+    break;
+  case mnuCmdIR_PREV:
+    editIRCode(CurrentSettings.IR_PREVIOUS);
+    complete = true;
+    break;
+  case mnuCmdIR_1:
+    editIRCode(CurrentSettings.IR_1);
+    complete = true;
+    break;
+  case mnuCmdIR_2:
+    editIRCode(CurrentSettings.IR_2);
+    complete = true;
+    break;
+  case mnuCmdIR_3:
+    editIRCode(CurrentSettings.IR_3);
+    complete = true;
+    break;
+  case mnuCmdIR_4:
+    editIRCode(CurrentSettings.IR_4);
+    complete = true;
+    break;
+  case mnuCmdIR_5:
+    editIRCode(CurrentSettings.IR_5);
+    complete = true;
+    break;
+  case mnuCmdIR_6:
+    editIRCode(CurrentSettings.IR_6);
     complete = true;
     break;
   case mnuCmdTRIGGER1_ACTIVE:
@@ -1290,6 +1374,7 @@ void editInputName(uint8_t InputNumber)
   lcd.BlinkingCursorOn();
   while (!complete)
   {
+    mil_LastUserInput = millis(); // Prevent the screen saver to kick in while editing
     switch (byte UserInput = getUserInput())
     {
     case KEY_RIGHT:
@@ -1414,6 +1499,7 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue)
 
   while (!complete)
   {
+    mil_LastUserInput = millis(); // Prevent the screen saver to kick in while editing
     switch (getUserInput())
     {
     case KEY_RIGHT:
@@ -1484,6 +1570,7 @@ bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const 
 
   while (!complete)
   {
+    mil_LastUserInput = millis(); // Prevent the screen saver to kick in while editing
     switch (getUserInput())
     {
     case KEY_RIGHT:
@@ -1525,19 +1612,78 @@ bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const 
   return result;
 }
 
-void notImplementedYet()
+bool editIRCode(HashIR_data_t &Value)
 {
+  bool complete = false;
+  bool result = false;
+  char nameBuf[11];
+
+  HashIR_data_t NewValue, OldValue;
+  NewValue.address = 0;
+  NewValue.command = 0;
+
+  // Display the screen
   lcd.clear();
-  lcd.print("This function is");
+  lcd.print(F("IR key "));
+  lcd.print(Menu1.getCurrentItemName(nameBuf));
+
   lcd.setCursor(0, 1);
-  lcd.print("not implemented yet.");
+  lcd.print(F("Current:"));
   lcd.setCursor(0, 2);
-  lcd.print("Press SELECT to");
+  lcd.print(Value.address, HEX);
   lcd.setCursor(0, 3);
-  lcd.print("continue...");
-  while (getUserInput() != KEY_SELECT)
+  lcd.print(Value.command, HEX);
+  lcd.setCursor(10, 1);
+  lcd.print(F("New:"));
+  lcd.setCursor(10, 2);
+  lcd.print(NewValue.address, HEX);
+  lcd.setCursor(10, 3);
+  lcd.print(NewValue.command, HEX);
+
+  // As we don't want to react to received IR code while learning new code we temporaryly disables the current code in the CurrentSettings (we save a copy in OldValue)
+  OldValue.address = Value.address;
+  OldValue.command = Value.command;
+  Value.address = 0x00;
+  Value.command = 0x00;
+
+  while (!complete)
   {
-  };
+    mil_LastUserInput = millis(); // Prevent the screen saver to kick in while editing
+    switch (getUserInput())
+    {
+    case KEY_SELECT:
+      Value.address = NewValue.address;
+      Value.command = NewValue.command;
+      writeSettingsToEEPROM();
+      result = true;
+      complete = true;
+      break;
+    case KEY_BACK:
+      // Exit without saving new value, but restore the original one
+      Value.address = OldValue.address;
+      Value.command = OldValue.command;
+      result = false;
+      complete = true;
+      break;
+    default:
+      break;
+    }
+    if (IRLremote.available())
+    {
+      // Get the new data from the remote
+      NewValue = IRLremote.read();
+      lcd.setCursor(10, 2);
+      lcd.print("          ");
+      lcd.setCursor(10, 2);
+      lcd.print(NewValue.address, HEX);
+      lcd.setCursor(10, 3);
+      lcd.print("          ");
+      lcd.setCursor(10, 3);
+      lcd.print(NewValue.command, HEX);
+    }
+  }
+  lcd.clear();
+  return result;
 }
 
 // Loads default settings into CurrentSettings and CurrentRuntimeSettings - this is only done when the EEPROM does not contain valid settings or when reset is chosen by user in the menu
@@ -1551,12 +1697,10 @@ void setCurrentSettingsToDefault()
   CurrentSettings.RecallSetLevel = true;
   CurrentSettings.IR_UP.address = 0x24;
   CurrentSettings.IR_UP.command = 0x3AEA5A5F;
-  CurrentSettings.IR_UP_REPEAT.address = 0x24;
-  CurrentSettings.IR_UP_REPEAT.command = 0x3AEA5A5F;
   CurrentSettings.IR_DOWN.address = 0x24;
   CurrentSettings.IR_DOWN.command = 0xE64E6057;
-  CurrentSettings.IR_DOWN_REPEAT.address = 0x24;
-  CurrentSettings.IR_DOWN_REPEAT.command = 0xE64E6057;
+  CurrentSettings.IR_REPEAT.address = 0x24;
+  CurrentSettings.IR_REPEAT.command = 0xE64E6057;
   CurrentSettings.IR_LEFT.address = 0x24;
   CurrentSettings.IR_LEFT.command = 0x4C7A8423;
   CurrentSettings.IR_RIGHT.address = 0x24;
@@ -1567,6 +1711,8 @@ void setCurrentSettingsToDefault()
   CurrentSettings.IR_BACK.command = 0xE28395C7;
   CurrentSettings.IR_MUTE.address = 0x24;
   CurrentSettings.IR_MUTE.command = 0x41C09D23;
+  CurrentSettings.IR_PREVIOUS.address = 0x24;
+  CurrentSettings.IR_PREVIOUS.command = 0x5A3E996B;
   CurrentSettings.IR_ONOFF.address = 0x24;
   CurrentSettings.IR_ONOFF.command = 0x41D976CF;
   CurrentSettings.IR_1.address = 0x24;
