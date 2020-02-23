@@ -75,7 +75,7 @@ typedef union {
     byte TriggerInactOffTimer;     // Hours without user interaction before automatic power down (0 = never)
     byte ScreenSaverActive;        // 0 = the display will stay on/not be dimmed, 1 = the display will be dimmed to the specified level after a specified period of time with no user input
     byte DisplayOnLevel;           // The contrast level of the display when it is on, 0 = 25%, 1 = 50%, 2 = 75%, 3 = 100%
-    byte DisplayDimLevel;          // The contrast level of the display when screen saver is active. 0 = 0%, 1 = 25%, 2 = 50%, 3 = 75%. If DisplayOnLevel = 3 and DisplayDimLevel = 0 the display will be turned off when the screen saver is active (to reduce electrical noise)
+    byte DisplayDimLevel;          // The contrast level of the display when screen saver is active. 0 = off, 1 = 3, 2 = 7 ... 32 = 127. If DisplayDimLevel = 0 the display will be turned off when the screen saver is active (to reduce electrical noise)
     byte DisplayTimeout;           // Number of seconds before the screen saver is activated.
     byte DisplaySelectedInput;     // 0 = the name of the active input is not shown on the display (ie. if only one input is used), 1 = the name of the selected input is shown on the display
     byte DisplayTemperature1;      // 0 = do not display the temperature measured by NTC 1, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
@@ -176,7 +176,7 @@ enum AppModeValues
   APP_MENU_MODE,
   APP_PROCESS_MENU_CMD,
   APP_STANDBY_MODE,
-  APP_OFF_STATE
+  APP_POWERLOSS_STATE
 };
 
 byte appMode = APP_NORMAL_MODE;
@@ -278,8 +278,6 @@ byte getUserInput()
   button1 = encoder1->getButton();
   switch (button1)
   {
-  case ClickEncoder::Open:
-    break;
   case ClickEncoder::Clicked:
     receivedInput = KEY_SELECT;
     break;
@@ -303,12 +301,13 @@ byte getUserInput()
   button2 = encoder2->getButton();
   switch (button2)
   {
-  case ClickEncoder::Open:
-    break;
   case ClickEncoder::Clicked:
     receivedInput = KEY_BACK;
     break;
-  default:
+   case ClickEncoder::DoubleClicked:
+    receivedInput = KEY_ONOFF;
+    break;
+   default:
     break;
   }
 
@@ -389,7 +388,7 @@ byte getUserInput()
       if (CurrentSettings.DisplayDimLevel == 0)
         lcd.lcdOff();
       else
-        lcd.backlight((CurrentSettings.DisplayDimLevel) * 64 - 1);
+        lcd.backlight(CurrentSettings.DisplayDimLevel * 4 - 1);
       ScreenSaverIsOn = true;
     }
   }
@@ -432,22 +431,23 @@ void setup()
   setupRelayController();
   readSettingsFromEEPROM();
   readRuntimeSettingsFromEEPROM();
+
+  // Check if settings stored in EEPROM are NOT valid - we write the default settings to the EEPROM and reboots
   if ((CurrentSettings.Version != VERSION) || (CurrentRuntimeSettings.Version != VERSION))
   {
-    Serial.println(F("ERROR: Settings read from EEPROM are not ok"));
+    //Serial.println(F("ERROR: Settings read from EEPROM are not ok"));
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(F("Restoring default"));
     lcd.setCursor(0, 1);
     lcd.print(F("settings..."));
-    delay(5000);
+    delay(2000);
     lcd.clear();
     writeDefaultSettingsToEEPROM();
     reboot();
   }
-  else
+  else // Settings read from EEPROM are valid so let's move on!
   {
-    Serial.println(F("Settings read from EEPROM are ok"));
     // TO DO if triggers are active then wait for the set number of seconds (if > 0) and turn them on with the chosen method
     // TO DO Select input relay
     // TO DO Set volume
@@ -458,7 +458,6 @@ void setup()
       lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
     }
     DisplayTemperatures();
-    Serial.println(F("Ready"));
   }
 }
 
@@ -499,6 +498,7 @@ void DisplayTemperatures()
         lcd.setCursor(0, 3);
         lcd.print(int(Temp));
         lcd.write(128); // Degree symbol
+        lcd.print(" ");
       }
       if (CurrentSettings.DisplayTemperature1 == 2 || CurrentSettings.DisplayTemperature1 == 3)
       {
@@ -573,6 +573,7 @@ void DisplayTemperatures()
         lcd.setCursor(Col, 3);
         lcd.print(int(Temp));
         lcd.write(128); // Degree symbol
+        lcd.print(" ");
       }
       if (CurrentSettings.DisplayTemperature2 == 2 || CurrentSettings.DisplayTemperature2 == 3)
       {
@@ -618,7 +619,7 @@ void loop()
   // If low power is detected the RuntimeSettings are written to EEPROM. We only write these data when power down is detected to avoid to write to the EEPROM every time the volume or input is changed (an EEPROM has a limited lifetime of about 100000 write cycles)
   // TO DO This could be moved to getUserInput() to ensure it is always checked - maybe also set appMode to APP_STANDBY_MODE to ensure the possibility to wake up again with ONOFF if the power drop is only very brief (and not a total loss of power)
   // TO DO The downside to checking this in getUserInput() is that it slows down but maybe it doesn't matter in practice.
-  if (appMode != APP_OFF_STATE)
+  if (appMode != APP_POWERLOSS_STATE)
   {
     long vcc;
     ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
@@ -633,7 +634,7 @@ void loop()
     {
       writeRuntimeSettingsToEEPROM();
       // TO DO Turn off trigger relays
-      appMode = APP_OFF_STATE; // Switch to APP_STATE_OFF and do nothing until power disappears completely
+      appMode = APP_POWERLOSS_STATE; // Switch to APP_STATE_OFF and do nothing until power disappears completely
     }
   }
 
@@ -845,9 +846,9 @@ void loop()
     break;
   }
   case APP_STANDBY_MODE:
-    // Do nothing if in APP_STANDBY_MODE - if the user presses ONOFF a restart/reboot is done by getUserInput();
+    // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart/reboot is done by getUserInput(). By the way: you don't need an IR remote to be set up - a doubleclick on encoder_2 is also KEY_ONOFF
     break;
-  case APP_OFF_STATE: // Only active if power drop is detected
+  case APP_POWERLOSS_STATE: // Only active if power drop is detected
     while (1)
     {
     }; // Wait until power is completely gone
@@ -867,7 +868,7 @@ void toStandbyMode()
     ScreenSaverIsOn = false;
   }
   lcd.clear();
-  lcd.setCursor(0, 2);
+  lcd.setCursor(0, 1);
   lcd.print(F("Going to sleep!"));
   lcd.setCursor(0, 3);
   lcd.print(F("           ...zzzZZZ"));
@@ -1134,7 +1135,13 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdDISP_DIM_LEVEL:
-    editOptionValue(CurrentSettings.DisplayDimLevel, 4, "0%", "25%", "50%", "75%");
+    editNumericValue(CurrentSettings.DisplayDimLevel, 0, 32);
+    if (CurrentSettings.DisplayDimLevel != 0)
+    {
+      lcd.backlight(CurrentSettings.DisplayDimLevel * 4 - 1);
+      delay(2000);
+      lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
+    }
     complete = true;
     break;
   case mnuCmdDISP_DIM_TIMEOUT:
@@ -1482,7 +1489,6 @@ void editInputName(uint8_t InputNumber)
     }
   }
   lcd.BlinkingCursorOff();
-  lcd.clear();
 }
 
 void drawEditInputNameScreen(bool isUpperCase)
@@ -1568,7 +1574,6 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue)
       break;
     }
   }
-  lcd.clear();
   return result;
 }
 
@@ -1645,7 +1650,6 @@ bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const 
       break;
     }
   }
-  lcd.clear();
   return result;
 }
 
@@ -1677,7 +1681,7 @@ bool editIRCode(HashIR_data_t &Value)
   lcd.setCursor(10, 3);
   lcd.print(NewValue.command, HEX);
 
-  // As we don't want to react to received IR code while learning new code we temporaryly disables the current code in the CurrentSettings (we save a copy in OldValue)
+  // As we don't want to react to received IR code while learning new code we temporaryly disable the current code in the CurrentSettings (we save a copy in OldValue)
   OldValue.address = Value.address;
   OldValue.command = Value.command;
   Value.address = 0x00;
@@ -1710,16 +1714,15 @@ bool editIRCode(HashIR_data_t &Value)
       // Get the new data from the remote
       NewValue = IRLremote.read();
       lcd.setCursor(10, 2);
-      lcd.print("          ");
+      lcd.print(F("          "));
       lcd.setCursor(10, 2);
       lcd.print(NewValue.address, HEX);
       lcd.setCursor(10, 3);
-      lcd.print("          ");
+      lcd.print(F("          "));
       lcd.setCursor(10, 3);
       lcd.print(NewValue.command, HEX);
     }
   }
-  lcd.clear();
   return result;
 }
 
@@ -1736,8 +1739,8 @@ void setCurrentSettingsToDefault()
   CurrentSettings.IR_UP.command = 0x3AEA5A5F;
   CurrentSettings.IR_DOWN.address = 0x24;
   CurrentSettings.IR_DOWN.command = 0xE64E6057;
-  CurrentSettings.IR_REPEAT.address = 0x24;
-  CurrentSettings.IR_REPEAT.command = 0xE64E6057;
+  CurrentSettings.IR_REPEAT.address = 0x00;
+  CurrentSettings.IR_REPEAT.command = 0x00;
   CurrentSettings.IR_LEFT.address = 0x24;
   CurrentSettings.IR_LEFT.command = 0x4C7A8423;
   CurrentSettings.IR_RIGHT.address = 0x24;
