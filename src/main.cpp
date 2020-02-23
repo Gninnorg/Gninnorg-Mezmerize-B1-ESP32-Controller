@@ -8,7 +8,7 @@
 **
 */
 
-#define VERSION 0.911
+#define VERSION 0.9
 
 #include "Wire.h"
 #include "OLedI2C.h"
@@ -20,6 +20,8 @@
 #include "MenuManager.h"
 #include "MenuData.h"
 #include "RelayController.h"
+
+unsigned long mil_On = millis(); // Holds the millis from last power on (or reboot)
 
 struct InputSettings
 {
@@ -43,6 +45,7 @@ typedef union {
     byte MaxStartVolume;           // If StoreSetLevel is true, then limit the volume to the specified value when the controller is powered on
     byte MuteLevel;                // The level to be set when Mute is activated by the user. The Mute function of the Muses72320 is activated if 0 is specified
     byte RecallSetLevel;           // Remember/store the volume level for each separate input
+    HashIR_data_t IR_ONOFF;        // IR data to be interpreted as ON/OFF - switch between running and suspend mode (and turn triggers off)
     HashIR_data_t IR_UP;           // IR data to be interpreted as UP
     HashIR_data_t IR_UP_REPEAT;    // IR data to be interpreted as UP (if different code is sent when the UP key on the remote is held down)
     HashIR_data_t IR_DOWN;         // IR data to be interpreted as DOWN
@@ -52,7 +55,6 @@ typedef union {
     HashIR_data_t IR_SELECT;       // IR data to be interpreted as SELECT
     HashIR_data_t IR_BACK;         // IR data to be interpreted as BACK
     HashIR_data_t IR_MUTE;         // IR data to be interpreted as MUTE
-    HashIR_data_t IR_ONOFF;        // IR data to be interpreted as ON/OFF - switch between running and suspend mode (and turn triggers off)
     HashIR_data_t IR_1;            // IR data to be interpreted as 1 (to select input 1 directly)
     HashIR_data_t IR_2;            // IR data to be interpreted as 2
     HashIR_data_t IR_3;            // IR data to be interpreted as 3
@@ -64,17 +66,16 @@ typedef union {
     byte Trigger1Type;             // 0 = momentary, 1 = latching
     byte Trigger1Mode;             // 0 = standard, 1 = intelligent (with measurement of NTC+LDR value)
     byte Trigger1OnDelay;          // Seconds from controller power up to activation of trigger. The default delay allows time for the output relay of the Mezmerize to be activated before we turn on the power amps. The selection of an input of the Mezmerize will also be delayed.
-    uint16_t Trigger1InactTimer;   // Minutes before automatic power down (0 = never)
     byte Trigger1Temp;             // Temperature protection: if the temperature is measured to the set number of degrees Celcius (via the LDRs), the controller will attempt to trigger a shutdown of the connected power amps (if set to 0, the temperature protection is not active
     byte Trigger2Active;           // 0 = the trigger is not active, 1 = the trigger is active
     byte Trigger2Type;             // 0 = momentary, 1 = latching
     byte Trigger2Mode;             // 0 = standard, 1 = intelligent (with measurement of NTC+LDR value)
     byte Trigger2OnDelay;          // Seconds from controller power up to activation of trigger. The default delay allows time for the output relay of the Mezmerize to be activated before we turn on the power amps. The selection of an input of the Mezmerize will also be delayed.
-    uint16_t Trigger2InactTimer;   // Minutes before automatic power down (0 = never)
     byte Trigger2Temp;             // Temperature protection: if the temperature is measured to the set number of degrees Celcius (via the LDRs), the controller will attempt to trigger a shutdown of the connected power amps (if set to 0, the temperature protection is not active)
+    byte TriggerInactOffTimer;     // Hours without user interaction before automatic power down (0 = never)
     byte ScreenSaverActive;        // 0 = the display will stay on/not be dimmed, 1 = the display will be dimmed to the specified level after a specified period of time with no user input
-    byte DisplayOnLevel;           // The contrast level of the display when it is on
-    byte DisplayDimLevel;          // The contrast level of the display when screen saver is active. If DisplayOnLevel = 0xFF and DisplayDimLevel = 0x00 the display will be turned off when the screen saver is active (to reduce electrical noise)
+    byte DisplayOnLevel;           // The contrast level of the display when it is on, 0 = 25%, 1 = 50%, 2 = 75%, 3 = 100%
+    byte DisplayDimLevel;          // The contrast level of the display when screen saver is active. 0 = 0%, 1 = 25%, 2 = 50%, 3 = 75%. If DisplayOnLevel = 3 and DisplayDimLevel = 0 the display will be turned off when the screen saver is active (to reduce electrical noise)
     byte DisplayTimeout;           // Number of seconds before the screen saver is activated.
     byte DisplaySelectedInput;     // 0 = the name of the active input is not shown on the display (ie. if only one input is used), 1 = the name of the selected input is shown on the display
     byte DisplayTemperature1;      // 0 = do not display the temperature measured by NTC 1, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
@@ -95,7 +96,7 @@ typedef union {
     bool Muted;             // Indicates if we are in mute mode or not
     byte InputLastVol[6];   // The last volume set for each input
     byte PrevSelectedInput; // Holds the input selected before the current one
-    float Version; // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
+    float Version;          // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
   };
   byte data[]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
 } RuntimeSettings;
@@ -152,14 +153,14 @@ void writeRuntimeSettingsToEEPROM(void);
 // Setup Display
 OLedI2C lcd;
 bool ScreenSaverIsOn = false;                  // Used to indicate whether the screen saver is running or not
-unsigned long mil_onAction;                    // Used to keep track of the time of the last user interaction (part of the screen saver timing)
+unsigned long mil_LastUserInput;               // Used to keep track of the time of the last user interaction (part of the screen saver timing)
 unsigned long mil_onRefreshTemperatureDisplay; // Used to time how often the display of temperatures is updated
 #define TEMP_REFRESH_INTERVAL 30000            // Update the display of temperatures every 30 seconds
 
 void setupDisplay()
 {
   lcd.begin();
-  lcd.backlight(CurrentSettings.DisplayOnLevel);
+  lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
   lcd.clear();
   lcd.defineCustomChar();
 }
@@ -248,7 +249,9 @@ enum UserInput
   KEY_ONOFF        // IR
 };
 
-byte UIkey; // holds the last received user input (from rotary encoders or IR)
+byte UIkey;                              // holds the last received user input (from rotary encoders or IR)
+unsigned long last_KEY_ONOFF = millis(); // Used to ensure that fast repetition of KEY_ONOFF is not accepted
+void toStandbyMode(void);
 
 // Returns input from the user - enumerated to be the same value no matter if input is from encoders or IR remote
 byte getUserInput()
@@ -311,22 +314,20 @@ byte getUserInput()
     // Get the new data from the remote
     auto data = IRLremote.read();
 
-    /* Print the protocol data
     Serial.print(F("Address: 0x"));
     Serial.println(data.address, HEX);
     Serial.print(F("Command: 0x"));
     Serial.println(data.command, HEX);
-    */
 
     // Map the received IR input to UserInput values
     if (data.address == CurrentSettings.IR_UP.address && data.command == CurrentSettings.IR_UP.command)
       receivedInput = KEY_UP;
     else if (data.address == CurrentSettings.IR_UP_REPEAT.address && data.command == CurrentSettings.IR_UP_REPEAT.command)
-      receivedInput = KEY_UP_REPEAT;
+      receivedInput = KEY_UP;
     else if (data.address == CurrentSettings.IR_DOWN.address && data.command == CurrentSettings.IR_DOWN.command)
       receivedInput = KEY_DOWN;
     else if (data.address == CurrentSettings.IR_DOWN_REPEAT.address && data.command == CurrentSettings.IR_DOWN_REPEAT.command)
-      receivedInput = KEY_DOWN_REPEAT;
+      receivedInput = KEY_DOWN;
     else if (data.address == CurrentSettings.IR_LEFT.address && data.command == CurrentSettings.IR_LEFT.command)
       receivedInput = KEY_LEFT;
     else if (data.address == CurrentSettings.IR_RIGHT.address && data.command == CurrentSettings.IR_RIGHT.command)
@@ -353,30 +354,56 @@ byte getUserInput()
       receivedInput = KEY_6;
   }
 
-  // Turn Screen Saver on/off if it is activated and if no user input has been received during the defined number of seconds
-  if (receivedInput == KEY_NONE && CurrentSettings.ScreenSaverActive)
+  // Cancel received KEY_ONOFF if it has been received before within the last 5 seconds
+  if (receivedInput == KEY_ONOFF)
   {
-    if (!ScreenSaverIsOn && (millis() - mil_onAction > (unsigned long)CurrentSettings.DisplayTimeout * 1000))
+    if (last_KEY_ONOFF + 5000 > millis())
+      receivedInput = KEY_NONE;
+    else
+    {
+      last_KEY_ONOFF = millis();
+      if (appMode != APP_STANDBY_MODE)
+      {
+        appMode = APP_STANDBY_MODE;
+        toStandbyMode();
+      }
+      else                       // wake from standby - we do it by restarting the sketch (a bit hardcore, but it works ;-)
+        asm volatile("  jmp 0"); // Restarts the sketch
+    }
+  }
+
+  // Turn Screen Saver on/off if it is activated and if no user input has been received during the defined number of seconds
+  if (receivedInput == KEY_NONE && CurrentSettings.ScreenSaverActive && appMode != APP_STANDBY_MODE)
+  {
+    if (!ScreenSaverIsOn && (millis() - mil_LastUserInput > (unsigned long)CurrentSettings.DisplayTimeout * 1000))
     {
       if (CurrentSettings.DisplayDimLevel == 0)
         lcd.lcdOff();
       else
-        lcd.backlight(CurrentSettings.DisplayDimLevel);
+        lcd.backlight((CurrentSettings.DisplayDimLevel) * 64 - 1);
       ScreenSaverIsOn = true;
     }
   }
   else
   {
-    mil_onAction = millis();
+    mil_LastUserInput = millis();
     if (ScreenSaverIsOn)
     {
       if (CurrentSettings.DisplayDimLevel == 0)
         lcd.lcdOn();
       else
-        lcd.backlight(CurrentSettings.DisplayOnLevel);
+        lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
       ScreenSaverIsOn = false;
     }
   }
+
+  // If inactivity timer is set, go to standby if the set number of hours have passed since power on (or reboot)
+  if ((appMode != APP_STANDBY_MODE) && (CurrentSettings.TriggerInactOffTimer > 0) && ((mil_On + CurrentSettings.TriggerInactOffTimer * 3600000) < millis()))
+  {
+    appMode = APP_STANDBY_MODE;
+    toStandbyMode();
+  }
+
   return (receivedInput);
 }
 
@@ -401,12 +428,10 @@ void setup()
     Serial.println(F("ERROR: Settings read from EEPROM are not ok"));
     lcd.clear();
     lcd.setCursor(0, 0);
-    //lcd.print(F("Restoring default"));
-    lcd.print(CurrentSettings.Version);
+    lcd.print(F("Restoring default"));
     lcd.setCursor(0, 1);
-    //lcd.print(F("settings..."));
-    lcd.print(CurrentRuntimeSettings.Version);
-    delay(10000);
+    lcd.print(F("settings..."));
+    delay(5000);
     lcd.clear();
     writeDefaultSettingsToEEPROM();
     reboot();
@@ -465,7 +490,7 @@ void DisplayTemperature(float Temp, float MaxTemp, byte ColumnForDegrees, byte S
         lcd.write(' ');
       }
       else if (nb_columns >= 5) // Full box
-      {                 
+      {
         lcd.write(208); // Full box symbol
         nb_columns -= 5;
       }
@@ -588,7 +613,6 @@ void loop()
         // TO DO set volume to CurrentSettings.CurrentVolume (remember validations against global volume levels and local volume levels)
         lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
         // TO DO Unmute
-        // TO DO Save to EEPROM
         if (CurrentSettings.DisplaySelectedInput)
         {
           lcd.setCursor(0, 0);
@@ -629,14 +653,23 @@ void loop()
       // Select input (if active)
       if (CurrentSettings.Input[inputNumber].Active)
       {
-        CurrentRuntimeSettings.PrevSelectedInput = CurrentRuntimeSettings.CurrentInput; // Save the current input as the previous selected input
-        CurrentRuntimeSettings.CurrentInput = inputNumber;
-        // TO DO switch to CurrentRuntimeSettings.CurrentInput
-        // TO DO Save to EEPROM
-        if (CurrentSettings.DisplaySelectedInput)
+        if (CurrentRuntimeSettings.CurrentInput != inputNumber) // Change settings
         {
-          lcd.setCursor(0, 0);
-          lcd.print(CurrentSettings.Input[inputNumber].Name); // TO DO Need to add padding with spaces to delete earlier displayed input name
+          CurrentRuntimeSettings.PrevSelectedInput = CurrentRuntimeSettings.CurrentInput; // Save the current input as the previous selected input
+          CurrentRuntimeSettings.CurrentInput = inputNumber;
+          // TO DO Mute
+          // TO DO switch to nextInput
+          if (CurrentSettings.RecallSetLevel)
+            CurrentRuntimeSettings.CurrentVolume = CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput];
+
+          // TO DO set volume to CurrentSettings.CurrentVolume (remember validations against global volume levels and local volume levels)
+          lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+          // TO DO Unmute
+          if (CurrentSettings.DisplaySelectedInput)
+          {
+            lcd.setCursor(0, 0);
+            lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
+          }
         }
       }
     }
@@ -667,10 +700,6 @@ void loop()
       }
       break;
     }
-    break;
-
-  case KEY_ONOFF:
-    appMode = APP_STANDBY_MODE;
     break;
 
   case APP_MENU_MODE:
@@ -710,14 +739,39 @@ void loop()
     }
     break;
   }
-  case APP_OFF_STATE: // Only active if power drop is detected
-    while (1)         // Wait until power is completely gone
-      ;
-    break;
   case APP_STANDBY_MODE:
-    // TO DO
+    // Do nothing if in APP_STANDBY_MODE - if the user presses ONOFF a restart/reboot is done by getUserInput();
+    break;
+  case APP_OFF_STATE: // Only active if power drop is detected
+    while (1)
+    {
+    }; // Wait until power is completely gone
     break;
   }
+}
+
+void toStandbyMode()
+{
+  writeRuntimeSettingsToEEPROM();
+  if (ScreenSaverIsOn)
+  {
+    if (CurrentSettings.DisplayDimLevel == 0)
+      lcd.lcdOn();
+    else
+      lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
+    ScreenSaverIsOn = false;
+  }
+  lcd.clear();
+  lcd.setCursor(0, 2);
+  lcd.print(F("Going to sleep!"));
+  lcd.setCursor(0, 3);
+  lcd.print(F("           ...zzzZZZ"));
+  // Mute output
+  // Turn of triggers
+  delay(2000);
+  lcd.PowerDown();
+  while (getUserInput() != KEY_ONOFF)
+    ;
 }
 
 //----------------------------------------------------------------------
@@ -760,12 +814,27 @@ byte processMenuCommand(byte cmdId)
     editOptionValue(CurrentSettings.RecallSetLevel, 2, "No", "Yes", "", "");
     complete = true;
     break;
+  case mnuCmdIR_ONOFF:
+    // TO DO
+    notImplementedYet();
+    complete = true;
+    break;
   case mnuCmdIR_UP:
     // TO DO
     notImplementedYet();
     complete = true;
     break;
+  case mnuCmdIR_UP_REPEAT:
+    // TO DO
+    notImplementedYet();
+    complete = true;
+    break;
   case mnuCmdIR_DOWN:
+    // TO DO
+    notImplementedYet();
+    complete = true;
+    break;
+  case mnuCmdIR_DOWN_REPEAT:
     // TO DO
     notImplementedYet();
     complete = true;
@@ -931,20 +1000,15 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdTRIGGER1_TYPE:
-    editOptionValue(CurrentSettings.Trigger1Type, 2, "Standard", "Smart", "", "");
+    editOptionValue(CurrentSettings.Trigger1Mode, 2, "Moment.", "Latching", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER1_MODE:
-    editOptionValue(CurrentSettings.Trigger1Mode, 2, "Moment.", "Latching", "", "");
+    editOptionValue(CurrentSettings.Trigger1Type, 2, "Standard", "SmartON", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER1_ON_DELAY:
     editNumericValue(CurrentSettings.Trigger1OnDelay, 0, 90);
-    complete = true;
-    break;
-  case mnuCmdTRIGGER1_INACT_TIMER:
-    // TO DO
-    notImplementedYet();
     complete = true;
     break;
   case mnuCmdTRIGGER1_TEMP:
@@ -956,25 +1020,23 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdTRIGGER2_TYPE:
-    editOptionValue(CurrentSettings.Trigger2Type, 2, "Standard", "Smart", "", "");
-    notImplementedYet();
+    editOptionValue(CurrentSettings.Trigger2Mode, 2, "Moment.", "Latching", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER2_MODE:
-    editOptionValue(CurrentSettings.Trigger2Mode, 2, "Moment.", "Latching", "", "");
+    editOptionValue(CurrentSettings.Trigger2Type, 2, "Standard", "SmartON", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER2_ON_DELAY:
     editNumericValue(CurrentSettings.Trigger2OnDelay, 0, 90);
     complete = true;
     break;
-  case mnuCmdTRIGGER2_INACT_TIMER:
-    // TO DO
-    notImplementedYet();
-    complete = true;
-    break;
   case mnuCmdTRIGGER2_TEMP:
     editNumericValue(CurrentSettings.Trigger2Temp, 0, 90);
+    complete = true;
+    break;
+  case mnuCmdTRIGGER_INACT_TIMER:
+    editNumericValue(CurrentSettings.TriggerInactOffTimer, 0, 24);
     complete = true;
     break;
   case mnuCmdDISP_SAVER_ACTIVE:
@@ -982,13 +1044,12 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdDISP_ON_LEVEL:
-    // TO DO
-    notImplementedYet();
+    editOptionValue(CurrentSettings.DisplayOnLevel, 4, "25%", "50%", "75%", "100%");
+    lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
     complete = true;
     break;
   case mnuCmdDISP_DIM_LEVEL:
-    // TO DO
-    notImplementedYet();
+    editOptionValue(CurrentSettings.DisplayDimLevel, 4, "0%", "25%", "50%", "75%");
     complete = true;
     break;
   case mnuCmdDISP_DIM_TIMEOUT:
@@ -1547,16 +1608,15 @@ void setCurrentSettingsToDefault()
   CurrentSettings.Trigger1Type = false;
   CurrentSettings.Trigger1Mode = true;
   CurrentSettings.Trigger1OnDelay = 10;
-  CurrentSettings.Trigger1InactTimer = 0;
   CurrentSettings.Trigger1Temp = 60;
   CurrentSettings.Trigger2Type = false;
   CurrentSettings.Trigger2Mode = true;
   CurrentSettings.Trigger2OnDelay = 10;
-  CurrentSettings.Trigger2InactTimer = 0;
   CurrentSettings.Trigger2Temp = 60;
+  CurrentSettings.TriggerInactOffTimer = 0;
   CurrentSettings.ScreenSaverActive = true;
-  CurrentSettings.DisplayOnLevel = 0xFF;
-  CurrentSettings.DisplayDimLevel = 0x00;
+  CurrentSettings.DisplayOnLevel = 3;
+  CurrentSettings.DisplayDimLevel = 0;
   CurrentSettings.DisplayTimeout = 30;
   CurrentSettings.DisplaySelectedInput = true;
   CurrentSettings.DisplayTemperature1 = 3;
@@ -1608,7 +1668,7 @@ void writeRuntimeSettingsToEEPROM()
 {
   // Write the settings to the EEPROM
   eeprom.begin(extEEPROM::twiClock400kHz);
-  eeprom.write(sizeof(CurrentSettings)+1, CurrentRuntimeSettings.data, sizeof(CurrentRuntimeSettings));
+  eeprom.write(sizeof(CurrentSettings) + 1, CurrentRuntimeSettings.data, sizeof(CurrentRuntimeSettings));
 }
 
 // Read the last runtime settings from EEPROM
@@ -1616,7 +1676,7 @@ void readRuntimeSettingsFromEEPROM()
 {
   // Read the settings from the EEPROM
   eeprom.begin(extEEPROM::twiClock400kHz);
-  eeprom.read(sizeof(CurrentSettings)+1, CurrentRuntimeSettings.data, sizeof(CurrentRuntimeSettings));
+  eeprom.read(sizeof(CurrentSettings) + 1, CurrentRuntimeSettings.data, sizeof(CurrentRuntimeSettings));
 }
 
 // Reboots the sketch - used after restoring default settings

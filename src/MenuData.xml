@@ -10,13 +10,16 @@
                 <Item Id="MAX_VOL" Name="Max. volume"/>
                 <Item Id="MAX_START_VOL" Name="Max start vol"/>
                 <Item Id="MUTE_LVL" Name="Mute level"/>
-                <Item Id="STORE_LVL" Name="Store volume"/>
+                <Item Id="STORE_LVL" Name="Vol. memory"/>
             </MenuItems>
         </Item>
         <Item Id="IR_MENU" Name="Learn IR">
             <MenuItems>
+                <Item Id="IR_ONOFF" Name="On/Off"/>
                 <Item Id="IR_UP" Name="Up"/>
+                <Item Id="IR_UP_REPEAT" Name="Up (repeat)"/>
                 <Item Id="IR_DOWN" Name="Down"/>
+                <Item Id="IR_DOWN_REPEAT" Name="Down (repeat)"/>
                 <Item Id="IR_LEFT" Name="Left"/>
                 <Item Id="IR_RIGHT" Name="Right"/>
                 <Item Id="IR_SELECT" Name="Select"/>
@@ -83,30 +86,50 @@
                 </Item>
             </MenuItems>
         </Item>
-
         <Item Id="PWR_CTL_MENU" Name="Triggers">
             <MenuItems>
                 <Item Id="TRIG1_MENU" Name="Trigger 1">
                     <MenuItems>
                         <Item Id="TRIGGER1_ACTIVE" Name="Active"/>
                         <Item Id="TRIGGER1_TYPE" Name="Moment./Latch"/>
-                        <Item Id="TRIGGER1_MODE" Name="Mode"/>
+                        <Item Id="TRIGGER1_MODE" Name="Std./SmartON"/>
                         <Item Id="TRIGGER1_ON_DELAY" Name="On delay"/>
-                        <Item Id="TRIGGER1_INACT_TIMER" Name="Off timer"/>
-                        <Item Id="TRIGGER1_TEMP" Name="Temp ctrl"/>
+                        <Item Id="TRIGGER1_TEMP" Name="Temp Ctrl"/>
                     </MenuItems>
                 </Item>
                 <Item Id="TRIG2_MENU" Name="Trigger 2">
                     <MenuItems>
                         <Item Id="TRIGGER2_ACTIVE" Name="Active"/>
                         <Item Id="TRIGGER2_TYPE" Name="Moment./Latch"/>
-                        <Item Id="TRIGGER2_MODE" Name="Mode"/>
+                        <Item Id="TRIGGER2_MODE" Name="Std./SmartON"/>
                         <Item Id="TRIGGER2_ON_DELAY" Name="On Delay"/>
-                        <Item Id="TRIGGER2_INACT_TIMER" Name="Off Timer"/>
-                        <Item Id="TRIGGER2_TEMP" Name="Temp ctrl"/>
+                        <Item Id="TRIGGER2_TEMP" Name="Temp Ctrl"/>
                     </MenuItems>
                 </Item>
+                <Item Id="TRIGGER_INACT_TIMER" Name="Standby Timer"/>
+
             </MenuItems>
+        </Item>
+        <Item Id="DISP_MENU" Name="Display">
+            <MenuItems>
+                <Item Id="DISP_SAVER_ACTIVE" Name="Screen saver"/>
+                <Item Id="DISP_ON_LEVEL" Name="On Level"/>
+                <Item Id="DISP_DIM_LEVEL" Name="Dim Level"/>
+                <Item Id="DISP_DIM_TIMEOUT" Name="Timeout"/>
+                <Item Id="DISP_INPUT" Name="Show Input"/>
+                <Item Id="DISP_TEMP1" Name="Show Temp 1"/>
+                <Item Id="DISP_TEMP2" Name="Show Temp 2"/>
+            </MenuItems>
+        </Item>
+        <Item Id="ABOUT" Name="About"/>
+        <Item Id="RESET_MENU" Name="Reset">
+            <MenuItems>
+                <Item Id="RESET_NOW" Name="Reset settings"/>
+            </MenuItems>
+        </Item>
+    </MenuItems>
+</RootMenu>
+    </MenuItems>
         </Item>
         <Item Id="DISP_MENU" Name="Display">
             <MenuItems>

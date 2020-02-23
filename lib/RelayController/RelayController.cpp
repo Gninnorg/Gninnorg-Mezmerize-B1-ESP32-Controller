@@ -161,9 +161,5 @@ float RelayController::getTemperature(uint8_t pinNmbr)
     Vout = (Vin * sensorValue) / 1023;   // Convert Vout to volts
     R = Rref * (1 / ((Vin / Vout) - 1)); // Formula to calculate tested resistor's value
     Temp = (-25.37 * log(R)) + 239.43;
-    Serial.print("R: ");
-    Serial.print(R);
-    Serial.print(" = Temp: ");
-    Serial.println(Temp);
     return (Temp);
 }
