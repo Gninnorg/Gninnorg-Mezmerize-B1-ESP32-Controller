@@ -184,6 +184,7 @@ byte appMode = APP_NORMAL_MODE;
 MenuManager Menu1(ctlMenu_Root, menuCount(ctlMenu_Root));
 
 void editInputName(uint8_t InputNumber);
+void drawEditInputNameScreen(bool isUpperCase);
 bool editNumericValue(byte &Value, byte MinValue, byte MaxValue);
 bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const char Option2[9], const char Option3[9], const char Option4[9]);
 bool editIRCode(HashIR_data_t &Value);
@@ -1343,6 +1344,7 @@ void refreshMenuDisplay(byte refreshMode)
 void editInputName(uint8_t InputNumber)
 {
   bool complete = false;
+  bool isUpperCase = true;
   // TO DO Maybe replace / character with symbol to allow for switching between upper and lower case letters?
   int arrowX = 1;              // text edit arrow start X position on selection line
   int arrowPointingUpDown = 0; // text edit arrow start direction: up == 0, down == 1
@@ -1353,17 +1355,8 @@ void editInputName(uint8_t InputNumber)
   lcd.print(InputNumber + 1);
   lcd.setCursor(7, 0);
   lcd.write(223); // Right arrow
-  lcd.setCursor(0, 1);
-  lcd.write(byte(196));         // Print underscore to indicate Space
-  for (int i = 65; i < 84; i++) // Print A-S
-    lcd.write(i);
-  lcd.setCursor(0, 3);
-  for (int i = 84; i < 91; i++) // Print T-Z
-    lcd.write(i);
-  for (int i = 47; i < 58; i++) // Print /-9
-    lcd.write(i);
-  lcd.write(225);      // "Backspace" icon
-  lcd.write(byte(28)); // "Enter" icon
+  drawEditInputNameScreen(isUpperCase);
+
   lcd.setCursor(arrowX, 2);
   lcd.write(byte(26 + arrowPointingUpDown)); // 26 is arrow up, 27 is arrow down
   newInputName = CurrentSettings.Input[InputNumber].Name;
@@ -1413,7 +1406,12 @@ void editInputName(uint8_t InputNumber)
       lcd.BlinkingCursorOff();
       if (arrowPointingUpDown == 1) // If arrow points down
       {
-        if (arrowX == 18) // Back Space (the Backspace icon has been selected)
+        if (arrowX == 17) // Switch between Upper and Lower case characters
+        {
+          isUpperCase = !isUpperCase;
+          drawEditInputNameScreen(isUpperCase);
+        }
+        else if (arrowX == 18) // Back Space (the Backspace icon has been selected)
         {
           if (newInputName.length() > 0) // Make sure there is a character to delete!
           {
@@ -1443,9 +1441,13 @@ void editInputName(uint8_t InputNumber)
         }
         else if (newInputName.length() < 10) // Only allow up to 10 characters
         {
-          byte v = 84;
+          byte v;
+          if (isUpperCase)
+            v = 84;
+          else
+            v = 116;
           if (arrowX > 6)
-            v = 40;
+            v = 41;
           newInputName = newInputName + (char(arrowX + v));
         }
       }
@@ -1456,7 +1458,12 @@ void editInputName(uint8_t InputNumber)
           if (arrowX == 0) // Space character has been selected (though it is shown as underscore)
             newInputName = newInputName + " ";
           else // A character between A-S has been selected, so add it to the string
-            newInputName = newInputName + (char(arrowX + 64));
+          {
+            if (isUpperCase)
+              newInputName = newInputName + (char(arrowX + 64));
+            else
+              newInputName = newInputName + (char(arrowX + 96));
+          }
         }
       }
       if (!complete)
@@ -1476,6 +1483,36 @@ void editInputName(uint8_t InputNumber)
   }
   lcd.BlinkingCursorOff();
   lcd.clear();
+}
+
+void drawEditInputNameScreen(bool isUpperCase)
+{
+  lcd.setCursor(0, 1);
+  lcd.write(byte(196)); // Print underscore to indicate Space
+  if (isUpperCase)
+  {
+    for (int i = 65; i < 84; i++) // Print A-S
+      lcd.write(i);
+    lcd.setCursor(0, 3);
+    for (int i = 84; i < 91; i++) // Print T-Z
+      lcd.write(i);
+  }
+  else
+  {
+    for (int i = 97; i < 116; i++) // Print a-s
+      lcd.write(i);
+    lcd.setCursor(0, 3);
+    for (int i = 116; i < 123; i++) // Print t-z
+      lcd.write(i);
+  }
+  for (int i = 48; i < 58; i++) // Print 0-9
+    lcd.write(i);
+  if (isUpperCase)
+    lcd.write(19);
+  else
+    lcd.write(18);
+  lcd.write(225); // "Backspace" icon
+  lcd.write(28);  // "Enter" icon
 }
 
 bool editNumericValue(byte &Value, byte MinValue, byte MaxValue)
@@ -1832,7 +1869,7 @@ void reboot()
   // TO DO Mute volume control)
   lcd.clear();
   lcd.setCursor(0, 2);
-  lcd.print(".....REBOOTING......");
+  lcd.print("Rebooting...");
   delay(2000);
   lcd.clear();
   asm volatile("  jmp 0"); // Restarts the sketch
