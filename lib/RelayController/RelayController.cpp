@@ -90,11 +90,11 @@ void RelayController::setTriggerOn()
     else
     {
         Serial.println("SetTrigger: Alternative");
-        if (getTemperature(A1) < 0)
+        if (getTemperature(A0) < 0)
         {
             setRelayOn(6);
             delay(200);
-            if (getTemperature(A1) < 0)
+            if (getTemperature(A0) < 0)
                 Serial.println("Check power to power amp L");
             else
                 Serial.println("Power amp L is on");
@@ -104,11 +104,11 @@ void RelayController::setTriggerOn()
             Serial.println("Power amp L was already on");
         }
 
-        if (getTemperature(A2) < 0)
+        if (getTemperature(A1) < 0)
         {
             setRelayOn(7);
             delay(200);
-            if (getTemperature(A2) < 0)
+            if (getTemperature(A1) < 0)
                 Serial.println("Check power to power amp R");
             else
                 Serial.println("Power amp R is on");
@@ -147,19 +147,21 @@ void RelayController::mute(boolean on)
     mcp.digitalWrite(selectedInput, on == false);
 }
 
-// Return masured temperature from 4.7K NTC connected to either A1 or A2
+// Return masured temperature from 4.7K NTC connected to pinNmbr
 float RelayController::getTemperature(uint8_t pinNmbr)
 {
-    int sensorValue = 0; // sensorPin default value
-    float Vin = 5;       // Input voltage
-    float Vout = 0;      // Vout default value
-    float Rref = 4700;   // Reference resistor's value in ohms (you can give this value in kiloohms or megaohms - the resistance of the tested resistor will be given in the same units)
-    float R = 0;         // Tested resistors default value
-    float Temp = 0;
+    uint16_t sensorValue = 0;
+    float Vin = 5.0;   // Input voltage 5V for Arduino Nano V3
+    float Vout = 0;    // Measured voltage
+    float Rref = 4700; // Reference resistor's value in ohms
+    float Rntc = 0;    // Measured resistance of NTC
+    float Temp;
 
-    sensorValue = analogRead(pinNmbr);   // Read Vout on analog input pin A0 (Arduino can sense from 0-1023, 1023 is 5V)
-    Vout = (Vin * sensorValue) / 1023;   // Convert Vout to volts
-    R = Rref * (1 / ((Vin / Vout) - 1)); // Formula to calculate tested resistor's value
-    Temp = (-25.37 * log(R)) + 239.43;
+    sensorValue = analogRead(pinNmbr); // Read Vout on analog input pin (Arduino can sense from 0-1023, 1023 is Vin)
+
+    Vout = (sensorValue * Vin) / 1024.0; // Convert Vout to volts
+    Rntc = Rref / ((Vin / Vout) - 1); // Formula to calculate the resisatance of the NTC
+
+    Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
     return (Temp);
 }

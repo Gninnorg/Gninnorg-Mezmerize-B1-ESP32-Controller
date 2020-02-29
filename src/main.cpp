@@ -1,6 +1,6 @@
 /*
 **
-**    Controller for Mezmerize B1 Buffer using Muses7220 potentiometer 
+**    Controller for Mezmerize B1 Buffer using Muses72320 potentiometer 
 **
 **    Copyright (c) 2020 Carsten Grønning, Jan Abkjer Tofft
 **
@@ -304,10 +304,10 @@ byte getUserInput()
   case ClickEncoder::Clicked:
     receivedInput = KEY_BACK;
     break;
-   case ClickEncoder::DoubleClicked:
+  case ClickEncoder::DoubleClicked:
     receivedInput = KEY_ONOFF;
     break;
-   default:
+  default:
     break;
   }
 
@@ -420,8 +420,8 @@ void DisplayTemperatures(void);
 
 void setup()
 {
-  pinMode(A0, INPUT_PULLUP);
-  pinMode(A1, INPUT_PULLUP);
+  pinMode(A1, INPUT);
+  pinMode(A2, INPUT);
 
   Serial.begin(115200);
   Wire.begin();
@@ -849,9 +849,29 @@ void loop()
     // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart/reboot is done by getUserInput(). By the way: you don't need an IR remote to be set up - a doubleclick on encoder_2 is also KEY_ONOFF
     break;
   case APP_POWERLOSS_STATE: // Only active if power drop is detected
-    while (1)
+    Serial.println("In APP_POWERLOSS_STATE");
+    lcd.clear();
+    lcd.setCursor(0,1);
+    lcd.print("ATTENTION:");
+    lcd.setCursor(0,2);
+    lcd.print("Check power supply!");
+    delay(2000);
+    lcd.clear();
+    long vcc;
+    do 
     {
-    }; // Wait until power is completely gone
+      ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+      delay(2);
+      ADCSRA |= _BV(ADSC);
+      while (bit_is_set(ADCSRA, ADSC))
+        ;
+      vcc = ADCL;
+      vcc |= ADCH << 8;
+      vcc = 1126400L / vcc;
+      Serial.print("Voltage: ");
+      Serial.println(vcc);
+    } while (vcc < 4700); // Wait until power is completely gone or reboot if it returns
+    reboot();
     break;
   }
 }
@@ -1871,8 +1891,8 @@ void reboot()
   // TO DO Unselect all inputs (unless all inputs are deactivated by the MCP23008 during reboot - has to be tested)
   // TO DO Mute volume control)
   lcd.clear();
-  lcd.setCursor(0, 2);
-  lcd.print("Rebooting...");
+  lcd.setCursor(0, 1);
+  lcd.print("REBOOTING...");
   delay(2000);
   lcd.clear();
   asm volatile("  jmp 0"); // Restarts the sketch
