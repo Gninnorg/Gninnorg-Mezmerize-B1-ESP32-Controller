@@ -166,7 +166,6 @@ void setupDisplay()
   lcd.begin();
   lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
   lcd.clear();
-  lcd.defineCustomChar();
 }
 
 //  Initialize the menu
@@ -416,7 +415,8 @@ byte getUserInput()
 }
 
 void reboot(void);
-void DisplayTemperatures(void);
+void displayTemperatures(void);
+void displayVolume(void);
 
 void setup()
 {
@@ -451,17 +451,17 @@ void setup()
     // TO DO if triggers are active then wait for the set number of seconds (if > 0) and turn them on with the chosen method
     // TO DO Select input relay
     // TO DO Set volume
-    lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+    displayVolume();
     if (CurrentSettings.DisplaySelectedInput)
     {
       lcd.setCursor(0, 0);
       lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
     }
-    DisplayTemperatures();
+    displayTemperatures();
   }
 }
 
-void DisplayTemperatures()
+void displayTemperatures()
 {
   if (CurrentSettings.DisplayTemperature1)
   {
@@ -611,6 +611,22 @@ void DisplayTemperatures()
   mil_onRefreshTemperatureDisplay = millis();
 }
 
+void displayVolume()
+{
+  // If show volume in -dB (-99.9 to 0)
+  // lcd.setCursor(17, 0);
+  // lcd.print("-dB");
+  // lcd.print3x3Number(10, 1, CurrentRuntimeSettings.CurrentVolume, 3, true); // Display volume as -dB - CurrentRuntimeSettings.CurrentVolume must be converted to -dB in the call to print3x3Number
+  // If show volume in steps
+  // If CurrentSettings.VolumeSteps > 100
+   lcd.setCursor(17, 0);
+   lcd.print("Vol");
+   lcd.print3x3Number(11, 1, CurrentRuntimeSettings.CurrentVolume, 3, false); // Display volume from 000-999 with 3x3 digits
+  // else 
+  // lcd.print4x4Number(11, CurrentRuntimeSettings.CurrentVolume); // Display volume from 00-99 with 4x4 digits
+
+}
+
 void loop()
 {
   UIkey = getUserInput();
@@ -642,7 +658,7 @@ void loop()
   {
   case APP_NORMAL_MODE:
     if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
-      DisplayTemperatures();
+      displayTemperatures();
 
     switch (UIkey)
     {
@@ -659,9 +675,8 @@ void loop()
       {
         CurrentRuntimeSettings.CurrentVolume++;
         CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
-        lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+        displayVolume();
         // TO DO Set volume to CurrentVolume
-        // TO DO Save CurrentVolume to EEPROM
       }
       break;
     case KEY_DOWN:
@@ -670,9 +685,8 @@ void loop()
       {
         CurrentRuntimeSettings.CurrentVolume--;
         CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
-        lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+        displayVolume();
         // TO DO Set volume to CurrentVolume
-        // TO DO Save CurrentVolume to EEPROM
       }
       break;
     case KEY_LEFT:
@@ -717,7 +731,7 @@ void loop()
           CurrentRuntimeSettings.CurrentVolume = CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput];
 
         // TO DO set volume to CurrentSettings.CurrentVolume (remember validations against global volume levels and local volume levels)
-        lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+        displayVolume();
         // TO DO Unmute
         if (CurrentSettings.DisplaySelectedInput)
         {
@@ -770,7 +784,7 @@ void loop()
             CurrentRuntimeSettings.CurrentVolume = CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput];
 
           // TO DO set volume to CurrentSettings.CurrentVolume (remember validations against global volume levels and local volume levels)
-          lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+          displayVolume();
           // TO DO Unmute
           if (CurrentSettings.DisplaySelectedInput)
           {
@@ -820,11 +834,11 @@ void loop()
     {
       lcd.clear();
       // Back to APP_NORMAL_MODE
-      lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+      displayVolume();
       lcd.setCursor(0, 0);
       if (CurrentSettings.DisplaySelectedInput)
         lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
-      DisplayTemperatures();
+      displayTemperatures();
 
       appMode = APP_NORMAL_MODE;
     }
@@ -870,7 +884,7 @@ void loop()
       vcc = 1126400L / vcc;
       Serial.print("Voltage: ");
       Serial.println(vcc);
-    } while (vcc < 4700); // Wait until power is completely gone or reboot if it returns
+    } while (vcc < 4700); // Wait until power is completely gone or reboot if it returnsad
     reboot();
     break;
   }
@@ -1558,7 +1572,7 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue)
   lcd.setCursor(0, 3);
   lcd.print("Max. ");
   lcd.print(MaxValue);
-  lcd.printTwoNumber(11, NewValue);
+  lcd.print4x4Number(11, NewValue);
 
   while (!complete)
   {
@@ -1569,14 +1583,14 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue)
       if (NewValue < MaxValue)
       {
         NewValue++;
-        lcd.printTwoNumber(11, NewValue);
+        lcd.print4x4Number(11, NewValue);
       }
       break;
     case KEY_LEFT:
       if (NewValue > MinValue)
       {
         NewValue--;
-        lcd.printTwoNumber(11, NewValue);
+        lcd.print4x4Number(11, NewValue);
       }
       break;
     case KEY_SELECT:
