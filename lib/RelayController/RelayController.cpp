@@ -56,13 +56,6 @@ void RelayController::setInput(uint8_t inputNmbr)
     selectedInput = pin_sel;
 }
 
-void RelayController::setInputName(uint8_t inputNmbr, String name)
-{
-    //Update name of input
-    if (inputNmbr >= 1 && inputNmbr <= 6)
-        inputName[inputNmbr] = name;
-}
-
 /*void RelayController::setAlternateTrigger(uint8_t inputRight, uint8_t inputLeft)
 {
     sensorRight = inputRight;
@@ -83,25 +76,25 @@ void RelayController::setTriggerOn()
     if (standardTrigger)
     {
         delay(3000);
-        Serial.println("SetTrigger:Standard");
+        Serial.println(F("SetTrigger:Standard"));
         mcp.digitalWrite(1, HIGH);
         mcp.digitalWrite(2, HIGH);
     }
     else
     {
-        Serial.println("SetTrigger: Alternative");
+        Serial.println(F("SetTrigger: Alternative"));
         if (getTemperature(A0) < 0)
         {
             setRelayOn(6);
             delay(200);
             if (getTemperature(A0) < 0)
-                Serial.println("Check power to power amp L");
+                Serial.println(F("Check power to power amp L"));
             else
-                Serial.println("Power amp L is on");
+                Serial.println(F("Power amp L is on"));
         }
         else
         {
-            Serial.println("Power amp L was already on");
+            Serial.println(F("Power amp L was already on"));
         }
 
         if (getTemperature(A1) < 0)
@@ -109,13 +102,13 @@ void RelayController::setTriggerOn()
             setRelayOn(7);
             delay(200);
             if (getTemperature(A1) < 0)
-                Serial.println("Check power to power amp R");
+                Serial.println(F("Check power to power amp R"));
             else
-                Serial.println("Power amp R is on");
+                Serial.println(F("Power amp R is on"));
         }
         else
         {
-            Serial.println("Power amp R was already on");
+            Serial.println(F("Power amp R was already on"));
         }
     }
 }
@@ -127,27 +120,12 @@ void RelayController::SetTriggerOff()
     mcp.digitalWrite(7, LOW);
 }
 
-uint8_t RelayController::getInput()
-{
-    return selectedInput;
-}
-
-String RelayController::getInputName(uint8_t inputNmbr)
-{
-    if (inputNmbr >= 1 && inputNmbr <= 6)
-    {
-        return inputName[inputNmbr];
-    }
-    else
-        return "";
-}
-
 void RelayController::mute(boolean on)
 {
     mcp.digitalWrite(selectedInput, on == false);
 }
 
-// Return masured temperature from 4.7K NTC connected to pinNmbr
+// Return measured temperature from 4.7K NTC connected to pinNmbr
 float RelayController::getTemperature(uint8_t pinNmbr)
 {
     uint16_t sensorValue = 0;

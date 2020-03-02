@@ -193,7 +193,6 @@ unsigned char MenuManager::handleNavigation(unsigned char (*getNavAction)(), voi
       refreshDisplay(REFRESH_MOVE_NEXT);
     }
   }
-
   return menuMode;
 }
 

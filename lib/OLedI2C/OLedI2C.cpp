@@ -84,7 +84,7 @@ void OLedI2C::FadeOutCancel()
 }
 
 // Write to CGRAM of new characters
-void OLedI2C::createChar(uint8_t location, uint8_t charmap[])
+void OLedI2C::createChar(uint8_t location, const uint8_t charmap[])
 {
   location &= 0x7; // we only have 8 locations 0-7
 
@@ -292,6 +292,10 @@ void OLedI2C::sendData(uint8_t data)
   Wire.endTransmission(); // **** End I2C
 }
 
+const uint8_t bn1[] = {5, 2, 6, 32, 5, 32, 2, 2, 6, 2, 2, 6, 31, 32, 31, 31, 2, 2, 5, 2, 2, 2, 2, 6, 5, 2, 6, 5, 2, 6};
+const uint8_t bn2[] = {31, 32, 31, 32, 31, 32, 5, 2, 2, 32, 2, 31, 0, 2, 31, 0, 2, 1, 31, 2, 1, 32, 32, 31, 31, 2, 31, 0, 2, 31};
+const uint8_t bn3[] = {4, 7, 3, 32, 31, 32, 4, 7, 7, 7, 7, 3, 32, 32, 31, 7, 7, 3, 4, 7, 3, 32, 32, 3, 4, 7, 3, 7, 7, 3};
+
 // Function for printing up tp three 3x3 digits. Works from 000-999 or 00.0-99.9 if decimalPoint is true
 void OLedI2C::print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8_t digits, bool decimalPoint)
 {
@@ -312,12 +316,11 @@ void OLedI2C::print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8
     thirddigit = ((number % 100) % 10) * 3;
   }
 
-  const uint8_t bn1[] = {5, 2, 6, 32, 5, 32, 2, 2, 6, 2, 2, 6, 31, 32, 31, 31, 2, 2, 5, 2, 2, 2, 2, 6, 5, 2, 6, 5, 2, 6};
-  const uint8_t bn2[] = {31, 32, 31, 32, 31, 32, 7, 208, 2, 32, 208, 31, 0, 208, 31, 0, 208, 1, 31, 208, 1, 32, 32, 31, 31, 208, 31, 0, 208, 31};
-  const uint8_t bn3[] = {4, 7, 3, 32, 31, 32, 4, 7, 7, 7, 7, 3, 32, 32, 31, 7, 7, 3, 4, 7, 3, 32, 32, 3, 4, 7, 3, 7, 7, 3};
-
   if (charSet != 1)
+  {
     defineCustomChar3x3();
+    charSet = 1;
+  }
 
   setCursor(column, row);
   if (number / 100 == 0)
@@ -411,18 +414,20 @@ void OLedI2C::print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8
 
 void OLedI2C::defineCustomChar3x3()
 {
+  
   // 3x3 charset
-  uint8_t cc0[8] = {// Custom Character 0
-                    B11111,
+
+  const uint8_t cc0[8] = {// Custom Character 0
                     B11111,
                     B11111,
                     B01111,
                     B00111,
                     B00011,
                     B00000,
+                    B00000,
                     B00000};
 
-  uint8_t cc1[8] = {// Custom Character 1
+  const uint8_t cc1[8] = {// Custom Character 1
                     B00000,
                     B10000,
                     B11000,
@@ -432,7 +437,7 @@ void OLedI2C::defineCustomChar3x3()
                     B11111,
                     B11111};
 
-  uint8_t cc2[8] = {// Custom Character 2
+  const uint8_t cc2[8] = {// Custom Character 2
                     B11111,
                     B11111,
                     B11111,
@@ -442,7 +447,7 @@ void OLedI2C::defineCustomChar3x3()
                     B00000,
                     B00000};
 
-  uint8_t cc3[8] = {// Custom Character 3
+  const uint8_t cc3[8] = {// Custom Character 3
                     B11111,
                     B11111,
                     B11111,
@@ -452,7 +457,7 @@ void OLedI2C::defineCustomChar3x3()
                     B11100,
                     B11000};
 
-  uint8_t cc4[8] = {// Custom Character 4
+  const uint8_t cc4[8] = {// Custom Character 4
                     B11111,
                     B11111,
                     B11111,
@@ -462,7 +467,7 @@ void OLedI2C::defineCustomChar3x3()
                     B00111,
                     B00011};
 
-  uint8_t cc5[8] = {// Custom Character 5
+  const uint8_t cc5[8] = {// Custom Character 5
                     B00011,
                     B00111,
                     B01111,
@@ -472,7 +477,7 @@ void OLedI2C::defineCustomChar3x3()
                     B11111,
                     B11111};
 
-  uint8_t cc6[8] = {// Custom Character 6
+  const uint8_t cc6[8] = {// Custom Character 6
                     B11000,
                     B11100,
                     B11110,
@@ -482,7 +487,7 @@ void OLedI2C::defineCustomChar3x3()
                     B11111,
                     B11111};
 
-  uint8_t cc7[8] = {// Custom Character 7
+  const uint8_t cc7[8] = {// Custom Character 7
                     B00000,
                     B00000,
                     B00000,
@@ -501,6 +506,7 @@ void OLedI2C::defineCustomChar3x3()
   createChar(7, cc7);
 }
 
+/*
 // Function for printing two 4x4 digits. Works from 00-99
 void OLedI2C::print4x4Number(uint8_t column, uint8_t number)
 {
@@ -563,7 +569,7 @@ void OLedI2C::print4x4Number(uint8_t column, uint8_t number)
 void OLedI2C::defineCustomChar4x4()
 {
   // 4x4 charset
-  uint8_t cc0[8] = {// Custom Character 0
+  const uint8_t cc0[8] = {// Custom Character 0
                     B00000,
                     B00000,
                     B00000,
@@ -573,7 +579,7 @@ void OLedI2C::defineCustomChar4x4()
                     B01111,
                     B11111};
 
-  uint8_t cc1[8] = {// Custom Character 1
+  const uint8_t cc1[8] = {// Custom Character 1
                     B10000,
                     B11000,
                     B11100,
@@ -583,7 +589,7 @@ void OLedI2C::defineCustomChar4x4()
                     B11111,
                     B11111};
 
-  uint8_t cc2[8] = {// Custom Character 2
+  const uint8_t cc2[8] = {// Custom Character 2
                     B11111,
                     B11111,
                     B11111,
@@ -593,7 +599,7 @@ void OLedI2C::defineCustomChar4x4()
                     B00000,
                     B00000};
 
-  uint8_t cc3[8] = {// Custom Character 3
+  const uint8_t cc3[8] = {// Custom Character 3
                     B00000,
                     B00000,
                     B00000,
@@ -603,7 +609,7 @@ void OLedI2C::defineCustomChar4x4()
                     B11111,
                     B11111};
 
-  uint8_t cc4[8] = {// Custom Character 4
+  const uint8_t cc4[8] = {// Custom Character 4
                     B11111,
                     B11111,
                     B11111,
@@ -613,7 +619,7 @@ void OLedI2C::defineCustomChar4x4()
                     B00011,
                     B00001};
 
-  uint8_t cc5[8] = {// Custom Character 5
+  const uint8_t cc5[8] = {// Custom Character 5
                     B00001,
                     B00011,
                     B00111,
@@ -623,7 +629,7 @@ void OLedI2C::defineCustomChar4x4()
                     B11111,
                     B11111};
 
-  uint8_t cc6[8] = {// Custom Character 6
+  const uint8_t cc6[8] = {// Custom Character 6
                     B00000,
                     B00000,
                     B00000,
@@ -633,7 +639,7 @@ void OLedI2C::defineCustomChar4x4()
                     B11110,
                     B11111};
 
-  uint8_t cc7[8] = {// Custom Character 7
+  const uint8_t cc7[8] = {// Custom Character 7
                     B11111,
                     B11111,
                     B11111,
@@ -651,3 +657,4 @@ void OLedI2C::defineCustomChar4x4()
   createChar(6, cc6);
   createChar(7, cc7);
 }
+*/

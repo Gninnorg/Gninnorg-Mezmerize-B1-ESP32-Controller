@@ -27,9 +27,6 @@ public:
 	void setRelayOn(uint8_t Nmbr);
 	void setRelayOff(uint8_t Nmbr);
 	void setInput(uint8_t inputNmbr);
-	void setInputName(uint8_t inputNmbr, String name);
-	uint8_t getInput();
-	String getInputName(uint8_t inputNmbr);
 	void mute(boolean on);
 
 	// Controlling triggers for amplifier.
@@ -47,8 +44,4 @@ private:
 	uint8_t sensorRight = A2;
 	uint8_t sensorLeft = A3;
 	boolean standardTrigger;
-
-	// Change number of inputs used (max=6) and input names below.
-	uint8_t numOfInputs = NUM_OF_INPUTS;
-	String inputName[6] = {"Input 1", "Input 2", "Input 3", "Input 4", "Input 5", "Input 6"};
 };
