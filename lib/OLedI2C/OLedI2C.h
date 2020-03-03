@@ -34,7 +34,7 @@ public:
 	void begin();
 	void sendCommand(uint8_t command);
 	void sendData(uint8_t data);
-	void createChar(uint8_t, const uint8_t[]);
+	void createChar(uint8_t, uint8_t[]);
 	void clear();
 	void setCursor(uint8_t, uint8_t); // Column, Row
 	void lcdOff();
@@ -48,16 +48,14 @@ public:
 	void EnterSleepMode();
 	void ExitingSleepMode();
 	void backlight(uint8_t contrast); // contrast should be the hex value between 0x00 and 0xFF
-	void print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8_t digits, bool decimalPoint); // prints large number 3x3 char per digit. The number of digits to be displayed can be set to 1, 2 or 3
-	//void print4x4Number(uint8_t column, uint8_t number); // prints large number 4x4 chars per digit
-	void defineCustomChar3x3();
-	//void defineCustomChar4x4();
-
-    // what custom characters are defined
-	uint8_t charSet = 0; // 0 = none, 1 = 3x3, 2, 4x4
+	void printTwoNumber(uint8_t column, uint8_t number); // prints large number
+	void defineCustomChar();
 
 	// support of Print class
 	virtual size_t write(uint8_t ch);
 	using Print::write;
 };
 #endif
+
+//	void print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8_t digits, bool decimalPoint); // prints large number 3x3 char per digit. The number of digits to be displayed can be set to 1, 2 or 3
+//	void defineCustomChar3x3();
