@@ -90,6 +90,7 @@ enum ctlMenuCommandId
   mnuCmdDISP_ON_LEVEL,
   mnuCmdDISP_DIM_LEVEL,
   mnuCmdDISP_DIM_TIMEOUT,
+  mnuCmdDISP_VOL,
   mnuCmdDISP_INPUT,
   mnuCmdDISP_TEMP1,
   mnuCmdDISP_TEMP2,
@@ -194,10 +195,11 @@ PROGMEM const char ctlMenu_5_1[] = "Screen saver";
 PROGMEM const char ctlMenu_5_2[] = "On Level";
 PROGMEM const char ctlMenu_5_3[] = "Dim Level";
 PROGMEM const char ctlMenu_5_4[] = "Timeout";
-PROGMEM const char ctlMenu_5_5[] = "Show Input";
-PROGMEM const char ctlMenu_5_6[] = "Show Temp 1";
-PROGMEM const char ctlMenu_5_7[] = "Show Temp 2";
-PROGMEM const MenuItem ctlMenu_List_5[] = {{mnuCmdDISP_SAVER_ACTIVE, ctlMenu_5_1}, {mnuCmdDISP_ON_LEVEL, ctlMenu_5_2}, {mnuCmdDISP_DIM_LEVEL, ctlMenu_5_3}, {mnuCmdDISP_DIM_TIMEOUT, ctlMenu_5_4}, {mnuCmdDISP_INPUT, ctlMenu_5_5}, {mnuCmdDISP_TEMP1, ctlMenu_5_6}, {mnuCmdDISP_TEMP2, ctlMenu_5_7}, {mnuCmdBack, ctlMenu_back}};
+PROGMEM const char ctlMenu_5_5[] = "Show Volume";
+PROGMEM const char ctlMenu_5_6[] = "Show Input";
+PROGMEM const char ctlMenu_5_7[] = "Show Temp 1";
+PROGMEM const char ctlMenu_5_8[] = "Show Temp 2";
+PROGMEM const MenuItem ctlMenu_List_5[] = {{mnuCmdDISP_SAVER_ACTIVE, ctlMenu_5_1}, {mnuCmdDISP_ON_LEVEL, ctlMenu_5_2}, {mnuCmdDISP_DIM_LEVEL, ctlMenu_5_3}, {mnuCmdDISP_DIM_TIMEOUT, ctlMenu_5_4}, {mnuCmdDISP_VOL, ctlMenu_5_5}, {mnuCmdDISP_INPUT, ctlMenu_5_6}, {mnuCmdDISP_TEMP1, ctlMenu_5_7}, {mnuCmdDISP_TEMP2, ctlMenu_5_8}, {mnuCmdBack, ctlMenu_back}};
 
 PROGMEM const char ctlMenu_7_1[] = "Reset settings";
 PROGMEM const MenuItem ctlMenu_List_7[] = {{mnuCmdRESET_NOW, ctlMenu_7_1}, {mnuCmdBack, ctlMenu_back}};
@@ -210,4 +212,275 @@ PROGMEM const char ctlMenu_5[] = "Display";
 PROGMEM const char ctlMenu_6[] = "About";
 PROGMEM const char ctlMenu_7[] = "Reset";
 PROGMEM const MenuItem ctlMenu_Root[] = {{mnuCmdVOLUME_MENU, ctlMenu_1, ctlMenu_List_1, menuCount(ctlMenu_List_1)}, {mnuCmdINPUT_MENU, ctlMenu_2, ctlMenu_List_2, menuCount(ctlMenu_List_2)}, {mnuCmdIR_MENU, ctlMenu_3, ctlMenu_List_3, menuCount(ctlMenu_List_3)}, {mnuCmdPWR_CTL_MENU, ctlMenu_4, ctlMenu_List_4, menuCount(ctlMenu_List_4)}, {mnuCmdDISP_MENU, ctlMenu_5, ctlMenu_List_5, menuCount(ctlMenu_List_5)}, {mnuCmdABOUT, ctlMenu_6}, {mnuCmdRESET_MENU, ctlMenu_7, ctlMenu_List_7, menuCount(ctlMenu_List_7)}, {mnuCmdBack, ctlMenu_exit}};
+
+/*
+case mnuCmdVOL_STEPS :
+	break;
+case mnuCmdMIN_VOL :
+	break;
+case mnuCmdMAX_VOL :
+	break;
+case mnuCmdMAX_START_VOL :
+	break;
+case mnuCmdMUTE_LVL :
+	break;
+case mnuCmdSTORE_LVL :
+	break;
+case mnuCmdINPUT1_ACTIVE :
+	break;
+case mnuCmdINPUT1_NAME :
+	break;
+case mnuCmdINPUT1_MAX_VOL :
+	break;
+case mnuCmdINPUT1_MIN_VOL :
+	break;
+case mnuCmdINPUT2_ACTIVE :
+	break;
+case mnuCmdINPUT2_NAME :
+	break;
+case mnuCmdINPUT2_MAX_VOL :
+	break;
+case mnuCmdINPUT2_MIN_VOL :
+	break;
+case mnuCmdINPUT3_ACTIVE :
+	break;
+case mnuCmdINPUT3_NAME :
+	break;
+case mnuCmdINPUT3_MAX_VOL :
+	break;
+case mnuCmdINPUT3_MIN_VOL :
+	break;
+case mnuCmdINPUT4_ACTIVE :
+	break;
+case mnuCmdINPUT4_NAME :
+	break;
+case mnuCmdINPUT4_MAX_VOL :
+	break;
+case mnuCmdINPUT4_MIN_VOL :
+	break;
+case mnuCmdINPUT5_ACTIVE :
+	break;
+case mnuCmdINPUT5_NAME :
+	break;
+case mnuCmdINPUT5_MAX_VOL :
+	break;
+case mnuCmdINPUT5_MIN_VOL :
+	break;
+case mnuCmdINPUT6_ACTIVE :
+	break;
+case mnuCmdINPUT6_NAME :
+	break;
+case mnuCmdINPUT6_MAX_VOL :
+	break;
+case mnuCmdINPUT6_MIN_VOL :
+	break;
+case mnuCmdIR_ONOFF :
+	break;
+case mnuCmdIR_UP :
+	break;
+case mnuCmdIR_DOWN :
+	break;
+case mnuCmdIR_REPEAT :
+	break;
+case mnuCmdIR_LEFT :
+	break;
+case mnuCmdIR_RIGHT :
+	break;
+case mnuCmdIR_SELECT :
+	break;
+case mnuCmdIR_BACK :
+	break;
+case mnuCmdIR_MUTE :
+	break;
+case mnuCmdIR_PREV :
+	break;
+case mnuCmdIR_1 :
+	break;
+case mnuCmdIR_2 :
+	break;
+case mnuCmdIR_3 :
+	break;
+case mnuCmdIR_4 :
+	break;
+case mnuCmdIR_5 :
+	break;
+case mnuCmdIR_6 :
+	break;
+case mnuCmdTRIGGER1_ACTIVE :
+	break;
+case mnuCmdTRIGGER1_TYPE :
+	break;
+case mnuCmdTRIGGER1_MODE :
+	break;
+case mnuCmdTRIGGER1_ON_DELAY :
+	break;
+case mnuCmdTRIGGER1_TEMP :
+	break;
+case mnuCmdTRIGGER2_ACTIVE :
+	break;
+case mnuCmdTRIGGER2_TYPE :
+	break;
+case mnuCmdTRIGGER2_MODE :
+	break;
+case mnuCmdTRIGGER2_ON_DELAY :
+	break;
+case mnuCmdTRIGGER2_TEMP :
+	break;
+case mnuCmdTRIGGER_INACT_TIMER :
+	break;
+case mnuCmdDISP_SAVER_ACTIVE :
+	break;
+case mnuCmdDISP_ON_LEVEL :
+	break;
+case mnuCmdDISP_DIM_LEVEL :
+	break;
+case mnuCmdDISP_DIM_TIMEOUT :
+	break;
+case mnuCmdDISP_VOL :
+	break;
+case mnuCmdDISP_INPUT :
+	break;
+case mnuCmdDISP_TEMP1 :
+	break;
+case mnuCmdDISP_TEMP2 :
+	break;
+case mnuCmdABOUT :
+	break;
+case mnuCmdRESET_NOW :
+	break;
+*/
+
+/*
+<?xml version="1.0"?>
+<RootMenu xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <Config IdPrefix="mnuCmd" VarPrefix="ctlMenu" UseNumbering="false" IncludeNumberHierarchy="false" MaxNameLen="15" MenuBackFirstItem="false" BackText="Back" ExitText="Exit" AvrProgMem="true"/>
+    <MenuItems>
+        <Item Id="VOLUME_MENU" Name="Volume">
+            <MenuItems>
+                <Item Id="VOL_STEPS" Name="Volume steps"/>
+                <Item Id="MIN_VOL" Name="Min. volume"/>
+                <Item Id="MAX_VOL" Name="Max. volume"/>
+                <Item Id="MAX_START_VOL" Name="Max start vol"/>
+                <Item Id="MUTE_LVL" Name="Mute level"/>
+                <Item Id="STORE_LVL" Name="Vol. memory"/>
+            </MenuItems>
+        </Item>
+        <Item Id="INPUT_MENU" Name="Inputs">
+            <MenuItems>
+                <Item Id="INPUT1_MENU" Name="Input 1">
+                    <MenuItems>
+                        <Item Id="INPUT1_ACTIVE" Name="Active"/>
+                        <Item Id="INPUT1_NAME" Name="Name"/>
+                        <Item Id="INPUT1_MAX_VOL" Name="Max. volume"/>
+                        <Item Id="INPUT1_MIN_VOL" Name="Min. volume"/>
+                    </MenuItems>
+                </Item>
+                <Item Id="INPUT2_MENU" Name="Input 2">
+                    <MenuItems>
+                        <Item Id="INPUT2_ACTIVE" Name="Active"/>
+                        <Item Id="INPUT2_NAME" Name="Name"/>
+                        <Item Id="INPUT2_MAX_VOL" Name="Max. volume"/>
+                        <Item Id="INPUT2_MIN_VOL" Name="Min. volume"/>
+                    </MenuItems>
+                </Item>
+                <Item Id="INPUT3_MENU" Name="Input 3">
+                    <MenuItems>
+                        <Item Id="INPUT3_ACTIVE" Name="Active"/>
+                        <Item Id="INPUT3_NAME" Name="Name"/>
+                        <Item Id="INPUT3_MAX_VOL" Name="Max. volume"/>
+                        <Item Id="INPUT3_MIN_VOL" Name="Min. volume"/>
+                    </MenuItems>
+                </Item>
+                <Item Id="INPUT4_MENU" Name="Input 4">
+                    <MenuItems>
+                        <Item Id="INPUT4_ACTIVE" Name="Active"/>
+                        <Item Id="INPUT4_NAME" Name="Name"/>
+                        <Item Id="INPUT4_MAX_VOL" Name="Max. volume"/>
+                        <Item Id="INPUT4_MIN_VOL" Name="Min. volume"/>
+                    </MenuItems>
+                </Item>
+                <Item Id="INPUT5_MENU" Name="Input 5">
+                    <MenuItems>
+                        <Item Id="INPUT5_ACTIVE" Name="Active"/>
+                        <Item Id="INPUT5_NAME" Name="Name"/>
+                        <Item Id="INPUT5_MAX_VOL" Name="Max. volume"/>
+                        <Item Id="INPUT5_MIN_VOL" Name="Min. volume"/>
+                    </MenuItems>
+                </Item>
+                <Item Id="INPUT6_MENU" Name="Input 6">
+                    <MenuItems>
+                        <Item Id="INPUT6_ACTIVE" Name="Active"/>
+                        <Item Id="INPUT6_NAME" Name="Name"/>
+                        <Item Id="INPUT6_MAX_VOL" Name="Max. volume"/>
+                        <Item Id="INPUT6_MIN_VOL" Name="Min. volume"/>
+                    </MenuItems>
+                </Item>
+            </MenuItems>
+        </Item>
+        <Item Id="IR_MENU" Name="Learn IR">
+            <MenuItems>
+                <Item Id="IR_ONOFF" Name="On/Off"/>
+                <Item Id="IR_UP" Name="Up"/>
+                <Item Id="IR_DOWN" Name="Down"/>
+                <Item Id="IR_REPEAT" Name="Repeat"/>
+                <Item Id="IR_LEFT" Name="Left"/>
+                <Item Id="IR_RIGHT" Name="Right"/>
+                <Item Id="IR_SELECT" Name="Select"/>
+                <Item Id="IR_BACK" Name="Back"/>
+                <Item Id="IR_MUTE" Name="Mute"/>
+                <Item Id="IR_PREV" Name="Previous"/>
+                <Item Id="IR_1" Name="1"/>
+                <Item Id="IR_2" Name="2"/>
+                <Item Id="IR_3" Name="3"/>
+                <Item Id="IR_4" Name="4"/>
+                <Item Id="IR_5" Name="5"/>
+                <Item Id="IR_6" Name="6"/>
+            </MenuItems>
+        </Item>
+        <Item Id="PWR_CTL_MENU" Name="Triggers">
+            <MenuItems>
+                <Item Id="TRIG1_MENU" Name="Trigger 1">
+                    <MenuItems>
+                        <Item Id="TRIGGER1_ACTIVE" Name="Active"/>
+                        <Item Id="TRIGGER1_TYPE" Name="Moment./Latch"/>
+                        <Item Id="TRIGGER1_MODE" Name="Std./SmartON"/>
+                        <Item Id="TRIGGER1_ON_DELAY" Name="On delay"/>
+                        <Item Id="TRIGGER1_TEMP" Name="Temp Ctrl"/>
+                    </MenuItems>
+                </Item>
+                <Item Id="TRIG2_MENU" Name="Trigger 2">
+                    <MenuItems>
+                        <Item Id="TRIGGER2_ACTIVE" Name="Active"/>
+                        <Item Id="TRIGGER2_TYPE" Name="Moment./Latch"/>
+                        <Item Id="TRIGGER2_MODE" Name="Std./SmartON"/>
+                        <Item Id="TRIGGER2_ON_DELAY" Name="On Delay"/>
+                        <Item Id="TRIGGER2_TEMP" Name="Temp Ctrl"/>
+                    </MenuItems>
+                </Item>
+                <Item Id="TRIGGER_INACT_TIMER" Name="Standby Timer"/>
+
+            </MenuItems>
+        </Item>
+        <Item Id="DISP_MENU" Name="Display">
+            <MenuItems>
+                <Item Id="DISP_SAVER_ACTIVE" Name="Screen saver"/>
+                <Item Id="DISP_ON_LEVEL" Name="On Level"/>
+                <Item Id="DISP_DIM_LEVEL" Name="Dim Level"/>
+                <Item Id="DISP_DIM_TIMEOUT" Name="Timeout"/>
+                <Item Id="DISP_VOL" Name="Show Volume"/>
+<Item Id="DISP_INPUT" Name="Show Input"/>
+                <Item Id="DISP_TEMP1" Name="Show Temp 1"/>
+                <Item Id="DISP_TEMP2" Name="Show Temp 2"/>
+            </MenuItems>
+        </Item>
+        <Item Id="ABOUT" Name="About"/>
+        <Item Id="RESET_MENU" Name="Reset">
+            <MenuItems>
+                <Item Id="RESET_NOW" Name="Reset settings"/>
+            </MenuItems>
+        </Item>
+    </MenuItems>
+</RootMenu>
+*/
 #endif

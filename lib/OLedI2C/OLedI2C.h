@@ -48,8 +48,12 @@ public:
 	void EnterSleepMode();
 	void ExitingSleepMode();
 	void backlight(uint8_t contrast); // contrast should be the hex value between 0x00 and 0xFF
-	void printTwoNumber(uint8_t column, uint8_t number); // prints large number
-	void defineCustomChar();
+ 	void print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8_t digits, bool decimalPoint); // prints large number 3x3 char per digit. The number of digits to be displayed can be set to 1, 2 or 3
+	void defineCustomChar3x3();
+	void print4x4Number(uint8_t column, uint8_t number); // prints large number
+	void defineCustomChar4x4();
+
+    byte charSet = 0; // 0 = no custom chars defined, 1 = 3x3 chars defined, 2 = 4x4 chars defined
 
 	// support of Print class
 	virtual size_t write(uint8_t ch);
@@ -57,5 +61,3 @@ public:
 };
 #endif
 
-//	void print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8_t digits, bool decimalPoint); // prints large number 3x3 char per digit. The number of digits to be displayed can be set to 1, 2 or 3
-//	void defineCustomChar3x3();

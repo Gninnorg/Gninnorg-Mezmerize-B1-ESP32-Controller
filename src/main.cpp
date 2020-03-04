@@ -77,6 +77,7 @@ typedef union {
     byte DisplayOnLevel;           // The contrast level of the display when it is on, 0 = 25%, 1 = 50%, 2 = 75%, 3 = 100%
     byte DisplayDimLevel;          // The contrast level of the display when screen saver is active. 0 = off, 1 = 3, 2 = 7 ... 32 = 127. If DisplayDimLevel = 0 the display will be turned off when the screen saver is active (to reduce electrical noise)
     byte DisplayTimeout;           // Number of seconds before the screen saver is activated.
+    byte DisplayVolume;            // 0 = no display of volume, 1 = show step number, 2 = show as -dB
     byte DisplaySelectedInput;     // 0 = the name of the active input is not shown on the display (ie. if only one input is used), 1 = the name of the selected input is shown on the display
     byte DisplayTemperature1;      // 0 = do not display the temperature measured by NTC 1, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
     byte DisplayTemperature2;      // 0 = do not display the temperature measured by NTC 2, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
@@ -166,7 +167,6 @@ void setupDisplay()
   lcd.begin();
   lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
   lcd.clear();
-  lcd.defineCustomChar();
 }
 
 //  Initialize the menu
@@ -416,7 +416,9 @@ byte getUserInput()
 }
 
 void reboot(void);
-void DisplayTemperatures(void);
+void displayTemperatures(void);
+void displayInput(void);
+void displayVolume(void);
 
 void setup()
 {
@@ -451,17 +453,47 @@ void setup()
     // TO DO if triggers are active then wait for the set number of seconds (if > 0) and turn them on with the chosen method
     // TO DO Select input relay
     // TO DO Set volume
-    lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
-    if (CurrentSettings.DisplaySelectedInput)
-    {
-      lcd.setCursor(0, 0);
-      lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
-    }
-    DisplayTemperatures();
+    displayVolume();
+    displayInput();
+    displayTemperatures();
   }
 }
 
-void DisplayTemperatures()
+void displayVolume()
+{
+  if (CurrentSettings.DisplayVolume)
+  {
+    // If show volume in steps
+    if (CurrentSettings.DisplayVolume == 1)
+    {
+      if (CurrentSettings.VolumeSteps > 100)
+      {
+        lcd.setCursor(17, 0);
+        lcd.print("Vol");
+        lcd.print3x3Number(11, 1, CurrentRuntimeSettings.CurrentVolume, 3, false); // Display volume from 000-999 with 3x3 digits
+      }
+      else
+        lcd.print4x4Number(11, CurrentRuntimeSettings.CurrentVolume); // Display volume from 00-99 with 4x4 digits
+    }
+    else // Show volume in -dB (-99.9 to 0)
+    {
+      lcd.setCursor(17, 0);
+      lcd.print("-dB");
+      lcd.print3x3Number(10, 1, CurrentRuntimeSettings.CurrentVolume, 3, true); // Display volume as -dB - CurrentRuntimeSettings.CurrentVolume must be converted to -dB in the call to print3x3Number
+    }
+  }
+}
+
+void displayInput()
+{
+  if (CurrentSettings.DisplaySelectedInput)
+  {
+    lcd.setCursor(0, 0);
+    lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
+  }
+}
+
+void displayTemperatures()
 {
   if (CurrentSettings.DisplayTemperature1)
   {
@@ -642,7 +674,7 @@ void loop()
   {
   case APP_NORMAL_MODE:
     if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
-      DisplayTemperatures();
+      displayTemperatures();
 
     switch (UIkey)
     {
@@ -659,7 +691,7 @@ void loop()
       {
         CurrentRuntimeSettings.CurrentVolume++;
         CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
-        lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+        displayVolume();
         // TO DO Set volume to CurrentVolume
         // TO DO Save CurrentVolume to EEPROM
       }
@@ -670,7 +702,7 @@ void loop()
       {
         CurrentRuntimeSettings.CurrentVolume--;
         CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
-        lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+        displayVolume();
         // TO DO Set volume to CurrentVolume
         // TO DO Save CurrentVolume to EEPROM
       }
@@ -717,13 +749,9 @@ void loop()
           CurrentRuntimeSettings.CurrentVolume = CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput];
 
         // TO DO set volume to CurrentSettings.CurrentVolume (remember validations against global volume levels and local volume levels)
-        lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
         // TO DO Unmute
-        if (CurrentSettings.DisplaySelectedInput)
-        {
-          lcd.setCursor(0, 0);
-          lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
-        }
+        displayVolume();
+        displayInput();
       }
     }
     break;
@@ -770,7 +798,7 @@ void loop()
             CurrentRuntimeSettings.CurrentVolume = CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput];
 
           // TO DO set volume to CurrentSettings.CurrentVolume (remember validations against global volume levels and local volume levels)
-          lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+          displayVolume();
           // TO DO Unmute
           if (CurrentSettings.DisplaySelectedInput)
           {
@@ -820,11 +848,11 @@ void loop()
     {
       lcd.clear();
       // Back to APP_NORMAL_MODE
-      lcd.printTwoNumber(11, CurrentRuntimeSettings.CurrentVolume);
+      displayVolume();
       lcd.setCursor(0, 0);
       if (CurrentSettings.DisplaySelectedInput)
         lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
-      DisplayTemperatures();
+      displayTemperatures();
 
       appMode = APP_NORMAL_MODE;
     }
@@ -851,14 +879,14 @@ void loop()
   case APP_POWERLOSS_STATE: // Only active if power drop is detected
     Serial.println("In APP_POWERLOSS_STATE");
     lcd.clear();
-    lcd.setCursor(0,1);
+    lcd.setCursor(0, 1);
     lcd.print("ATTENTION:");
-    lcd.setCursor(0,2);
+    lcd.setCursor(0, 2);
     lcd.print("Check power supply!");
     delay(2000);
     lcd.clear();
     long vcc;
-    do 
+    do
     {
       ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
       delay(2);
@@ -916,7 +944,7 @@ byte processMenuCommand(byte cmdId)
   {
   case mnuCmdVOL_STEPS:
   {
-    editNumericValue(CurrentSettings.VolumeSteps, 0, 99);
+    editNumericValue(CurrentSettings.VolumeSteps, 0, 222);
     // TO DO Validate if VolumeSteps < Max_Volume (both global and for each input) - if so, they must be changed. Also if Max vol's are changed then maybe min. vol's needs to be changed also. Same goes for max start vol and mute lvl
     complete = true;
     break;
@@ -1166,6 +1194,10 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdDISP_DIM_TIMEOUT:
     editNumericValue(CurrentSettings.DisplayTimeout, 0, 90);
+    complete = true;
+    break;
+  case mnuCmdDISP_VOL:
+    editOptionValue(CurrentSettings.DisplayVolume, 3, "Hide", "Steps", "-dB", "");
     complete = true;
     break;
   case mnuCmdDISP_INPUT:
@@ -1558,7 +1590,7 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue)
   lcd.setCursor(0, 3);
   lcd.print("Max. ");
   lcd.print(MaxValue);
-  lcd.printTwoNumber(11, NewValue);
+  lcd.print3x3Number(11, 1, NewValue, 3, false); // Display volume from 000-999 with 3x3 digits
 
   while (!complete)
   {
@@ -1569,14 +1601,14 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue)
       if (NewValue < MaxValue)
       {
         NewValue++;
-        lcd.printTwoNumber(11, NewValue);
+        lcd.print3x3Number(11, 1, NewValue, 3, false); // Display volume from 000-999 with 3x3 digits
       }
       break;
     case KEY_LEFT:
       if (NewValue > MinValue)
       {
         NewValue--;
-        lcd.printTwoNumber(11, NewValue);
+        lcd.print3x3Number(11, 1, NewValue, 3, false); // Display volume from 000-999 with 3x3 digits
       }
       break;
     case KEY_SELECT:
@@ -1749,7 +1781,7 @@ bool editIRCode(HashIR_data_t &Value)
 // Loads default settings into CurrentSettings and CurrentRuntimeSettings - this is only done when the EEPROM does not contain valid settings or when reset is chosen by user in the menu
 void setCurrentSettingsToDefault()
 {
-  CurrentSettings.VolumeSteps = 24;
+  CurrentSettings.VolumeSteps = 128;
   CurrentSettings.MinVolume = 0;
   CurrentSettings.MaxVolume = CurrentSettings.VolumeSteps;
   CurrentSettings.MaxStartVolume = CurrentSettings.VolumeSteps;
@@ -1824,6 +1856,7 @@ void setCurrentSettingsToDefault()
   CurrentSettings.DisplayOnLevel = 3;
   CurrentSettings.DisplayDimLevel = 0;
   CurrentSettings.DisplayTimeout = 30;
+  CurrentSettings.DisplayVolume = 1;
   CurrentSettings.DisplaySelectedInput = true;
   CurrentSettings.DisplayTemperature1 = 3;
   CurrentSettings.DisplayTemperature2 = 3;
