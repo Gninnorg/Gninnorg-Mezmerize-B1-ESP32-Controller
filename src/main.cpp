@@ -94,6 +94,7 @@ typedef union {
   {
     byte CurrentInput;      // The number of the currently set input
     byte CurrentVolume;     // The currently set volume
+    byte CurrentAttenuation;// The currently set attenuation in ½ dB steps
     bool Muted;             // Indicates if we are in mute mode or not
     byte InputLastVol[6];   // The last volume set for each input
     byte PrevSelectedInput; // Holds the input selected before the current one
@@ -422,6 +423,7 @@ void displayTemperatures(void);
 void displayInput(void);
 void displayVolume(void);
 void displayMute(void);
+uint8_t getAttenuation(uint8_t, uint8_t, uint8_t, uint8_t);
 
 void setup()
 {
@@ -462,6 +464,29 @@ void setup()
   }
 }
 
+uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB) {
+
+  float att_dB = max_dB-min_dB;
+  float sizeOfLargeSteps = round(pow(2.0,att_dB/steps)-0.5);
+  float numberOfSmallSteps = (sizeOfLargeSteps*steps-att_dB)/(sizeOfLargeSteps/2);
+    
+  if (steps >= numberOfSmallSteps &&   // Profile cannot be made resolution to low
+      selStep <= steps &&              // Attenuation cannot be calculated when selected step is higher than the steps
+      sizeOfLargeSteps <= 4          // As a rule of thumb steps must not be larger than 2 db
+      ) 
+  {
+    //selStep = steps - selStep;
+    return (max_dB - ((min(selStep,numberOfSmallSteps)*(sizeOfLargeSteps/2)+max((selStep-numberOfSmallSteps),0)*sizeOfLargeSteps)))*2;
+  } else {
+    return 223;                        // If a attenuation cannot be calculated then select mute 
+  }
+}
+
+void setVolume() {
+  CurrentRuntimeSettings.CurrentAttenuation = getAttenuation(CurrentSettings.VolumeSteps, CurrentRuntimeSettings.CurrentVolume, CurrentSettings.MinAttenuation, CurrentSettings.MaxAttenuation);
+  // ToDo call muses incl. balance logic
+}
+
 void displayVolume()
 {
   if (CurrentSettings.DisplayVolume)
@@ -491,7 +516,7 @@ void displayVolume()
       lcd.setCursor(17, 0);
       lcd.print("-dB");
       if (!CurrentRuntimeSettings.Muted)
-        lcd.print3x3Number(10, 1, CurrentRuntimeSettings.CurrentVolume, 3, true); // TO DO Display volume as -dB - CurrentRuntimeSettings.CurrentVolume must be converted to -dB in the call to print3x3Number
+        lcd.print3x3Number(10, 1, (CurrentRuntimeSettings.CurrentAttenuation * 10)/2, 3, true); // TO DO Display volume as -dB - CurrentRuntimeSettings.CurrentVolume must be converted to -dB in the call to print3x3Number
       else
         displayMute();
     }
@@ -715,6 +740,8 @@ void loop()
       {
         CurrentRuntimeSettings.CurrentVolume++;
         CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
+        setVolume();
+        
         displayVolume();
         // TO DO Set volume to CurrentVolume
         // TO DO Save CurrentVolume to EEPROM
@@ -726,6 +753,7 @@ void loop()
       {
         CurrentRuntimeSettings.CurrentVolume--;
         CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
+        setVolume();
         displayVolume();
         // TO DO Set volume to CurrentVolume
         // TO DO Save CurrentVolume to EEPROM
@@ -968,7 +996,7 @@ byte processMenuCommand(byte cmdId)
   {
   case mnuCmdVOL_STEPS:
   {
-    editNumericValue(CurrentSettings.VolumeSteps, 0, 222, "Steps");
+    editNumericValue(CurrentSettings.VolumeSteps, 0, 189, "Steps");
     // TO DO Validate if VolumeSteps < Max_Volume (both global and for each input) - if so, they must be changed. Also if Max vol's are changed then maybe min. vol's needs to be changed also. Same goes for max start vol and mute lvl
     complete = true;
     break;
@@ -1620,14 +1648,14 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit
 {
   bool complete = false;
   bool result = false;
-  char nameBuf[11];
+  //char nameBuf[11];
   uint8_t digits;
 
   byte NewValue = Value;
 
   // Display the screen
   lcd.clear();
-  lcd.print(Menu1.getCurrentItemName(nameBuf));
+  //lcd.print(Menu1.getCurrentItemName(nameBuf));
   lcd.setCursor(0, 2);
   lcd.print(F("Min. "));
   lcd.print(MinValue);
@@ -1831,7 +1859,7 @@ void setCurrentSettingsToDefault()
 {
   CurrentSettings.VolumeSteps = 128;
   CurrentSettings.MinAttenuation = 0;
-  CurrentSettings.MaxAttenuation = 111;
+  CurrentSettings.MaxAttenuation = 120;
   CurrentSettings.MaxStartVolume = CurrentSettings.VolumeSteps;
   CurrentSettings.MuteLevel = 0;
   CurrentSettings.RecallSetLevel = true;
@@ -1912,6 +1940,7 @@ void setCurrentSettingsToDefault()
 
   CurrentRuntimeSettings.CurrentInput = 0;
   CurrentRuntimeSettings.CurrentVolume = 0;
+  CurrentRuntimeSettings.CurrentAttenuation = 223;
   CurrentRuntimeSettings.Muted = 0;
   CurrentRuntimeSettings.InputLastVol[0] = 0;
   CurrentRuntimeSettings.InputLastVol[1] = 0;
