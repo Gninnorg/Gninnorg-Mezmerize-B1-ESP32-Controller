@@ -40,8 +40,8 @@ typedef union {
   struct
   {
     byte VolumeSteps;              // The number of steps of the volume control
-    byte MinVolume;                // Minimum value allowed to be set by user
-    byte MaxVolume;                // Maximum step allowed to be set by user
+    byte MinAttenuation;           // Minimum attenuation in -dB (as 0 db equals no attenuation this is equal to the highest volume allowed)
+    byte MaxAttenuation;           // Maximum attenuation in -dB (as -111.5 db is the limit of the Muses72320 this is equal to the lowest volume possible). We only keep this setting as a positive number, and we do also only allow the user to set the value in 1 dB steps
     byte MaxStartVolume;           // If StoreSetLevel is true, then limit the volume to the specified value when the controller is powered on
     byte MuteLevel;                // The level to be set when Mute is activated by the user. The Mute function of the Muses72320 is activated if 0 is specified
     byte RecallSetLevel;           // Remember/store the volume level for each separate input
@@ -150,6 +150,8 @@ void writeSettingsToEEPROM(void);
 void writeDefaultSettingsToEEPROM(void);
 void readRuntimeSettingsFromEEPROM(void);
 void writeRuntimeSettingsToEEPROM(void);
+void readUserSettingsFromEEPROM(void);
+void writeUserSettingsToEEPROM(void);
 
 // Setup Display ---------------------------------------------------------------
 OLedI2C lcd;
@@ -185,7 +187,7 @@ MenuManager Menu1(ctlMenu_Root, menuCount(ctlMenu_Root));
 
 void editInputName(uint8_t InputNumber);
 void drawEditInputNameScreen(bool isUpperCase);
-bool editNumericValue(byte &Value, byte MinValue, byte MaxValue);
+bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit[5]);
 bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const char Option2[9], const char Option3[9], const char Option4[9]);
 bool editIRCode(HashIR_data_t &Value);
 void drawMenu();
@@ -419,6 +421,7 @@ void reboot(void);
 void displayTemperatures(void);
 void displayInput(void);
 void displayVolume(void);
+void displayMute(void);
 
 void setup()
 {
@@ -434,7 +437,7 @@ void setup()
   readSettingsFromEEPROM();
   readRuntimeSettingsFromEEPROM();
 
-  // Check if settings stored in EEPROM are NOT valid - we write the default settings to the EEPROM and reboots
+  // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
   if ((CurrentSettings.Version != VERSION) || (CurrentRuntimeSettings.Version != VERSION))
   {
     //Serial.println(F("ERROR: Settings read from EEPROM are not ok"));
@@ -451,7 +454,7 @@ void setup()
   else // Settings read from EEPROM are valid so let's move on!
   {
     // TO DO if triggers are active then wait for the set number of seconds (if > 0) and turn them on with the chosen method
-    // TO DO Select input relay
+    // TO DO Select input relay 
     // TO DO Set volume
     displayVolume();
     displayInput();
@@ -470,17 +473,38 @@ void displayVolume()
       {
         lcd.setCursor(17, 0);
         lcd.print("Vol");
-        lcd.print3x3Number(11, 1, CurrentRuntimeSettings.CurrentVolume, 3, false); // Display volume from 000-999 with 3x3 digits
+        if (!CurrentRuntimeSettings.Muted)
+          lcd.print3x3Number(11, 1, CurrentRuntimeSettings.CurrentVolume, 3, false); // Display volume from 000-999 with 3x3 digits
+        else
+          displayMute();
       }
       else
-        lcd.print4x4Number(11, CurrentRuntimeSettings.CurrentVolume); // Display volume from 00-99 with 4x4 digits
+      {
+        if (!CurrentRuntimeSettings.Muted)
+          lcd.print4x4Number(11, CurrentRuntimeSettings.CurrentVolume); // Display volume from 00-99 with 4x4 digits
+        else
+          displayMute();
+      }
     }
     else // Show volume in -dB (-99.9 to 0)
     {
       lcd.setCursor(17, 0);
       lcd.print("-dB");
-      lcd.print3x3Number(10, 1, CurrentRuntimeSettings.CurrentVolume, 3, true); // Display volume as -dB - CurrentRuntimeSettings.CurrentVolume must be converted to -dB in the call to print3x3Number
+      if (!CurrentRuntimeSettings.Muted)
+        lcd.print3x3Number(10, 1, CurrentRuntimeSettings.CurrentVolume, 3, true); // TO DO Display volume as -dB - CurrentRuntimeSettings.CurrentVolume must be converted to -dB in the call to print3x3Number
+      else
+        displayMute();
     }
+  }
+}
+
+void displayMute()
+{
+  for (int8_t i = 0; i < 4; i++)
+  {
+    lcd.setCursor(10,i);
+    for (int8_t x = 0; x < 10; x++) 
+    lcd.write(32);
   }
 }
 
@@ -686,8 +710,8 @@ void loop()
       refreshMenuDisplay(REFRESH_DESCEND);
       break;
     case KEY_UP:
-      // Turn volume up if we're not muted and we'll not exceed the global maximum volume or the maximum volume set for the currently selected input
-      if (!CurrentRuntimeSettings.Muted && (CurrentRuntimeSettings.CurrentVolume < CurrentSettings.MaxVolume) && (CurrentRuntimeSettings.CurrentVolume < CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].MaxVol))
+      // Turn volume up if we're not muted and we'll not exceed the maximum volume set for the currently selected input
+      if (!CurrentRuntimeSettings.Muted && (CurrentRuntimeSettings.CurrentVolume < CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].MaxVol))
       {
         CurrentRuntimeSettings.CurrentVolume++;
         CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
@@ -697,8 +721,8 @@ void loop()
       }
       break;
     case KEY_DOWN:
-      // Turn volume down if we're not muted and we'll not get below the global minimum volume or the minimum volume set for the currently selected input
-      if (!CurrentRuntimeSettings.Muted && (CurrentRuntimeSettings.CurrentVolume > CurrentSettings.MinVolume) && (CurrentRuntimeSettings.CurrentVolume > CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].MinVol))
+      // Turn volume down if we're not muted and we'll not get below the minimum volume set for the currently selected input
+      if (!CurrentRuntimeSettings.Muted && (CurrentRuntimeSettings.CurrentVolume > CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].MinVol))
       {
         CurrentRuntimeSettings.CurrentVolume--;
         CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
@@ -836,6 +860,8 @@ void loop()
           // TO DO Mute the Muses volume control
         }
       }
+      CurrentRuntimeSettings.Muted = !CurrentRuntimeSettings.Muted;
+      displayVolume();
       break;
     }
     break;
@@ -848,10 +874,8 @@ void loop()
     {
       lcd.clear();
       // Back to APP_NORMAL_MODE
+      displayInput();
       displayVolume();
-      lcd.setCursor(0, 0);
-      if (CurrentSettings.DisplaySelectedInput)
-        lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
       displayTemperatures();
 
       appMode = APP_NORMAL_MODE;
@@ -944,25 +968,25 @@ byte processMenuCommand(byte cmdId)
   {
   case mnuCmdVOL_STEPS:
   {
-    editNumericValue(CurrentSettings.VolumeSteps, 0, 222);
+    editNumericValue(CurrentSettings.VolumeSteps, 0, 222, "Steps");
     // TO DO Validate if VolumeSteps < Max_Volume (both global and for each input) - if so, they must be changed. Also if Max vol's are changed then maybe min. vol's needs to be changed also. Same goes for max start vol and mute lvl
     complete = true;
     break;
   }
-  case mnuCmdMIN_VOL:
-    editNumericValue(CurrentSettings.MinVolume, 0, CurrentSettings.MaxVolume);
+  case mnuCmdMIN_ATT:
+    editNumericValue(CurrentSettings.MinAttenuation, 0, CurrentSettings.MaxAttenuation, "  -dB");
     complete = true;
     break;
-  case mnuCmdMAX_VOL:
-    editNumericValue(CurrentSettings.MaxVolume, CurrentSettings.MinVolume, CurrentSettings.VolumeSteps);
+  case mnuCmdMAX_ATT:
+    editNumericValue(CurrentSettings.MaxAttenuation, CurrentSettings.MinAttenuation, CurrentSettings.MaxAttenuation, "  -dB");
     complete = true;
     break;
   case mnuCmdMAX_START_VOL:
-    editNumericValue(CurrentSettings.MaxStartVolume, CurrentSettings.MinVolume, CurrentSettings.MaxVolume);
+    editNumericValue(CurrentSettings.MaxStartVolume, CurrentSettings.MinAttenuation, CurrentSettings.MaxAttenuation, " Step");
     complete = true;
     break;
   case mnuCmdMUTE_LVL:
-    editNumericValue(CurrentSettings.MuteLevel, 0, CurrentSettings.MaxVolume);
+    editNumericValue(CurrentSettings.MuteLevel, 0, CurrentSettings.MaxAttenuation, " Step");
     complete = true;
     break;
   case mnuCmdSTORE_LVL:
@@ -970,7 +994,7 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT1_ACTIVE:
-    editOptionValue(CurrentSettings.Input[0].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 0) editOptionValue(CurrentSettings.Input[0].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT1_NAME:
@@ -978,15 +1002,15 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT1_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[0].MaxVol, CurrentSettings.MinVolume, CurrentSettings.MaxVolume);
+    editNumericValue(CurrentSettings.Input[0].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT1_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[0].MinVol, CurrentSettings.MinVolume, CurrentSettings.Input[0].MaxVol);
+    editNumericValue(CurrentSettings.Input[0].MinVol, 0, CurrentSettings.Input[0].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdINPUT2_ACTIVE:
-    editOptionValue(CurrentSettings.Input[1].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 1) editOptionValue(CurrentSettings.Input[1].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT2_NAME:
@@ -994,15 +1018,15 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT2_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[1].MaxVol, CurrentSettings.MinVolume, CurrentSettings.MaxVolume);
+    editNumericValue(CurrentSettings.Input[1].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT2_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[1].MinVol, CurrentSettings.MinVolume, CurrentSettings.Input[1].MaxVol);
+    editNumericValue(CurrentSettings.Input[1].MinVol, 0, CurrentSettings.Input[1].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdINPUT3_ACTIVE:
-    editOptionValue(CurrentSettings.Input[2].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 2) editOptionValue(CurrentSettings.Input[2].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT3_NAME:
@@ -1010,31 +1034,31 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT3_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[2].MaxVol, CurrentSettings.MinVolume, CurrentSettings.MaxVolume);
+    editNumericValue(CurrentSettings.Input[2].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT3_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[2].MinVol, CurrentSettings.MinVolume, CurrentSettings.Input[2].MaxVol);
+    editNumericValue(CurrentSettings.Input[2].MinVol, 0, CurrentSettings.Input[2].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdINPUT4_ACTIVE:
-    editOptionValue(CurrentSettings.Input[3].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 3) editOptionValue(CurrentSettings.Input[3].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT4_NAME:
     editInputName(3);
     complete = true;
     break;
-  case mnuCmdINPUT4_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[3].MaxVol, CurrentSettings.MinVolume, CurrentSettings.MaxVolume);
+case mnuCmdINPUT4_MAX_VOL:
+    editNumericValue(CurrentSettings.Input[3].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT4_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[3].MinVol, CurrentSettings.MinVolume, CurrentSettings.Input[3].MaxVol);
+    editNumericValue(CurrentSettings.Input[3].MinVol, 0, CurrentSettings.Input[3].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdINPUT5_ACTIVE:
-    editOptionValue(CurrentSettings.Input[4].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 4) editOptionValue(CurrentSettings.Input[4].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT5_NAME:
@@ -1042,15 +1066,16 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT5_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[4].MaxVol, CurrentSettings.MinVolume, CurrentSettings.MaxVolume);
+    editNumericValue(CurrentSettings.Input[4].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT5_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[4].MinVol, CurrentSettings.MinVolume, CurrentSettings.Input[4].MaxVol);
+    editNumericValue(CurrentSettings.Input[4].MinVol, 0, CurrentSettings.Input[4].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdINPUT6_ACTIVE:
-    editOptionValue(CurrentSettings.Input[5].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 5) editOptionValue(CurrentSettings.Input[5].Active, 2, "No", "Yes", "", "");
+    // TO DO Might be implemented as: if this input is not selected then "HT", "Yes", "No" else only allow to select "HT", "Yes"
     complete = true;
     break;
   case mnuCmdINPUT6_NAME:
@@ -1058,11 +1083,11 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT6_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[5].MaxVol, CurrentSettings.MinVolume, CurrentSettings.MaxVolume);
+    editNumericValue(CurrentSettings.Input[5].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT6_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[5].MinVol, CurrentSettings.MinVolume, CurrentSettings.Input[5].MaxVol);
+    editNumericValue(CurrentSettings.Input[5].MinVol, 0, CurrentSettings.Input[5].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdIR_ONOFF:
@@ -1142,11 +1167,11 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdTRIGGER1_ON_DELAY:
-    editNumericValue(CurrentSettings.Trigger1OnDelay, 0, 90);
+    editNumericValue(CurrentSettings.Trigger1OnDelay, 0, 90, "Secs.");
     complete = true;
     break;
   case mnuCmdTRIGGER1_TEMP:
-    editNumericValue(CurrentSettings.Trigger1Temp, 0, 90);
+    editNumericValue(CurrentSettings.Trigger1Temp, 0, 90, "Deg C");
     complete = true;
     break;
   case mnuCmdTRIGGER2_ACTIVE:
@@ -1162,15 +1187,15 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdTRIGGER2_ON_DELAY:
-    editNumericValue(CurrentSettings.Trigger2OnDelay, 0, 90);
+    editNumericValue(CurrentSettings.Trigger2OnDelay, 0, 90, "Secs.");
     complete = true;
     break;
   case mnuCmdTRIGGER2_TEMP:
-    editNumericValue(CurrentSettings.Trigger2Temp, 0, 90);
+    editNumericValue(CurrentSettings.Trigger2Temp, 0, 90, "Deg C");
     complete = true;
     break;
   case mnuCmdTRIGGER_INACT_TIMER:
-    editNumericValue(CurrentSettings.TriggerInactOffTimer, 0, 24);
+    editNumericValue(CurrentSettings.TriggerInactOffTimer, 0, 24, "Hours");
     complete = true;
     break;
   case mnuCmdDISP_SAVER_ACTIVE:
@@ -1183,7 +1208,7 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdDISP_DIM_LEVEL:
-    editNumericValue(CurrentSettings.DisplayDimLevel, 0, 32);
+    editNumericValue(CurrentSettings.DisplayDimLevel, 0, 32, "     ");
     if (CurrentSettings.DisplayDimLevel != 0)
     {
       lcd.backlight(CurrentSettings.DisplayDimLevel * 4 - 1);
@@ -1193,7 +1218,7 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdDISP_DIM_TIMEOUT:
-    editNumericValue(CurrentSettings.DisplayTimeout, 0, 90);
+    editNumericValue(CurrentSettings.DisplayTimeout, 0, 90, "Secs.");
     complete = true;
     break;
   case mnuCmdDISP_VOL:
@@ -1215,26 +1240,37 @@ byte processMenuCommand(byte cmdId)
   case mnuCmdABOUT:
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("Firmware ");
+    lcd.print(F("Firmware "));
     lcd.print(VERSION);
     lcd.setCursor(0, 1);
-    lcd.print("built by carsten");
+    lcd.print(F("built by carsten"));
     lcd.write(160);
     lcd.setCursor(0, 2);
-    lcd.print("groenning.net &");
+    lcd.print(F("groenning.net &"));
     lcd.setCursor(0, 3);
-    lcd.print("jan");
+    lcd.print(F("jan"));
     lcd.write(160);
-    lcd.print("tofft.dk (c)2020");
+    lcd.print(F("tofft.dk (c)2020"));
     delay(5000);
     complete = true;
     break;
-  case mnuCmdRESET_NOW:
+  case mnuCmdSAVE_CUST:
+    writeUserSettingsToEEPROM();
+    complete = true;
+    break;
+  case mnuCmdLOAD_CUST:
+    readUserSettingsFromEEPROM();
+    writeSettingsToEEPROM();
+    writeRuntimeSettingsToEEPROM();
+    reboot();
+    complete = true;
+    break;
+  case mnuCmdLOAD_DEFAULT:
     writeDefaultSettingsToEEPROM();
     reboot();
+    complete = true;
     break;
   }
-
   return complete;
 }
 
@@ -1255,10 +1291,13 @@ byte getNavAction()
   return navAction;
 }
 
+//----------------------------------------------------------------------
+// Show menu items based upon where the user has navigated to
+// The menu consists of up to four lines: one line to show the name of the current menu and up to three lines of menu items. 
 void drawMenu()
 {
-  char strbuf[LCD_COLS + 1]; // one line of lcd display
-  char nameBuf[LCD_COLS - 2];
+  char strbuf[21]; // one line of lcd display
+  char nameBuf[18];
 
   // Display the name of the menu
   lcd.setCursor(0, 0);
@@ -1369,7 +1408,7 @@ void refreshMenuDisplay(byte refreshMode)
     else
     {
       lcd.setCursor(1, menuIndex + 1);
-      lcd.print(' '); // Delete the arrow previously set
+      lcd.write(32); // Delete the arrow previously set
       menuIndex--;
       // Redraw indication of what menu item is selected
       lcd.setCursor(1, menuIndex + 1);
@@ -1382,7 +1421,7 @@ void refreshMenuDisplay(byte refreshMode)
     else
     {
       lcd.setCursor(1, menuIndex + 1);
-      lcd.print(' '); // Delete the arrow previously set
+      lcd.write(32); // Delete the arrow previously set
       menuIndex++;
       // Redraw indication of what menu item is selected
       lcd.setCursor(1, menuIndex + 1);
@@ -1400,6 +1439,10 @@ void refreshMenuDisplay(byte refreshMode)
   }
 }
 
+//----------------------------------------------------------------------
+// Editing of input names up to ten characters long
+// A name can consist of upper or lower case characters, digits and space characters
+// An empty name or a name only consisting of spaces are not allowed as it makes no sense
 void editInputName(uint8_t InputNumber)
 {
   bool complete = false;
@@ -1407,7 +1450,7 @@ void editInputName(uint8_t InputNumber)
   // TO DO Maybe replace / character with symbol to allow for switching between upper and lower case letters?
   int arrowX = 1;              // text edit arrow start X position on selection line
   int arrowPointingUpDown = 0; // text edit arrow start direction: up == 0, down == 1
-  String newInputName = "XXXXXXXXXX";
+  String newInputName = "          ";
   // Display the screen
   lcd.clear();
   lcd.print("Input ");
@@ -1573,11 +1616,12 @@ void drawEditInputNameScreen(bool isUpperCase)
   lcd.write(28);  // "Enter" icon
 }
 
-bool editNumericValue(byte &Value, byte MinValue, byte MaxValue)
+bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit[5])
 {
   bool complete = false;
   bool result = false;
   char nameBuf[11];
+  uint8_t digits;
 
   byte NewValue = Value;
 
@@ -1585,12 +1629,16 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue)
   lcd.clear();
   lcd.print(Menu1.getCurrentItemName(nameBuf));
   lcd.setCursor(0, 2);
-  lcd.print("Min. ");
+  lcd.print(F("Min. "));
   lcd.print(MinValue);
   lcd.setCursor(0, 3);
-  lcd.print("Max. ");
+  lcd.print(F("Max. "));
   lcd.print(MaxValue);
-  lcd.print3x3Number(11, 1, NewValue, 3, false); // Display volume from 000-999 with 3x3 digits
+  lcd.setCursor(15, 0);
+  lcd.print(Unit);
+  if (MaxValue > 99) digits = 3; else digits = 2;
+  
+  lcd.print3x3Number(11, 1, NewValue, digits, false); // Display number from 000-999 with 3x3 digits
 
   while (!complete)
   {
@@ -1601,14 +1649,14 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue)
       if (NewValue < MaxValue)
       {
         NewValue++;
-        lcd.print3x3Number(11, 1, NewValue, 3, false); // Display volume from 000-999 with 3x3 digits
+        lcd.print3x3Number(11, 1, NewValue, digits, false); // Display number from 000-999 with 3x3 digits
       }
       break;
     case KEY_LEFT:
       if (NewValue > MinValue)
       {
         NewValue--;
-        lcd.print3x3Number(11, 1, NewValue, 3, false); // Display volume from 000-999 with 3x3 digits
+        lcd.print3x3Number(11, 1, NewValue, digits, false); // Display number from 000-999 with 3x3 digits
       }
       break;
     case KEY_SELECT:
@@ -1782,8 +1830,8 @@ bool editIRCode(HashIR_data_t &Value)
 void setCurrentSettingsToDefault()
 {
   CurrentSettings.VolumeSteps = 128;
-  CurrentSettings.MinVolume = 0;
-  CurrentSettings.MaxVolume = CurrentSettings.VolumeSteps;
+  CurrentSettings.MinAttenuation = 0;
+  CurrentSettings.MaxAttenuation = 111;
   CurrentSettings.MaxStartVolume = CurrentSettings.VolumeSteps;
   CurrentSettings.MuteLevel = 0;
   CurrentSettings.RecallSetLevel = true;
@@ -1917,6 +1965,23 @@ void readRuntimeSettingsFromEEPROM()
   eeprom.begin(extEEPROM::twiClock400kHz);
   eeprom.read(sizeof(CurrentSettings) + 1, CurrentRuntimeSettings.data, sizeof(CurrentRuntimeSettings));
 }
+
+// Read the user defined settings from EEPROM
+void readUserSettingsFromEEPROM()
+{
+  // Read the settings from the EEPROM
+  eeprom.begin(extEEPROM::twiClock400kHz);
+  eeprom.read(sizeof(CurrentSettings) + sizeof(CurrentRuntimeSettings) + 1, CurrentSettings.data, sizeof(CurrentSettings));
+}
+
+// Read the user defined settings from EEPROM
+void writeUserSettingsToEEPROM()
+{
+  // Write the user settings to the EEPROM
+  eeprom.begin(extEEPROM::twiClock400kHz);
+  eeprom.write(sizeof(CurrentSettings) + sizeof(CurrentRuntimeSettings) + 1, CurrentSettings.data, sizeof(CurrentSettings));
+}
+
 
 // Reboots the sketch - used after restoring default settings
 void reboot()

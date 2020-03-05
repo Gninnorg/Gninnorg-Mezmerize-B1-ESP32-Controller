@@ -8,7 +8,6 @@
 **
 ** PIN1 & PIN2 : Used for controlling amplifier triggers relays
 ** PIN3 - PIN8 : Used for controlling input relays
-** PIN8 --> INPUT1 (8 - INPUT + 1)
 **                     
 */
 
@@ -51,7 +50,7 @@ void RelayController::setInput(uint8_t inputNmbr)
     //Unselect previous input relay
     mcp.digitalWrite(pin_unsel, LOW);
 
-    //Select neew input and save the selected input relay
+    //Select new input and save the selected input relay
     mcp.digitalWrite(pin_sel, HIGH);
     selectedInput = pin_sel;
 }

@@ -18,8 +18,8 @@ enum ctlMenuCommandId
   mnuCmdBack = 0,
   mnuCmdVOLUME_MENU,
   mnuCmdVOL_STEPS,
-  mnuCmdMIN_VOL,
-  mnuCmdMAX_VOL,
+  mnuCmdMIN_ATT,
+  mnuCmdMAX_ATT,
   mnuCmdMAX_START_VOL,
   mnuCmdMUTE_LVL,
   mnuCmdSTORE_LVL,
@@ -96,7 +96,9 @@ enum ctlMenuCommandId
   mnuCmdDISP_TEMP2,
   mnuCmdABOUT,
   mnuCmdRESET_MENU,
-  mnuCmdRESET_NOW
+  mnuCmdSAVE_CUST,
+  mnuCmdLOAD_CUST,
+  mnuCmdLOAD_DEFAULT
 };
 
 PROGMEM const char ctlMenu_back[] = "Back";
@@ -153,12 +155,12 @@ PROGMEM const char ctlMenu_4_2_5[] = "Temp Ctrl";
 PROGMEM const MenuItem ctlMenu_List_4_2[] = {{mnuCmdTRIGGER2_ACTIVE, ctlMenu_4_2_1}, {mnuCmdTRIGGER2_TYPE, ctlMenu_4_2_2}, {mnuCmdTRIGGER2_MODE, ctlMenu_4_2_3}, {mnuCmdTRIGGER2_ON_DELAY, ctlMenu_4_2_4}, {mnuCmdTRIGGER2_TEMP, ctlMenu_4_2_5}, {mnuCmdBack, ctlMenu_back}};
 
 PROGMEM const char ctlMenu_1_1[] = "Volume steps";
-PROGMEM const char ctlMenu_1_2[] = "Min. volume";
-PROGMEM const char ctlMenu_1_3[] = "Max. volume";
+PROGMEM const char ctlMenu_1_2[] = "Min attenuation";
+PROGMEM const char ctlMenu_1_3[] = "Max attenuation";
 PROGMEM const char ctlMenu_1_4[] = "Max start vol";
 PROGMEM const char ctlMenu_1_5[] = "Mute level";
 PROGMEM const char ctlMenu_1_6[] = "Vol. memory";
-PROGMEM const MenuItem ctlMenu_List_1[] = {{mnuCmdVOL_STEPS, ctlMenu_1_1}, {mnuCmdMIN_VOL, ctlMenu_1_2}, {mnuCmdMAX_VOL, ctlMenu_1_3}, {mnuCmdMAX_START_VOL, ctlMenu_1_4}, {mnuCmdMUTE_LVL, ctlMenu_1_5}, {mnuCmdSTORE_LVL, ctlMenu_1_6}, {mnuCmdBack, ctlMenu_back}};
+PROGMEM const MenuItem ctlMenu_List_1[] = {{mnuCmdVOL_STEPS, ctlMenu_1_1}, {mnuCmdMIN_ATT, ctlMenu_1_2}, {mnuCmdMAX_ATT, ctlMenu_1_3}, {mnuCmdMAX_START_VOL, ctlMenu_1_4}, {mnuCmdMUTE_LVL, ctlMenu_1_5}, {mnuCmdSTORE_LVL, ctlMenu_1_6}, {mnuCmdBack, ctlMenu_back}};
 
 PROGMEM const char ctlMenu_2_1[] = "Input 1";
 PROGMEM const char ctlMenu_2_2[] = "Input 2";
@@ -201,8 +203,10 @@ PROGMEM const char ctlMenu_5_7[] = "Show Temp 1";
 PROGMEM const char ctlMenu_5_8[] = "Show Temp 2";
 PROGMEM const MenuItem ctlMenu_List_5[] = {{mnuCmdDISP_SAVER_ACTIVE, ctlMenu_5_1}, {mnuCmdDISP_ON_LEVEL, ctlMenu_5_2}, {mnuCmdDISP_DIM_LEVEL, ctlMenu_5_3}, {mnuCmdDISP_DIM_TIMEOUT, ctlMenu_5_4}, {mnuCmdDISP_VOL, ctlMenu_5_5}, {mnuCmdDISP_INPUT, ctlMenu_5_6}, {mnuCmdDISP_TEMP1, ctlMenu_5_7}, {mnuCmdDISP_TEMP2, ctlMenu_5_8}, {mnuCmdBack, ctlMenu_back}};
 
-PROGMEM const char ctlMenu_7_1[] = "Reset settings";
-PROGMEM const MenuItem ctlMenu_List_7[] = {{mnuCmdRESET_NOW, ctlMenu_7_1}, {mnuCmdBack, ctlMenu_back}};
+PROGMEM const char ctlMenu_7_1[] = "Save user setup";
+PROGMEM const char ctlMenu_7_2[] = "Load user setup";
+PROGMEM const char ctlMenu_7_3[] = "Reset default";
+PROGMEM const MenuItem ctlMenu_List_7[] = {{mnuCmdSAVE_CUST, ctlMenu_7_1}, {mnuCmdLOAD_CUST, ctlMenu_7_2}, {mnuCmdLOAD_DEFAULT, ctlMenu_7_3}, {mnuCmdBack, ctlMenu_back}};
 
 PROGMEM const char ctlMenu_1[] = "Volume";
 PROGMEM const char ctlMenu_2[] = "Inputs";
@@ -216,9 +220,9 @@ PROGMEM const MenuItem ctlMenu_Root[] = {{mnuCmdVOLUME_MENU, ctlMenu_1, ctlMenu_
 /*
 case mnuCmdVOL_STEPS :
 	break;
-case mnuCmdMIN_VOL :
+case mnuCmdMIN_ATT :
 	break;
-case mnuCmdMAX_VOL :
+case mnuCmdMAX_ATT :
 	break;
 case mnuCmdMAX_START_VOL :
 	break;
@@ -346,7 +350,11 @@ case mnuCmdDISP_TEMP2 :
 	break;
 case mnuCmdABOUT :
 	break;
-case mnuCmdRESET_NOW :
+case mnuCmdSAVE_CUST :
+	break;
+case mnuCmdLOAD_CUST :
+	break;
+case mnuCmdLOAD_DEFAULT :
 	break;
 */
 
@@ -359,8 +367,8 @@ case mnuCmdRESET_NOW :
         <Item Id="VOLUME_MENU" Name="Volume">
             <MenuItems>
                 <Item Id="VOL_STEPS" Name="Volume steps"/>
-                <Item Id="MIN_VOL" Name="Min. volume"/>
-                <Item Id="MAX_VOL" Name="Max. volume"/>
+                <Item Id="MIN_ATT" Name="Min attenuation"/>
+                <Item Id="MAX_ATT" Name="Max attenuation"/>
                 <Item Id="MAX_START_VOL" Name="Max start vol"/>
                 <Item Id="MUTE_LVL" Name="Mute level"/>
                 <Item Id="STORE_LVL" Name="Vol. memory"/>
@@ -469,7 +477,7 @@ case mnuCmdRESET_NOW :
                 <Item Id="DISP_DIM_LEVEL" Name="Dim Level"/>
                 <Item Id="DISP_DIM_TIMEOUT" Name="Timeout"/>
                 <Item Id="DISP_VOL" Name="Show Volume"/>
-<Item Id="DISP_INPUT" Name="Show Input"/>
+                <Item Id="DISP_INPUT" Name="Show Input"/>
                 <Item Id="DISP_TEMP1" Name="Show Temp 1"/>
                 <Item Id="DISP_TEMP2" Name="Show Temp 2"/>
             </MenuItems>
@@ -477,7 +485,9 @@ case mnuCmdRESET_NOW :
         <Item Id="ABOUT" Name="About"/>
         <Item Id="RESET_MENU" Name="Reset">
             <MenuItems>
-                <Item Id="RESET_NOW" Name="Reset settings"/>
+                <Item Id="SAVE_CUST" Name="Save user setup"/>
+                <Item Id="LOAD_CUST" Name="Load user setup"/>
+                <Item Id="LOAD_DEFAULT" Name="Reset default"/>
             </MenuItems>
         </Item>
     </MenuItems>
