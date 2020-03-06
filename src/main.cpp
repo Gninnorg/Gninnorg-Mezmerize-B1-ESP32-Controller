@@ -8,7 +8,7 @@
 **
 */
 
-#define VERSION 0.9
+#define VERSION 0.91
 
 #include "Wire.h"
 #include "OLedI2C.h"
@@ -1902,7 +1902,7 @@ bool editIRCode(HashIR_data_t &Value)
 // Loads default settings into CurrentSettings and CurrentRuntimeSettings - this is only done when the EEPROM does not contain valid settings or when reset is chosen by user in the menu
 void setCurrentSettingsToDefault()
 {
-  CurrentSettings.VolumeSteps = 64;
+  CurrentSettings.VolumeSteps = 60;
   CurrentSettings.MinAttenuation = 0;
   CurrentSettings.MaxAttenuation = 60;
   CurrentSettings.MaxStartVolume = CurrentSettings.VolumeSteps;
