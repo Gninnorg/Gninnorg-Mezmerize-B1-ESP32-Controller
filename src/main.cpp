@@ -92,13 +92,13 @@ void setCurrentSettingsToDefault(void);
 typedef union {
   struct
   {
-    byte CurrentInput;      // The number of the currently set input
-    byte CurrentVolume;     // The currently set volume
-    byte CurrentAttenuation;// The currently set attenuation in ½ dB steps
-    bool Muted;             // Indicates if we are in mute mode or not
-    byte InputLastVol[6];   // The last volume set for each input
-    byte PrevSelectedInput; // Holds the input selected before the current one
-    float Version;          // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
+    byte CurrentInput;       // The number of the currently set input
+    byte CurrentVolume;      // The currently set volume
+    byte CurrentAttenuation; // The currently set attenuation in ½ dB steps
+    bool Muted;              // Indicates if we are in mute mode or not
+    byte InputLastVol[6];    // The last volume set for each input
+    byte PrevSelectedInput;  // Holds the input selected before the current one
+    float Version;           // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
   };
   byte data[]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
 } RuntimeSettings;
@@ -130,18 +130,11 @@ void setupRotaryEncoders()
 #define pinIR 2
 CHashIR IRLremote;
 
-void setupIR()
-{
-  if (!IRLremote.begin(pinIR))
-    Serial.println(F("You did not choose a valid pin."));
-}
+// Setup Muses72320 -----------------------------------------------------------
+Muses72320 muses(0);
 
 // Setup Relay Controller------------------------------------------------------
 RelayController relayControl;
-void setupRelayController()
-{
-  relayControl.begin();
-}
 
 // Setup EEPROM ---------------------------------------------------------------
 #define EEPROM_Address 0x50
@@ -155,7 +148,7 @@ void readUserSettingsFromEEPROM(void);
 void writeUserSettingsToEEPROM(void);
 
 // Setup Display ---------------------------------------------------------------
-OLedI2C lcd;
+OLedI2C oled;
 // Used to indicate whether the screen saver is running or not
 bool ScreenSaverIsOn = false;
 // Used to keep track of the time of the last user interaction (part of the screen saver timing)
@@ -164,13 +157,6 @@ unsigned long mil_LastUserInput = millis();
 unsigned long mil_onRefreshTemperatureDisplay;
 // Update interval for the display of temperatures
 #define TEMP_REFRESH_INTERVAL 5000
-
-void setupDisplay()
-{
-  lcd.begin();
-  lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
-  lcd.clear();
-}
 
 //  Initialize the menu
 enum AppModeValues
@@ -389,9 +375,9 @@ byte getUserInput()
     if (!ScreenSaverIsOn && (millis() - mil_LastUserInput > (unsigned long)CurrentSettings.DisplayTimeout * 1000))
     {
       if (CurrentSettings.DisplayDimLevel == 0)
-        lcd.lcdOff();
+        oled.lcdOff();
       else
-        lcd.backlight(CurrentSettings.DisplayDimLevel * 4 - 1);
+        oled.backlight(CurrentSettings.DisplayDimLevel * 4 - 1);
       ScreenSaverIsOn = true;
     }
   }
@@ -401,9 +387,9 @@ byte getUserInput()
     if (ScreenSaverIsOn)
     {
       if (CurrentSettings.DisplayDimLevel == 0)
-        lcd.lcdOn();
+        oled.lcdOn();
       else
-        lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
+        oled.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
       ScreenSaverIsOn = false;
     }
   }
@@ -420,10 +406,12 @@ byte getUserInput()
 
 void reboot(void);
 void displayTemperatures(void);
+float getTemperature(uint8_t);
 void displayInput(void);
 void displayVolume(void);
 void displayMute(void);
 uint8_t getAttenuation(uint8_t, uint8_t, uint8_t, uint8_t);
+void setVolume(void);
 
 void setup()
 {
@@ -433,56 +421,63 @@ void setup()
   Serial.begin(115200);
   Wire.begin();
   setupRotaryEncoders();
-  setupIR();
-  setupDisplay();
-  setupRelayController();
+  IRLremote.begin(pinIR);
+  muses.begin();
+  oled.begin();
+  oled.clear();
+  relayControl.begin();
   readSettingsFromEEPROM();
   readRuntimeSettingsFromEEPROM();
-
+ 
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
   if ((CurrentSettings.Version != VERSION) || (CurrentRuntimeSettings.Version != VERSION))
   {
     //Serial.println(F("ERROR: Settings read from EEPROM are not ok"));
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print(F("Restoring default"));
-    lcd.setCursor(0, 1);
-    lcd.print(F("settings..."));
+    oled.clear();
+    oled.setCursor(0, 0);
+    oled.print(F("Restoring default"));
+    oled.setCursor(0, 1);
+    oled.print(F("settings..."));
     delay(2000);
-    lcd.clear();
+    oled.clear();
     writeDefaultSettingsToEEPROM();
     reboot();
   }
   else // Settings read from EEPROM are valid so let's move on!
   {
+    oled.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
     // TO DO if triggers are active then wait for the set number of seconds (if > 0) and turn them on with the chosen method
-    // TO DO Select input relay 
-    // TO DO Set volume
+    // TO DO Select input relay
+    setVolume();
     displayVolume();
     displayInput();
     displayTemperatures();
   }
 }
 
-uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB) {
+uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
+{
 
-  float att_dB = max_dB-min_dB;
-  float sizeOfLargeSteps = round(pow(2.0,att_dB/steps)-0.5);
-  float numberOfSmallSteps = (sizeOfLargeSteps*steps-att_dB)/(sizeOfLargeSteps/2);
-    
-  if (steps >= numberOfSmallSteps &&   // Profile cannot be made resolution to low
-      selStep <= steps &&              // Attenuation cannot be calculated when selected step is higher than the steps
+  float att_dB = max_dB - min_dB;
+  float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
+  float numberOfSmallSteps = (sizeOfLargeSteps * steps - att_dB) / (sizeOfLargeSteps / 2);
+
+  if (steps >= numberOfSmallSteps && // Profile cannot be made resolution to low
+      selStep <= steps &&            // Attenuation cannot be calculated when selected step is higher than the steps
       sizeOfLargeSteps <= 4          // As a rule of thumb steps must not be larger than 2 db
-      ) 
+  )
   {
     //selStep = steps - selStep;
-    return (max_dB - ((min(selStep,numberOfSmallSteps)*(sizeOfLargeSteps/2)+max((selStep-numberOfSmallSteps),0)*sizeOfLargeSteps)))*2;
-  } else {
-    return 223;                        // If a attenuation cannot be calculated then select mute 
+    return (max_dB - ((min(selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max((selStep - numberOfSmallSteps), 0) * sizeOfLargeSteps))) * 2;
+  }
+  else
+  {
+    return 223; // If a attenuation cannot be calculated then select mute
   }
 }
 
-void setVolume() {
+void setVolume()
+{
   CurrentRuntimeSettings.CurrentAttenuation = getAttenuation(CurrentSettings.VolumeSteps, CurrentRuntimeSettings.CurrentVolume, CurrentSettings.MinAttenuation, CurrentSettings.MaxAttenuation);
   // ToDo call muses incl. balance logic
 }
@@ -496,49 +491,56 @@ void displayVolume()
     {
       if (CurrentSettings.VolumeSteps > 100)
       {
-        lcd.setCursor(17, 0);
-        lcd.print("Vol");
+        oled.setCursor(17, 0);
+        oled.print("Vol");
         if (!CurrentRuntimeSettings.Muted)
-          lcd.print3x3Number(11, 1, CurrentRuntimeSettings.CurrentVolume, 3, false); // Display volume from 000-999 with 3x3 digits
+          oled.print3x3Number(11, 1, CurrentRuntimeSettings.CurrentVolume, false); // Display volume from 000-999 with 3x3 digits
         else
           displayMute();
       }
       else
       {
         if (!CurrentRuntimeSettings.Muted)
-          lcd.print4x4Number(11, CurrentRuntimeSettings.CurrentVolume); // Display volume from 00-99 with 4x4 digits
+          oled.print4x4Number(11, CurrentRuntimeSettings.CurrentVolume); // Display volume from 00-99 with 4x4 digits
         else
           displayMute();
       }
     }
     else // Show volume in -dB (-99.9 to 0)
     {
-      lcd.setCursor(17, 0);
-      lcd.print("-dB");
+      oled.setCursor(1, 0);
+      oled.print("   ");
+      oled.setCursor(1, 0);
+      oled.print(CurrentRuntimeSettings.CurrentVolume); // TO DO Remove display of step - only for debug purposes
+
+      oled.setCursor(17, 0);
+      oled.print("-dB");
       if (!CurrentRuntimeSettings.Muted)
-        lcd.print3x3Number(10, 1, (CurrentRuntimeSettings.CurrentAttenuation * 10)/2, 3, true); // TO DO Display volume as -dB - CurrentRuntimeSettings.CurrentVolume must be converted to -dB in the call to print3x3Number
+        oled.print3x3Number(10, 1, ((float)CurrentRuntimeSettings.CurrentAttenuation / 2) * 10, true); // Display volume as -dB - CurrentRuntimeSettings.CurrentAttennuation are converted to -dB and multiplied by 10 to be able to show 0.5 dB steps
       else
         displayMute();
     }
   }
 }
 
+// Clear previously displayed volume steps/-dB to indicate that mute is selected
 void displayMute()
 {
   for (int8_t i = 0; i < 4; i++)
   {
-    lcd.setCursor(10,i);
-    for (int8_t x = 0; x < 10; x++) 
-    lcd.write(32);
+    oled.setCursor(10, i);
+    for (int8_t x = 0; x < 10; x++)
+      oled.write(32);
   }
 }
 
+// Display the name of the current input (but only if it has been chosen to be so by the user)
 void displayInput()
 {
   if (CurrentSettings.DisplaySelectedInput)
   {
-    lcd.setCursor(0, 0);
-    lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
+    oled.setCursor(0, 0);
+    oled.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
   }
 }
 
@@ -546,47 +548,47 @@ void displayTemperatures()
 {
   if (CurrentSettings.DisplayTemperature1)
   {
-    float Temp = relayControl.getTemperature(A0);
+    float Temp = getTemperature(A0);
     float MaxTemp;
     if (CurrentSettings.Trigger1Temp == 0)
       MaxTemp = 60;
     else
       MaxTemp = CurrentSettings.Trigger1Temp;
-    lcd.setCursor(0, 3);
+    oled.setCursor(0, 3);
     if (Temp < 0)
     {
-      lcd.print("OFF ");
+      oled.print("OFF ");
       if (CurrentSettings.DisplayTemperature1 == 3)
       {
-        lcd.setCursor(0, 2);
-        lcd.print("AMP ");
+        oled.setCursor(0, 2);
+        oled.print("AMP ");
       }
     }
     else if (Temp > MaxTemp)
     {
-      lcd.setCursor(0, 3);
-      lcd.print("HIGH");
+      oled.setCursor(0, 3);
+      oled.print("HIGH");
       if (CurrentSettings.DisplayTemperature1 == 3)
       {
-        lcd.setCursor(0, 2);
-        lcd.print("TEMP");
+        oled.setCursor(0, 2);
+        oled.print("TEMP");
       }
     }
     else
     {
       if (CurrentSettings.DisplayTemperature1 == 1 || CurrentSettings.DisplayTemperature1 == 3)
       {
-        lcd.setCursor(0, 3);
-        lcd.print(int(Temp));
-        lcd.write(128); // Degree symbol
-        lcd.print(" ");
+        oled.setCursor(0, 3);
+        oled.print(int(Temp));
+        oled.write(128); // Degree symbol
+        oled.print(" ");
       }
       if (CurrentSettings.DisplayTemperature1 == 2 || CurrentSettings.DisplayTemperature1 == 3)
       {
         if (CurrentSettings.DisplayTemperature1 == 2)
-          lcd.setCursor(0, 3);
+          oled.setCursor(0, 3);
         else
-          lcd.setCursor(0, 2);
+          oled.setCursor(0, 2);
 
         // Map the range (0c ~ max temperature) to the range of the bar (0 to Number of characters to show the bar * Number of possible values per character )
         byte nb_columns = map(Temp, 0, MaxTemp, 0, 4 * 5);
@@ -597,16 +599,16 @@ void displayTemperatures()
           // Write character depending on number of columns remaining to display
           if (nb_columns == 0)
           { // Case empty
-            lcd.write(' ');
+            oled.write(' ');
           }
           else if (nb_columns >= 5) // Full box
           {
-            lcd.write(208); // Full box symbol
+            oled.write(208); // Full box symbol
             nb_columns -= 5;
           }
           else // Partial box
           {
-            lcd.write(map(nb_columns, 1, 4, 212, 209)); // Map the remaining nb_columns (case between 1 and 4) to the corresponding character number symbols : 212 = 1 bar, 211 = 2 bars, 210 = 3 bars, 209 = 4 bars
+            oled.write(map(nb_columns, 1, 4, 212, 209)); // Map the remaining nb_columns (case between 1 and 4) to the corresponding character number symbols : 212 = 1 bar, 211 = 2 bars, 210 = 3 bars, 209 = 4 bars
             nb_columns = 0;
           }
         }
@@ -616,7 +618,7 @@ void displayTemperatures()
 
   if (CurrentSettings.DisplayTemperature2)
   {
-    float Temp = relayControl.getTemperature(A1);
+    float Temp = getTemperature(A1);
     float MaxTemp;
     if (CurrentSettings.Trigger2Temp == 0)
       MaxTemp = 60;
@@ -627,41 +629,41 @@ void displayTemperatures()
       Col = 5;
     else
       Col = 0;
-    lcd.setCursor(Col, 3);
+    oled.setCursor(Col, 3);
     if (Temp < 0)
     {
-      lcd.print("OFF ");
+      oled.print("OFF ");
       if (CurrentSettings.DisplayTemperature2 == 3)
       {
-        lcd.setCursor(Col, 2);
-        lcd.print("AMP ");
+        oled.setCursor(Col, 2);
+        oled.print("AMP ");
       }
     }
     else if (Temp > MaxTemp)
     {
-      lcd.setCursor(Col, 3);
-      lcd.print("HIGH");
+      oled.setCursor(Col, 3);
+      oled.print("HIGH");
       if (CurrentSettings.DisplayTemperature2 == 3)
       {
-        lcd.setCursor(Col, 2);
-        lcd.print("TEMP");
+        oled.setCursor(Col, 2);
+        oled.print("TEMP");
       }
     }
     else
     {
       if (CurrentSettings.DisplayTemperature2 == 1 || CurrentSettings.DisplayTemperature2 == 3)
       {
-        lcd.setCursor(Col, 3);
-        lcd.print(int(Temp));
-        lcd.write(128); // Degree symbol
-        lcd.print(" ");
+        oled.setCursor(Col, 3);
+        oled.print(int(Temp));
+        oled.write(128); // Degree symbol
+        oled.print(" ");
       }
       if (CurrentSettings.DisplayTemperature2 == 2 || CurrentSettings.DisplayTemperature2 == 3)
       {
         if (CurrentSettings.DisplayTemperature2 == 2)
-          lcd.setCursor(Col, 3);
+          oled.setCursor(Col, 3);
         else
-          lcd.setCursor(Col, 2);
+          oled.setCursor(Col, 2);
 
         // Map the range (0c ~ max temperature) to the range of the bar (0 to Number of characters to show the bar * Number of possible values per character )
         byte nb_columns = map(Temp, 0, MaxTemp, 0, 4 * 5);
@@ -672,16 +674,16 @@ void displayTemperatures()
           // Write character depending on number of columns remaining to display
           if (nb_columns == 0)
           { // Case empty
-            lcd.write(' ');
+            oled.write(' ');
           }
           else if (nb_columns >= 5) // Full box
           {
-            lcd.write(208); // Full box symbol
+            oled.write(208); // Full box symbol
             nb_columns -= 5;
           }
           else // Partial box
           {
-            lcd.write(map(nb_columns, 1, 4, 212, 209)); // Map the remaining nb_columns (case between 1 and 4) to the corresponding character number symbols : 212 = 1 bar, 211 = 2 bars, 210 = 3 bars, 209 = 4 bars
+            oled.write(map(nb_columns, 1, 4, 212, 209)); // Map the remaining nb_columns (case between 1 and 4) to the corresponding character number symbols : 212 = 1 bar, 211 = 2 bars, 210 = 3 bars, 209 = 4 bars
             nb_columns = 0;
           }
         }
@@ -690,6 +692,25 @@ void displayTemperatures()
   }
 
   mil_onRefreshTemperatureDisplay = millis();
+}
+
+// Return measured temperature from 4.7K NTC connected to pinNmbr
+float getTemperature(uint8_t pinNmbr)
+{
+    uint16_t sensorValue = 0;
+    float Vin = 5.0;   // Input voltage 5V for Arduino Nano V3
+    float Vout = 0;    // Measured voltage
+    float Rref = 4700; // Reference resistor's value in ohms
+    float Rntc = 0;    // Measured resistance of NTC
+    float Temp;
+
+    sensorValue = analogRead(pinNmbr); // Read Vout on analog input pin (Arduino can sense from 0-1023, 1023 is Vin)
+
+    Vout = (sensorValue * Vin) / 1024.0; // Convert Vout to volts
+    Rntc = Rref / ((Vin / Vout) - 1); // Formula to calculate the resisatance of the NTC
+
+    Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
+    return (Temp);
 }
 
 void loop()
@@ -741,7 +762,7 @@ void loop()
         CurrentRuntimeSettings.CurrentVolume++;
         CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
         setVolume();
-        
+
         displayVolume();
         // TO DO Set volume to CurrentVolume
         // TO DO Save CurrentVolume to EEPROM
@@ -854,8 +875,8 @@ void loop()
           // TO DO Unmute
           if (CurrentSettings.DisplaySelectedInput)
           {
-            lcd.setCursor(0, 0);
-            lcd.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
+            oled.setCursor(0, 0);
+            oled.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
           }
         }
       }
@@ -900,7 +921,7 @@ void loop()
 
     if (menuMode == MENU_EXIT)
     {
-      lcd.clear();
+      oled.clear();
       // Back to APP_NORMAL_MODE
       displayInput();
       displayVolume();
@@ -930,13 +951,13 @@ void loop()
     break;
   case APP_POWERLOSS_STATE: // Only active if power drop is detected
     Serial.println("In APP_POWERLOSS_STATE");
-    lcd.clear();
-    lcd.setCursor(0, 1);
-    lcd.print("ATTENTION:");
-    lcd.setCursor(0, 2);
-    lcd.print("Check power supply!");
+    oled.clear();
+    oled.setCursor(0, 1);
+    oled.print("ATTENTION:");
+    oled.setCursor(0, 2);
+    oled.print("Check power supply!");
     delay(2000);
-    lcd.clear();
+    oled.clear();
     long vcc;
     do
     {
@@ -962,20 +983,20 @@ void toStandbyMode()
   if (ScreenSaverIsOn)
   {
     if (CurrentSettings.DisplayDimLevel == 0)
-      lcd.lcdOn();
+      oled.lcdOn();
     else
-      lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
+      oled.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
     ScreenSaverIsOn = false;
   }
-  lcd.clear();
-  lcd.setCursor(0, 1);
-  lcd.print(F("Going to sleep!"));
-  lcd.setCursor(0, 3);
-  lcd.print(F("           ...zzzZZZ"));
+  oled.clear();
+  oled.setCursor(0, 1);
+  oled.print(F("Going to sleep!"));
+  oled.setCursor(0, 3);
+  oled.print(F("           ...zzzZZZ"));
   // TO DO Mute output
   // TO DO Turn of triggers
   delay(2000);
-  lcd.PowerDown();
+  oled.PowerDown();
   while (getUserInput() != KEY_ONOFF)
     ;
 }
@@ -996,21 +1017,42 @@ byte processMenuCommand(byte cmdId)
   {
   case mnuCmdVOL_STEPS:
   {
-    editNumericValue(CurrentSettings.VolumeSteps, 0, 189, "Steps");
-    // TO DO Validate if VolumeSteps < Max_Volume (both global and for each input) - if so, they must be changed. Also if Max vol's are changed then maybe min. vol's needs to be changed also. Same goes for max start vol and mute lvl
-    complete = true;
-    break;
+    if (editNumericValue(CurrentSettings.VolumeSteps, 1, 179, "Steps"))
+    {
+      // Validate if changed MaxVol > VolumeSteps for any inputs - if so, change MaxVol to VolumeSteps
+      for (uint8_t i = 0; i < 6; i++)
+        if (CurrentSettings.Input[i].MaxVol > CurrentSettings.VolumeSteps)
+          CurrentSettings.Input[i].MaxVol = CurrentSettings.VolumeSteps;
+      // Validate if changed MinVol > VolumeSteps for any inputs - if so, change MinVol to VolumeSteps
+      for (uint8_t i = 0; i < 6; i++)
+        if (CurrentSettings.Input[i].MinVol > CurrentSettings.VolumeSteps)
+          CurrentSettings.Input[i].MinVol = CurrentSettings.VolumeSteps;
+      // Validate if changed MaxStartVolume > VolumeStepsMaxStartVolume - if so, change MaxStartVolume to VolumeSteps
+      if (CurrentSettings.MaxStartVolume > CurrentSettings.VolumeSteps)
+        CurrentSettings.MaxStartVolume = CurrentSettings.VolumeSteps;
+      // Validate if changed CurrentVolume > VolumeSteps - if so, change CurrentVolume to VolumeSteps
+      if (CurrentRuntimeSettings.CurrentVolume > CurrentSettings.VolumeSteps)
+      {
+        CurrentRuntimeSettings.CurrentVolume = CurrentSettings.VolumeSteps;
+        if (!CurrentRuntimeSettings.Muted)
+          setVolume();
+        writeSettingsToEEPROM();
+        writeRuntimeSettingsToEEPROM();
+      }
+      complete = true;
+      break;
+    }
   }
   case mnuCmdMIN_ATT:
     editNumericValue(CurrentSettings.MinAttenuation, 0, CurrentSettings.MaxAttenuation, "  -dB");
     complete = true;
     break;
   case mnuCmdMAX_ATT:
-    editNumericValue(CurrentSettings.MaxAttenuation, CurrentSettings.MinAttenuation, CurrentSettings.MaxAttenuation, "  -dB");
+    editNumericValue(CurrentSettings.MaxAttenuation, CurrentSettings.MinAttenuation + 1, 90, "  -dB");
     complete = true;
     break;
   case mnuCmdMAX_START_VOL:
-    editNumericValue(CurrentSettings.MaxStartVolume, CurrentSettings.MinAttenuation, CurrentSettings.MaxAttenuation, " Step");
+    editNumericValue(CurrentSettings.MaxStartVolume, 0, CurrentSettings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdMUTE_LVL:
@@ -1022,7 +1064,8 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT1_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 0) editOptionValue(CurrentSettings.Input[0].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 0)
+      editOptionValue(CurrentSettings.Input[0].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT1_NAME:
@@ -1038,7 +1081,8 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT2_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 1) editOptionValue(CurrentSettings.Input[1].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 1)
+      editOptionValue(CurrentSettings.Input[1].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT2_NAME:
@@ -1054,7 +1098,8 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT3_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 2) editOptionValue(CurrentSettings.Input[2].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 2)
+      editOptionValue(CurrentSettings.Input[2].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT3_NAME:
@@ -1070,14 +1115,15 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT4_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 3) editOptionValue(CurrentSettings.Input[3].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 3)
+      editOptionValue(CurrentSettings.Input[3].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT4_NAME:
     editInputName(3);
     complete = true;
     break;
-case mnuCmdINPUT4_MAX_VOL:
+  case mnuCmdINPUT4_MAX_VOL:
     editNumericValue(CurrentSettings.Input[3].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
     complete = true;
     break;
@@ -1086,7 +1132,8 @@ case mnuCmdINPUT4_MAX_VOL:
     complete = true;
     break;
   case mnuCmdINPUT5_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 4) editOptionValue(CurrentSettings.Input[4].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 4)
+      editOptionValue(CurrentSettings.Input[4].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT5_NAME:
@@ -1102,7 +1149,8 @@ case mnuCmdINPUT4_MAX_VOL:
     complete = true;
     break;
   case mnuCmdINPUT6_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 5) editOptionValue(CurrentSettings.Input[5].Active, 2, "No", "Yes", "", "");
+    if (CurrentRuntimeSettings.CurrentInput != 5)
+      editOptionValue(CurrentSettings.Input[5].Active, 2, "No", "Yes", "", "");
     // TO DO Might be implemented as: if this input is not selected then "HT", "Yes", "No" else only allow to select "HT", "Yes"
     complete = true;
     break;
@@ -1232,16 +1280,16 @@ case mnuCmdINPUT4_MAX_VOL:
     break;
   case mnuCmdDISP_ON_LEVEL:
     editOptionValue(CurrentSettings.DisplayOnLevel, 4, "25%", "50%", "75%", "100%");
-    lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
+    oled.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
     complete = true;
     break;
   case mnuCmdDISP_DIM_LEVEL:
     editNumericValue(CurrentSettings.DisplayDimLevel, 0, 32, "     ");
     if (CurrentSettings.DisplayDimLevel != 0)
     {
-      lcd.backlight(CurrentSettings.DisplayDimLevel * 4 - 1);
+      oled.backlight(CurrentSettings.DisplayDimLevel * 4 - 1);
       delay(2000);
-      lcd.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
+      oled.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
     }
     complete = true;
     break;
@@ -1266,19 +1314,19 @@ case mnuCmdINPUT4_MAX_VOL:
     complete = true;
     break;
   case mnuCmdABOUT:
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print(F("Firmware "));
-    lcd.print(VERSION);
-    lcd.setCursor(0, 1);
-    lcd.print(F("built by carsten"));
-    lcd.write(160);
-    lcd.setCursor(0, 2);
-    lcd.print(F("groenning.net &"));
-    lcd.setCursor(0, 3);
-    lcd.print(F("jan"));
-    lcd.write(160);
-    lcd.print(F("tofft.dk (c)2020"));
+    oled.clear();
+    oled.setCursor(0, 0);
+    oled.print(F("Firmware "));
+    oled.print(VERSION);
+    oled.setCursor(0, 1);
+    oled.print(F("built by carsten"));
+    oled.write(160);
+    oled.setCursor(0, 2);
+    oled.print(F("groenning.net &"));
+    oled.setCursor(0, 3);
+    oled.print(F("jan"));
+    oled.write(160);
+    oled.print(F("tofft.dk (c)2020"));
     delay(5000);
     complete = true;
     break;
@@ -1321,34 +1369,34 @@ byte getNavAction()
 
 //----------------------------------------------------------------------
 // Show menu items based upon where the user has navigated to
-// The menu consists of up to four lines: one line to show the name of the current menu and up to three lines of menu items. 
+// The menu consists of up to four lines: one line to show the name of the current menu and up to three lines of menu items.
 void drawMenu()
 {
   char strbuf[21]; // one line of lcd display
   char nameBuf[18];
 
   // Display the name of the menu
-  lcd.setCursor(0, 0);
+  oled.setCursor(0, 0);
   if (Menu1.currentMenuHasParent())
   {
     rpad(strbuf, Menu1.getParentItemName(nameBuf), ' ', 20);
-    lcd.print(strbuf);
+    oled.print(strbuf);
   }
   else
-    lcd.print(F("Main menu           "));
+    oled.print(F("Main menu           "));
 
   // Clear any previously displayed arrow
   for (int i = 1; i < 4; i++)
   {
-    lcd.setCursor(0, i);
-    lcd.print("  ");
+    oled.setCursor(0, i);
+    oled.print("  ");
   }
 
   // Display the name of the currently active menu item on the row set by menuIndex (+1 because row 0 is used to display the name of the menu)
-  lcd.setCursor(1, menuIndex + 1);
-  lcd.write(16); // Mark with an arrow that this is the menu item that will be activated if the user press select
+  oled.setCursor(1, menuIndex + 1);
+  oled.write(16); // Mark with an arrow that this is the menu item that will be activated if the user press select
   rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
-  lcd.print(strbuf);
+  oled.print(strbuf);
 
   switch (menuIndex)
   {
@@ -1357,22 +1405,22 @@ void drawMenu()
     {
       Menu1.moveToNextItem();
       rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
-      lcd.setCursor(2, menuIndex + 2);
-      lcd.print(strbuf);
+      oled.setCursor(2, menuIndex + 2);
+      oled.print(strbuf);
       if (Menu1.getCurrentItemIndex() + 2 <= Menu1.getMenuItemCount())
       {
         Menu1.moveToNextItem();
         rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
-        lcd.setCursor(2, menuIndex + 3);
-        lcd.print(strbuf);
+        oled.setCursor(2, menuIndex + 3);
+        oled.print(strbuf);
         Menu1.moveToPreviousItem();
       }
       else
       {
         /* clear line at menuIndex + 3 */
         rpad(strbuf, " ", ' ', 17);
-        lcd.setCursor(2, menuIndex + 3);
-        lcd.print(strbuf);
+        oled.setCursor(2, menuIndex + 3);
+        oled.print(strbuf);
       }
       Menu1.moveToPreviousItem();
     }
@@ -1380,44 +1428,44 @@ void drawMenu()
     {
       /* clear line at menuIndex + 2 and menuIndex + 3*/
       rpad(strbuf, " ", ' ', 17);
-      lcd.setCursor(2, menuIndex + 2);
-      lcd.print(strbuf);
-      lcd.setCursor(2, menuIndex + 3);
-      lcd.print(strbuf);
+      oled.setCursor(2, menuIndex + 2);
+      oled.print(strbuf);
+      oled.setCursor(2, menuIndex + 3);
+      oled.print(strbuf);
     }
 
     break;
   case 1:                       // The current menu item was displayed on row 1 - display item on row 0 and see if there is an item to display on row 2
     Menu1.moveToPreviousItem(); // Move one item up in the menu to find the name of the item to be displayed one the line just before the current one
     rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
-    lcd.setCursor(2, menuIndex);
-    lcd.print(strbuf);
+    oled.setCursor(2, menuIndex);
+    oled.print(strbuf);
     Menu1.moveToNextItem(); // Move to next menu item to get back to current one
     if (Menu1.getCurrentItemIndex() + 1 <= Menu1.getMenuItemCount())
     {
       Menu1.moveToNextItem(); // Move to next menu item to find the name of the item after the current one
       rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
-      lcd.setCursor(2, menuIndex + 2);
-      lcd.print(strbuf);
+      oled.setCursor(2, menuIndex + 2);
+      oled.print(strbuf);
       Menu1.moveToPreviousItem(); // Move to previous menu item to get back to current one
     }
     else // No more items in the menu - make sure we clear up any previously displayed info from the display
     {
       /* clear line at menuIndex + 2 */
       rpad(strbuf, " ", ' ', 17);
-      lcd.setCursor(2, menuIndex + 2);
-      lcd.print(strbuf);
+      oled.setCursor(2, menuIndex + 2);
+      oled.print(strbuf);
     }
     break;
   case 2:                       // The current menu item was displayed on row 2 - display items on row 0 and 1
     Menu1.moveToPreviousItem(); // Move one item up in the menu to find the name of the item to be displayed one the line just before the current one
     rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
-    lcd.setCursor(2, menuIndex);
-    lcd.print(strbuf);
+    oled.setCursor(2, menuIndex);
+    oled.print(strbuf);
     Menu1.moveToPreviousItem(); // Once again we move one item up in the menu to find the name of the item to be displayed as the first one
     rpad(strbuf, Menu1.getCurrentItemName(nameBuf), ' ', 18);
-    lcd.setCursor(2, menuIndex - 1);
-    lcd.print(strbuf);
+    oled.setCursor(2, menuIndex - 1);
+    oled.print(strbuf);
     Menu1.moveToNextItem(); // Move to next menu item
     Menu1.moveToNextItem(); // Move to next menu item to get back to current one
     break;
@@ -1435,12 +1483,12 @@ void refreshMenuDisplay(byte refreshMode)
       drawMenu();
     else
     {
-      lcd.setCursor(1, menuIndex + 1);
-      lcd.write(32); // Delete the arrow previously set
+      oled.setCursor(1, menuIndex + 1);
+      oled.write(32); // Delete the arrow previously set
       menuIndex--;
       // Redraw indication of what menu item is selected
-      lcd.setCursor(1, menuIndex + 1);
-      lcd.write(16); // Mark with an arrow that this is the menu item that will be activated if the user press select
+      oled.setCursor(1, menuIndex + 1);
+      oled.write(16); // Mark with an arrow that this is the menu item that will be activated if the user press select
     }
     break;
   case REFRESH_MOVE_NEXT: // user has navigated to next menu item.
@@ -1448,12 +1496,12 @@ void refreshMenuDisplay(byte refreshMode)
       drawMenu();
     else
     {
-      lcd.setCursor(1, menuIndex + 1);
-      lcd.write(32); // Delete the arrow previously set
+      oled.setCursor(1, menuIndex + 1);
+      oled.write(32); // Delete the arrow previously set
       menuIndex++;
       // Redraw indication of what menu item is selected
-      lcd.setCursor(1, menuIndex + 1);
-      lcd.write(16); // Mark with an arrow that this is the menu item that will be activated if the user press select
+      oled.setCursor(1, menuIndex + 1);
+      oled.write(16); // Mark with an arrow that this is the menu item that will be activated if the user press select
     }
     break;
   case REFRESH_ASCEND: // user has navigated to parent menu.
@@ -1480,21 +1528,21 @@ void editInputName(uint8_t InputNumber)
   int arrowPointingUpDown = 0; // text edit arrow start direction: up == 0, down == 1
   String newInputName = "          ";
   // Display the screen
-  lcd.clear();
-  lcd.print("Input ");
-  lcd.print(InputNumber + 1);
-  lcd.setCursor(7, 0);
-  lcd.write(223); // Right arrow
+  oled.clear();
+  oled.print("Input ");
+  oled.print(InputNumber + 1);
+  oled.setCursor(7, 0);
+  oled.write(223); // Right arrow
   drawEditInputNameScreen(isUpperCase);
 
-  lcd.setCursor(arrowX, 2);
-  lcd.write(byte(26 + arrowPointingUpDown)); // 26 is arrow up, 27 is arrow down
+  oled.setCursor(arrowX, 2);
+  oled.write(byte(26 + arrowPointingUpDown)); // 26 is arrow up, 27 is arrow down
   newInputName = CurrentSettings.Input[InputNumber].Name;
   newInputName.trim();
-  lcd.setCursor(9, 0);
-  lcd.print(newInputName);
-  lcd.setCursor(9 + newInputName.length(), 0);
-  lcd.BlinkingCursorOn();
+  oled.setCursor(9, 0);
+  oled.print(newInputName);
+  oled.setCursor(9 + newInputName.length(), 0);
+  oled.BlinkingCursorOn();
   while (!complete)
   {
     mil_LastUserInput = millis(); // Prevent the screen saver to kick in while editing
@@ -1502,10 +1550,10 @@ void editInputName(uint8_t InputNumber)
     {
     case KEY_RIGHT:
     case KEY_LEFT:
-      lcd.BlinkingCursorOff();
+      oled.BlinkingCursorOff();
       // Clear current arrow
-      lcd.setCursor(arrowX, 2);
-      lcd.write(' ');
+      oled.setCursor(arrowX, 2);
+      oled.write(' ');
 
       // Decide if position or direction of arrow must be changed
       if (arrowPointingUpDown == 0 && UserInput == KEY_RIGHT)     // The arrow points up and the user input is "turn to the right"
@@ -1524,16 +1572,16 @@ void editInputName(uint8_t InputNumber)
         arrowPointingUpDown = 0;                                  // Set the arrow to point up but don't change position of ArrowX
 
       // Display arrow
-      lcd.setCursor(arrowX, 2);
+      oled.setCursor(arrowX, 2);
       if (arrowPointingUpDown == 1) // if arrow == 1, then print arrow that points down; if arrow == 0, then print arrow that points up
-        lcd.write(27);
+        oled.write(27);
       else
-        lcd.write(26);
-      lcd.setCursor(9 + newInputName.length(), 0);
-      lcd.BlinkingCursorOn();
+        oled.write(26);
+      oled.setCursor(9 + newInputName.length(), 0);
+      oled.BlinkingCursorOn();
       break;
     case KEY_SELECT:
-      lcd.BlinkingCursorOff();
+      oled.BlinkingCursorOff();
       if (arrowPointingUpDown == 1) // If arrow points down
       {
         if (arrowX == 17) // Switch between Upper and Lower case characters
@@ -1545,8 +1593,8 @@ void editInputName(uint8_t InputNumber)
         {
           if (newInputName.length() > 0) // Make sure there is a character to delete!
           {
-            lcd.setCursor(9 + newInputName.length() - 1, 0);
-            lcd.print(" "); // Print to clear the deleted character on the display
+            oled.setCursor(9 + newInputName.length() - 1, 0);
+            oled.print(" "); // Print to clear the deleted character on the display
             newInputName = newInputName.substring(0, newInputName.length() - 1);
           }
         }
@@ -1598,9 +1646,9 @@ void editInputName(uint8_t InputNumber)
       }
       if (!complete)
       {
-        lcd.setCursor(9, 0);
-        lcd.print(newInputName);
-        lcd.BlinkingCursorOn();
+        oled.setCursor(9, 0);
+        oled.print(newInputName);
+        oled.BlinkingCursorOn();
       }
       break;
     case KEY_BACK:
@@ -1611,62 +1659,60 @@ void editInputName(uint8_t InputNumber)
       break;
     }
   }
-  lcd.BlinkingCursorOff();
+  oled.BlinkingCursorOff();
 }
 
 void drawEditInputNameScreen(bool isUpperCase)
 {
-  lcd.setCursor(0, 1);
-  lcd.write(byte(196)); // Print underscore to indicate Space
+  oled.setCursor(0, 1);
+  oled.write(byte(196)); // Print underscore to indicate Space
   if (isUpperCase)
   {
     for (int i = 65; i < 84; i++) // Print A-S
-      lcd.write(i);
-    lcd.setCursor(0, 3);
+      oled.write(i);
+    oled.setCursor(0, 3);
     for (int i = 84; i < 91; i++) // Print T-Z
-      lcd.write(i);
+      oled.write(i);
   }
   else
   {
     for (int i = 97; i < 116; i++) // Print a-s
-      lcd.write(i);
-    lcd.setCursor(0, 3);
+      oled.write(i);
+    oled.setCursor(0, 3);
     for (int i = 116; i < 123; i++) // Print t-z
-      lcd.write(i);
+      oled.write(i);
   }
   for (int i = 48; i < 58; i++) // Print 0-9
-    lcd.write(i);
+    oled.write(i);
   if (isUpperCase)
-    lcd.write(19);
+    oled.write(19);
   else
-    lcd.write(18);
-  lcd.write(225); // "Backspace" icon
-  lcd.write(28);  // "Enter" icon
+    oled.write(18);
+  oled.write(225); // "Backspace" icon
+  oled.write(28);  // "Enter" icon
 }
 
 bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit[5])
 {
   bool complete = false;
   bool result = false;
-  //char nameBuf[11];
-  uint8_t digits;
+  char nameBuf[11];
 
   byte NewValue = Value;
 
   // Display the screen
-  lcd.clear();
-  //lcd.print(Menu1.getCurrentItemName(nameBuf));
-  lcd.setCursor(0, 2);
-  lcd.print(F("Min. "));
-  lcd.print(MinValue);
-  lcd.setCursor(0, 3);
-  lcd.print(F("Max. "));
-  lcd.print(MaxValue);
-  lcd.setCursor(15, 0);
-  lcd.print(Unit);
-  if (MaxValue > 99) digits = 3; else digits = 2;
-  
-  lcd.print3x3Number(11, 1, NewValue, digits, false); // Display number from 000-999 with 3x3 digits
+  oled.clear();
+  oled.print(Menu1.getCurrentItemName(nameBuf));
+  oled.setCursor(0, 2);
+  oled.print(F("Min. "));
+  oled.print(MinValue);
+  oled.setCursor(0, 3);
+  oled.print(F("Max. "));
+  oled.print(MaxValue);
+  oled.setCursor(15, 0);
+  oled.print(Unit);
+
+  oled.print3x3Number(11, 1, NewValue, false); // Display number from 000-999 with 3x3 digits
 
   while (!complete)
   {
@@ -1677,14 +1723,14 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit
       if (NewValue < MaxValue)
       {
         NewValue++;
-        lcd.print3x3Number(11, 1, NewValue, digits, false); // Display number from 000-999 with 3x3 digits
+        oled.print3x3Number(11, 1, NewValue, false); // Display number from 000-999 with 3x3 digits
       }
       break;
     case KEY_LEFT:
       if (NewValue > MinValue)
       {
         NewValue--;
-        lcd.print3x3Number(11, 1, NewValue, digits, false); // Display number from 000-999 with 3x3 digits
+        oled.print3x3Number(11, 1, NewValue, false); // Display number from 000-999 with 3x3 digits
       }
       break;
     case KEY_SELECT:
@@ -1714,29 +1760,29 @@ bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const 
   byte NewValue = Value;
 
   // Display the screen
-  lcd.clear();
-  lcd.print(Menu1.getCurrentItemName(nameBuf));
+  oled.clear();
+  oled.print(Menu1.getCurrentItemName(nameBuf));
   if (NumOptions < 3)
   {
-    lcd.setCursor(1, 2);
-    lcd.print(Option1);
-    lcd.setCursor(11, 2);
-    lcd.print(Option2);
+    oled.setCursor(1, 2);
+    oled.print(Option1);
+    oled.setCursor(11, 2);
+    oled.print(Option2);
   }
   else
   {
-    lcd.setCursor(1, 2);
-    lcd.print(Option1);
-    lcd.setCursor(11, 2);
-    lcd.print(Option2);
-    lcd.setCursor(1, 3);
-    lcd.print(Option3);
-    lcd.setCursor(11, 3);
-    lcd.print(Option4);
+    oled.setCursor(1, 2);
+    oled.print(Option1);
+    oled.setCursor(11, 2);
+    oled.print(Option2);
+    oled.setCursor(1, 3);
+    oled.print(Option3);
+    oled.setCursor(11, 3);
+    oled.print(Option4);
   }
 
-  lcd.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
-  lcd.write(16);
+  oled.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
+  oled.write(16);
 
   while (!complete)
   {
@@ -1744,24 +1790,24 @@ bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const 
     switch (getUserInput())
     {
     case KEY_RIGHT:
-      lcd.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
-      lcd.print(" ");
+      oled.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
+      oled.print(" ");
       if (NewValue < NumOptions - 1)
         NewValue++;
       else
         NewValue = 0;
-      lcd.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
-      lcd.write(16);
+      oled.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
+      oled.write(16);
       break;
     case KEY_LEFT:
-      lcd.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
-      lcd.print(" ");
+      oled.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
+      oled.print(" ");
       if (NewValue == 0)
         NewValue = NumOptions - 1;
       else
         NewValue--;
-      lcd.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
-      lcd.write(16);
+      oled.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
+      oled.write(16);
       break;
     case KEY_SELECT:
       Value = NewValue;
@@ -1792,22 +1838,22 @@ bool editIRCode(HashIR_data_t &Value)
   NewValue.command = 0;
 
   // Display the screen
-  lcd.clear();
-  lcd.print(F("IR key "));
-  lcd.print(Menu1.getCurrentItemName(nameBuf));
+  oled.clear();
+  oled.print(F("IR key "));
+  oled.print(Menu1.getCurrentItemName(nameBuf));
 
-  lcd.setCursor(0, 1);
-  lcd.print(F("Current:"));
-  lcd.setCursor(0, 2);
-  lcd.print(Value.address, HEX);
-  lcd.setCursor(0, 3);
-  lcd.print(Value.command, HEX);
-  lcd.setCursor(10, 1);
-  lcd.print(F("New:"));
-  lcd.setCursor(10, 2);
-  lcd.print(NewValue.address, HEX);
-  lcd.setCursor(10, 3);
-  lcd.print(NewValue.command, HEX);
+  oled.setCursor(0, 1);
+  oled.print(F("Current:"));
+  oled.setCursor(0, 2);
+  oled.print(Value.address, HEX);
+  oled.setCursor(0, 3);
+  oled.print(Value.command, HEX);
+  oled.setCursor(10, 1);
+  oled.print(F("New:"));
+  oled.setCursor(10, 2);
+  oled.print(NewValue.address, HEX);
+  oled.setCursor(10, 3);
+  oled.print(NewValue.command, HEX);
 
   // As we don't want to react to received IR code while learning new code we temporaryly disable the current code in the CurrentSettings (we save a copy in OldValue)
   OldValue.address = Value.address;
@@ -1841,14 +1887,14 @@ bool editIRCode(HashIR_data_t &Value)
     {
       // Get the new data from the remote
       NewValue = IRLremote.read();
-      lcd.setCursor(10, 2);
-      lcd.print(F("          "));
-      lcd.setCursor(10, 2);
-      lcd.print(NewValue.address, HEX);
-      lcd.setCursor(10, 3);
-      lcd.print(F("          "));
-      lcd.setCursor(10, 3);
-      lcd.print(NewValue.command, HEX);
+      oled.setCursor(10, 2);
+      oled.print(F("          "));
+      oled.setCursor(10, 2);
+      oled.print(NewValue.address, HEX);
+      oled.setCursor(10, 3);
+      oled.print(F("          "));
+      oled.setCursor(10, 3);
+      oled.print(NewValue.command, HEX);
     }
   }
   return result;
@@ -1857,9 +1903,9 @@ bool editIRCode(HashIR_data_t &Value)
 // Loads default settings into CurrentSettings and CurrentRuntimeSettings - this is only done when the EEPROM does not contain valid settings or when reset is chosen by user in the menu
 void setCurrentSettingsToDefault()
 {
-  CurrentSettings.VolumeSteps = 128;
+  CurrentSettings.VolumeSteps = 64;
   CurrentSettings.MinAttenuation = 0;
-  CurrentSettings.MaxAttenuation = 120;
+  CurrentSettings.MaxAttenuation = 60;
   CurrentSettings.MaxStartVolume = CurrentSettings.VolumeSteps;
   CurrentSettings.MuteLevel = 0;
   CurrentSettings.RecallSetLevel = true;
@@ -1940,7 +1986,7 @@ void setCurrentSettingsToDefault()
 
   CurrentRuntimeSettings.CurrentInput = 0;
   CurrentRuntimeSettings.CurrentVolume = 0;
-  CurrentRuntimeSettings.CurrentAttenuation = 223;
+  CurrentRuntimeSettings.CurrentAttenuation = 0;
   CurrentRuntimeSettings.Muted = 0;
   CurrentRuntimeSettings.InputLastVol[0] = 0;
   CurrentRuntimeSettings.InputLastVol[1] = 0;
@@ -2011,16 +2057,15 @@ void writeUserSettingsToEEPROM()
   eeprom.write(sizeof(CurrentSettings) + sizeof(CurrentRuntimeSettings) + 1, CurrentSettings.data, sizeof(CurrentSettings));
 }
 
-
 // Reboots the sketch - used after restoring default settings
 void reboot()
 {
   // TO DO Unselect all inputs (unless all inputs are deactivated by the MCP23008 during reboot - has to be tested)
   // TO DO Mute volume control)
-  lcd.clear();
-  lcd.setCursor(0, 1);
-  lcd.print("REBOOTING...");
+  oled.clear();
+  oled.setCursor(0, 1);
+  oled.print("REBOOTING...");
   delay(2000);
-  lcd.clear();
+  oled.clear();
   asm volatile("  jmp 0"); // Restarts the sketch
 }

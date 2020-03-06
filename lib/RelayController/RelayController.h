@@ -36,7 +36,6 @@ public:
 	void setStandardTrigger();
 	void setTriggerOn();
 	void SetTriggerOff();
-	float getTemperature(uint8_t pinNmbr);
 
 private:
 	Adafruit_MCP23008 mcp;

@@ -72,7 +72,7 @@ void RelayController::setStandardTrigger()
 // <TO DO: Should we have separate functions to call for the two relays?>
 void RelayController::setTriggerOn()
 {
-    if (standardTrigger)
+    /*if (standardTrigger)
     {
         delay(3000);
         Serial.println(F("SetTrigger:Standard"));
@@ -109,7 +109,7 @@ void RelayController::setTriggerOn()
         {
             Serial.println(F("Power amp R was already on"));
         }
-    }
+    }*/
 }
 
 // <TO DO: Should we have separate functions to call for the two relays?>
@@ -124,21 +124,3 @@ void RelayController::mute(boolean on)
     mcp.digitalWrite(selectedInput, on == false);
 }
 
-// Return measured temperature from 4.7K NTC connected to pinNmbr
-float RelayController::getTemperature(uint8_t pinNmbr)
-{
-    uint16_t sensorValue = 0;
-    float Vin = 5.0;   // Input voltage 5V for Arduino Nano V3
-    float Vout = 0;    // Measured voltage
-    float Rref = 4700; // Reference resistor's value in ohms
-    float Rntc = 0;    // Measured resistance of NTC
-    float Temp;
-
-    sensorValue = analogRead(pinNmbr); // Read Vout on analog input pin (Arduino can sense from 0-1023, 1023 is Vin)
-
-    Vout = (sensorValue * Vin) / 1024.0; // Convert Vout to volts
-    Rntc = Rref / ((Vin / Vout) - 1); // Formula to calculate the resisatance of the NTC
-
-    Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
-    return (Temp);
-}

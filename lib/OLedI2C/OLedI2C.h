@@ -41,14 +41,10 @@ public:
 	void lcdOn();
 	void BlinkingCursorOn();
     void BlinkingCursorOff();
-	void FadeOut();
-	void FadeOutCancel();
 	void PowerDown();
 	void PowerUp();
-	void EnterSleepMode();
-	void ExitingSleepMode();
 	void backlight(uint8_t contrast); // contrast should be the hex value between 0x00 and 0xFF
- 	void print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8_t digits, bool decimalPoint); // prints large number 3x3 char per digit. The number of digits to be displayed can be set to 1, 2 or 3
+ 	void print3x3Number(uint8_t column, uint8_t row, uint16_t number, bool decimalPoint); // prints large number 3x3 char per digit. Leading 0's are not displayed
 	void defineCustomChar3x3();
 	void print4x4Number(uint8_t column, uint8_t number); // prints large number
 	void defineCustomChar4x4();

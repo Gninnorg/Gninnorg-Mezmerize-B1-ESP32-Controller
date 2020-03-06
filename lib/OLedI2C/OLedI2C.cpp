@@ -57,32 +57,6 @@ void OLedI2C::BlinkingCursorOff()
   sendCommand(0x0C); // Same as lcdOn :-)
 }
 
-void OLedI2C::FadeOut()
-{
-  //Set OLED Command set
-  sendCommand(0x2A);
-  sendCommand(0x79);
-
-  sendCommand(0x23); // Set FadeOut
-  sendCommand(0x21);
-
-  sendCommand(0x78); // Exiting Set OLED Command set
-  sendCommand(0x28);
-}
-
-void OLedI2C::FadeOutCancel()
-{
-  //Set OLED Command set
-  sendCommand(0x2A);
-  sendCommand(0x79);
-
-  sendCommand(0x23); // Set FadeOut
-  sendCommand(0x00); // Cancel FadeOut
-
-  sendCommand(0x78); // Exiting Set OLED Command set
-  sendCommand(0x28);
-}
-
 // Write to CGRAM of new characters
 void OLedI2C::createChar(uint8_t location, uint8_t charmap[])
 {
@@ -209,53 +183,6 @@ void OLedI2C::PowerDown()
   // Vdd/Vcc off State
 }
 
-void OLedI2C::EnterSleepMode()
-{
-  // Normal operation
-
-  // Power down Vcc (GPIO)
-  sendCommand(0x2A);
-  sendCommand(0x79);
-  sendCommand(0xDC);
-  sendCommand(0x02);
-
-  // Set Display Off
-  sendCommand(0x78);
-  sendCommand(0x28);
-  sendCommand(0x08);
-
-  // Disable Internal Regulator
-  sendCommand(0x2A);
-  sendCommand(0x71);
-  sendData(0x00);
-  sendCommand(0x28);
-
-  // Sleep Mode
-}
-
-void OLedI2C::ExitingSleepMode()
-{
-  // Sleep Mode
-
-  // Disable Internal Regulator
-  sendCommand(0x2A);
-  sendCommand(0x79);
-  sendCommand(0x71);
-  sendCommand(0x5C);
-  sendCommand(0xDC);
-  sendCommand(0x03);
-
-  // Power up Vcc (100ms Delay Recommended)
-  delay(100);
-
-  // Set Display On
-  sendCommand(0x78);
-  sendCommand(0x28);
-  sendCommand(0x0C);
-
-  // Normal Operation
-}
-
 void OLedI2C::sendCommand(uint8_t command)
 {
   Wire.beginTransmission(OLED_Address); // **** Start I2C
@@ -293,7 +220,7 @@ void OLedI2C::sendData(uint8_t data)
 }
 
 // Function for printing up tp three 3x3 digits. Works from 000-999 or 00.0-99.9 if decimalPoint is true
-void OLedI2C::print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8_t digits, bool decimalPoint)
+void OLedI2C::print3x3Number(uint8_t column, uint8_t row, uint16_t number, bool decimalPoint)
 {
   uint8_t firstdigit, seconddigit, thirddigit = 0;
 
@@ -301,20 +228,9 @@ void OLedI2C::print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8
   uint8_t bn2[] = {31, 32, 31, 32, 31, 32, 5, 2, 2, 32, 2, 31, 0, 2, 31, 0, 2, 1, 31, 2, 1, 32, 32, 31, 31, 2, 31, 0, 2, 31};
   uint8_t bn3[] = {4, 7, 3, 32, 31, 32, 4, 7, 7, 7, 7, 3, 32, 32, 31, 7, 7, 3, 4, 7, 3, 32, 32, 3, 4, 7, 3, 7, 7, 3};
 
-  switch (digits)
-  {
-  case 1:
-    firstdigit = number * 3;
-    break;
-  case 2:
-    firstdigit = (number / 10) * 3;
-    seconddigit = (number % 10) * 3;
-    break;
-  default:
-    firstdigit = (number / 100) * 3;
-    seconddigit = ((number % 100) / 10) * 3;
-    thirddigit = ((number % 100) % 10) * 3;
-  }
+  firstdigit = (number / 100) * 3;
+  seconddigit = ((number % 100) / 10) * 3;
+  thirddigit = ((number % 100) % 10) * 3;
 
   if (charSet != 1)
   {
@@ -323,7 +239,7 @@ void OLedI2C::print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8
   }
 
   setCursor(column, row);
-  if (number / 100 == 0)
+  if (firstdigit == 0)
     print("   ");
   else
   {
@@ -332,29 +248,22 @@ void OLedI2C::print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8
     sendData(bn1[firstdigit + 2]);
   }
 
-  if (digits > 1)
+  if (firstdigit == 0 && seconddigit == 0 && decimalPoint == false)
+    print("   ");
+  else
   {
-    if ((number / 100 == 0) && (number / 10 == 0) && !decimalPoint)
-      print("   ");
-    else
-    {
-      sendData(bn1[seconddigit]);
-      sendData(bn1[seconddigit + 1]);
-      sendData(bn1[seconddigit + 2]);
-    }
-
-    if (digits > 2)
-    {
-      if (decimalPoint)
-        sendData(32);
-      sendData(bn1[thirddigit]);
-      sendData(bn1[thirddigit + 1]);
-      sendData(bn1[thirddigit + 2]);
-    }
+    sendData(bn1[seconddigit]);
+    sendData(bn1[seconddigit + 1]);
+    sendData(bn1[seconddigit + 2]);
   }
+  if (decimalPoint)
+    sendData(32);
+  sendData(bn1[thirddigit]);
+  sendData(bn1[thirddigit + 1]);
+  sendData(bn1[thirddigit + 2]);
 
   setCursor(column, row + 1);
-  if (number / 100 == 0)
+  if (firstdigit == 0)
     print("   ");
   else
   {
@@ -362,28 +271,22 @@ void OLedI2C::print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8
     sendData(bn2[firstdigit + 1]);
     sendData(bn2[firstdigit + 2]);
   }
-  if (digits > 1)
+  if (firstdigit == 0 && seconddigit == 0 && decimalPoint == false)
+    print("   ");
+  else
   {
-    if ((number / 100 == 0) && (number / 10 == 0) && !decimalPoint)
-      print("   ");
-    else
-    {
-      sendData(bn2[seconddigit]);
-      sendData(bn2[seconddigit + 1]);
-      sendData(bn2[seconddigit + 2]);
-    }
-    if (digits > 2)
-    {
-      if (decimalPoint)
-        sendData(32);
-      sendData(bn2[thirddigit]);
-      sendData(bn2[thirddigit + 1]);
-      sendData(bn2[thirddigit + 2]);
-    }
+    sendData(bn2[seconddigit]);
+    sendData(bn2[seconddigit + 1]);
+    sendData(bn2[seconddigit + 2]);
   }
+  if (decimalPoint)
+    sendData(32);
+  sendData(bn2[thirddigit]);
+  sendData(bn2[thirddigit + 1]);
+  sendData(bn2[thirddigit + 2]);
 
   setCursor(column, row + 2);
-  if (number / 100 == 0)
+  if (firstdigit == 0)
     print("   ");
   else
   {
@@ -391,30 +294,24 @@ void OLedI2C::print3x3Number(uint8_t column, uint8_t row, uint16_t number, uint8
     sendData(bn3[firstdigit + 1]);
     sendData(bn3[firstdigit + 2]);
   }
-  if (digits > 1)
+  if (firstdigit == 0 && seconddigit == 0 && decimalPoint == false)
+    print("   ");
+  else
   {
-    if ((number / 100 == 0) && (number / 10 == 0) && !decimalPoint)
-      print("   ");
-    else
-    {
-      sendData(bn3[seconddigit]);
-      sendData(bn3[seconddigit + 1]);
-      sendData(bn3[seconddigit + 2]);
-    }
-    if (digits > 2)
-    {
-      if (decimalPoint)
-        sendData(46);
-      sendData(bn3[thirddigit]);
-      sendData(bn3[thirddigit + 1]);
-      sendData(bn3[thirddigit + 2]);
-    }
+    sendData(bn3[seconddigit]);
+    sendData(bn3[seconddigit + 1]);
+    sendData(bn3[seconddigit + 2]);
   }
+  if (decimalPoint)
+    sendData(46);
+  sendData(bn3[thirddigit]);
+  sendData(bn3[thirddigit + 1]);
+  sendData(bn3[thirddigit + 2]);
 }
 
 void OLedI2C::defineCustomChar3x3()
 {
-  
+
   // 3x3 charset
 
   uint8_t cc0[8] = {// Custom Character 0
@@ -506,7 +403,6 @@ void OLedI2C::defineCustomChar3x3()
   createChar(7, cc7);
   charSet = 1;
 }
-
 
 // Function for printing two 4x4 digits. Works from 00-99
 void OLedI2C::print4x4Number(uint8_t column, uint8_t number)
