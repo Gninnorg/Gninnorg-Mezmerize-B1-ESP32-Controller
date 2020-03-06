@@ -428,7 +428,7 @@ void setup()
   relayControl.begin();
   readSettingsFromEEPROM();
   readRuntimeSettingsFromEEPROM();
- 
+
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
   if ((CurrentSettings.Version != VERSION) || (CurrentRuntimeSettings.Version != VERSION))
   {
@@ -508,15 +508,14 @@ void displayVolume()
     }
     else // Show volume in -dB (-99.9 to 0)
     {
-      oled.setCursor(1, 0);
-      oled.print("   ");
-      oled.setCursor(1, 0);
-      oled.print(CurrentRuntimeSettings.CurrentVolume); // TO DO Remove display of step - only for debug purposes
-
       oled.setCursor(17, 0);
       oled.print("-dB");
       if (!CurrentRuntimeSettings.Muted)
+      {
+        // TO DO Remove as only for debug purpose
         oled.print3x3Number(10, 1, ((float)CurrentRuntimeSettings.CurrentAttenuation / 2) * 10, true); // Display volume as -dB - CurrentRuntimeSettings.CurrentAttennuation are converted to -dB and multiplied by 10 to be able to show 0.5 dB steps
+        Serial.print(F("Step: ")); Serial.print(CurrentRuntimeSettings.CurrentVolume); Serial.print(F(" CurrentAttenuation: ")); Serial.print(CurrentRuntimeSettings.CurrentAttenuation); Serial.print(F(" Att to display: ")); Serial.println(((float)CurrentRuntimeSettings.CurrentAttenuation / 2) * 10);
+      }
       else
         displayMute();
     }
@@ -697,20 +696,20 @@ void displayTemperatures()
 // Return measured temperature from 4.7K NTC connected to pinNmbr
 float getTemperature(uint8_t pinNmbr)
 {
-    uint16_t sensorValue = 0;
-    float Vin = 5.0;   // Input voltage 5V for Arduino Nano V3
-    float Vout = 0;    // Measured voltage
-    float Rref = 4700; // Reference resistor's value in ohms
-    float Rntc = 0;    // Measured resistance of NTC
-    float Temp;
+  uint16_t sensorValue = 0;
+  float Vin = 5.0;   // Input voltage 5V for Arduino Nano V3
+  float Vout = 0;    // Measured voltage
+  float Rref = 4700; // Reference resistor's value in ohms
+  float Rntc = 0;    // Measured resistance of NTC
+  float Temp;
 
-    sensorValue = analogRead(pinNmbr); // Read Vout on analog input pin (Arduino can sense from 0-1023, 1023 is Vin)
+  sensorValue = analogRead(pinNmbr); // Read Vout on analog input pin (Arduino can sense from 0-1023, 1023 is Vin)
 
-    Vout = (sensorValue * Vin) / 1024.0; // Convert Vout to volts
-    Rntc = Rref / ((Vin / Vout) - 1); // Formula to calculate the resisatance of the NTC
+  Vout = (sensorValue * Vin) / 1024.0; // Convert Vout to volts
+  Rntc = Rref / ((Vin / Vout) - 1);    // Formula to calculate the resisatance of the NTC
 
-    Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
-    return (Temp);
+  Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
+  return (Temp);
 }
 
 void loop()
