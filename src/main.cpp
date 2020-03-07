@@ -6,7 +6,7 @@
 **
 **    2019-2020
 **
-*/ 
+*/
 
 #define VERSION 0.93
 
@@ -55,7 +55,7 @@ byte processMenuCommand(byte cmdId);
 byte getNavAction();
 byte menuIndex = 0;
 
-unsigned long mil_On = millis(); // Holds the millis from last power on (or reboot)
+unsigned long mil_On = millis(); // Holds the millis from last power on (or restart)
 
 struct InputSettings
 {
@@ -380,7 +380,7 @@ byte getUserInput()
         appMode = APP_STANDBY_MODE;
         toStandbyMode();
       }
-      else                       // wake from standby
+      else // wake from standby
         startUp();
     }
   }
@@ -440,6 +440,8 @@ void setup()
 
 void startUp()
 {
+  oled.lcdOn();
+
   // Define all pins as OUTPUT and disable all relais
   for (byte pin = 0; pin <= 7; pin++)
   {
@@ -463,10 +465,45 @@ void startUp()
   }
 
   // Settings read from EEPROM are read and are valid so let's move on!
+  mil_On = millis();
   oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
-  // TO DO if triggers are active then wait for the set number of seconds (if > 0) and turn them on with the chosen method
-  setTrigger1On();
-  setTrigger2On();
+  // If triggers are active then wait for the set number of seconds and turn them on
+  unsigned long delayTrigger1 = (Settings.Trigger1Active) ? (mil_On + Settings.Trigger1OnDelay * 1000) : 0;
+  unsigned long delayTrigger2 = (Settings.Trigger2Active) ? (mil_On + Settings.Trigger2OnDelay * 1000) : 0;
+  
+  if (Settings.Trigger1Active)
+  {
+    oled.clear();
+    oled.print(F("Wait..."));
+  }
+
+  while (delayTrigger1 || delayTrigger2)
+  {
+    if (millis() > delayTrigger1 && delayTrigger1 != 0)
+    {
+      setTrigger1On();
+      delayTrigger1 = 0;
+      oled.print3x3Number(2, 1, 0, false);
+    }
+    else
+    {
+      if (Settings.Trigger1Active && delayTrigger1 != 0)
+        oled.print3x3Number(2, 1, (delayTrigger1 - millis()) / 1000, false);
+    }
+
+    if (millis() > delayTrigger2 && delayTrigger2 != 0)
+    {
+      setTrigger2On();
+      delayTrigger2 = 0;
+      oled.print3x3Number(11, 1, 0, false);
+    }
+    else
+    {
+      if (Settings.Trigger2Active && delayTrigger2 != 0)
+        oled.print3x3Number(11, 1, (delayTrigger2 - millis()) / 1000, false);
+    }
+  }
+
   //----
   oled.clear();
   setInput(RuntimeSettings.CurrentInput);
@@ -592,13 +629,13 @@ void setTrigger2Off()
   }
 }
 
-uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB) 
+uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
 {
-  uint8_t att_dB = max_dB-min_dB;
-  float sizeOfLargeSteps = round(pow(2.0,att_dB/steps)-0.5);
-  uint8_t numberOfSmallSteps = (sizeOfLargeSteps*steps-att_dB)/(sizeOfLargeSteps/2);
+  uint8_t att_dB = max_dB - min_dB;
+  float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
+  uint8_t numberOfSmallSteps = (sizeOfLargeSteps * steps - att_dB) / (sizeOfLargeSteps / 2);
 
-  return min((min_dB + min(steps-selStep, numberOfSmallSteps) * (sizeOfLargeSteps/2) + max(steps-numberOfSmallSteps-selStep,0) * sizeOfLargeSteps), max_dB) * 2;
+  return min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * 2;
 }
 
 void setVolume()
@@ -648,14 +685,6 @@ void displayVolume()
         oled.setCursor(17, 0);
         oled.print(F("-dB"));
         oled.print3x3Number(10, 1, ((float)RuntimeSettings.CurrentAttenuation / 2) * 10, true); // Display volume as -dB - RuntimeSettings.CurrentAttennuation are converted to -dB and multiplied by 10 to be able to show 0.5 dB steps
-                                                                                                // TO DO Remove as only for debug purpose
-                                                                                                /* Serial.print(F("Step: "));
-        Serial.print(RuntimeSettings.CurrentVolume);
-        Serial.print(F(" CurrentAttenuation: "));
-        Serial.print(RuntimeSettings.CurrentAttenuation);
-        Serial.print(F(" Att to display: "));
-        Serial.println(((float)RuntimeSettings.CurrentAttenuation / 2) * 10);
-      */
       }
     }
     else
@@ -676,7 +705,8 @@ void displayMute()
 
 void setInput(uint8_t NewInput)
 {
-  if (!RuntimeSettings.Muted) mute();
+  if (!RuntimeSettings.Muted)
+    mute();
 
   //Unselect currently selected input
   relayController.digitalWrite(RuntimeSettings.CurrentInput, LOW);
@@ -695,7 +725,8 @@ void setInput(uint8_t NewInput)
   else if (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MinVol)
     RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol;
   setVolume();
-  if (RuntimeSettings.Muted) unmute();
+  if (RuntimeSettings.Muted)
+    unmute();
   displayVolume();
   displayInput();
 }
@@ -1042,7 +1073,7 @@ void loop()
     break;
   }
   case APP_STANDBY_MODE:
-    // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart/reboot is done by getUserInput(). By the way: you don't need an IR remote: a doubleclick on encoder_2 is also KEY_ONOFF
+    // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart is done by getUserInput(). By the way: you don't need an IR remote: a doubleclick on encoder_2 is also KEY_ONOFF
     break;
   case APP_POWERLOSS_STATE: // Only active if power drop is detected
     oled.lcdOn();
@@ -1064,7 +1095,7 @@ void loop()
       vcc = ADCL;
       vcc |= ADCH << 8;
       vcc = 1126400L / vcc;
-    } while (vcc < 4700); // Wait until power is completely gone or reboot if it returns
+    } while (vcc < 4700); // Wait until power is completely gone or restart if it returns
     startUp();
     break;
   }
@@ -1090,11 +1121,9 @@ void toStandbyMode()
   setTrigger1Off();
   setTrigger2Off();
   delay(2000);
-  oled.PowerDown();
-  while (getUserInput() != KEY_ONOFF)
+  oled.lcdOff();
+  while (getUserInput() != KEY_ONOFF)  // getUserInput will take care of wakeup when KEY_ONOFF is received
     ;
-  oled.PowerUp();
-  startUp();
 }
 
 //----------------------------------------------------------------------
