@@ -455,25 +455,13 @@ void setup()
   }
 }
 
-uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
-{
+uint8_t getAttenuation2(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB) {
 
-  float att_dB = max_dB - min_dB;
-  float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
-  float numberOfSmallSteps = (sizeOfLargeSteps * steps - att_dB) / (sizeOfLargeSteps / 2);
+  uint8_t att_dB = max_dB-min_dB;
+  float sizeOfLargeSteps = round(pow(2.0,att_dB/steps)-0.5);
+  uint8_t numberOfSmallSteps = (sizeOfLargeSteps*steps-att_dB)/(sizeOfLargeSteps/2);
 
-  if (steps >= numberOfSmallSteps && // Profile cannot be made resolution to low
-      selStep <= steps &&            // Attenuation cannot be calculated when selected step is higher than the steps
-      sizeOfLargeSteps <= 4          // As a rule of thumb steps must not be larger than 2 db
-  )
-  {
-    //selStep = steps - selStep;
-    return (max_dB - ((min(selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max((selStep - numberOfSmallSteps), 0) * sizeOfLargeSteps))) * 2;
-  }
-  else
-  {
-    return 223; // If a attenuation cannot be calculated then select mute
-  }
+  return min((min_dB + min(steps-selStep, numberOfSmallSteps) * (sizeOfLargeSteps/2) + max(steps-numberOfSmallSteps-selStep,0) * sizeOfLargeSteps), max_dB) * 2;
 }
 
 void setVolume()
