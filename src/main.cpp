@@ -470,6 +470,7 @@ void startUp()
   //----
   oled.clear();
   setInput(RuntimeSettings.CurrentInput);
+  RuntimeSettings.CurrentVolume = min(RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput], Settings.MaxStartVolume); // Avoid setting volume higher than MaxStartVol
   setVolume();
   displayVolume();
   displayInput();
@@ -986,7 +987,9 @@ void loop()
       {
         RuntimeSettings.PrevSelectedInput = RuntimeSettings.CurrentInput; // Save the current input as the previous selected input
         RuntimeSettings.CurrentInput = nextInput;
-        setInput(nextInput);
+        setInput(RuntimeSettings.CurrentInput);
+        RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput] = RuntimeSettings.CurrentVolume;
+        setVolume();
       }
     }
     break;
@@ -1112,10 +1115,9 @@ byte processMenuCommand(byte cmdId)
   {
     if (editNumericValue(Settings.VolumeSteps, 1, 179, "Steps"))
     {
-      // Validate if changed MaxVol > VolumeSteps for any inputs - if so, change MaxVol to VolumeSteps
+      // Update MaxVol for all inputs to VolumeSteps
       for (uint8_t i = 0; i < 6; i++)
-        if (Settings.Input[i].MaxVol > Settings.VolumeSteps)
-          Settings.Input[i].MaxVol = Settings.VolumeSteps;
+        Settings.Input[i].MaxVol = Settings.VolumeSteps;
       // Validate if changed MinVol > VolumeSteps for any inputs - if so, change MinVol to VolumeSteps
       for (uint8_t i = 0; i < 6; i++)
         if (Settings.Input[i].MinVol > Settings.VolumeSteps)
@@ -1125,10 +1127,11 @@ byte processMenuCommand(byte cmdId)
         Settings.MaxStartVolume = Settings.VolumeSteps;
       // Validate if changed CurrentVolume > VolumeSteps - if so, change CurrentVolume to VolumeSteps
       RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol; // Turn the volume down to the minimum set for the current input (just in case)
+      writeSettingsToEEPROM();
       setVolume();
-      complete = true;
-      break;
     }
+    complete = true;
+    break;
   }
   case mnuCmdMIN_ATT:
     editNumericValue(Settings.MinAttenuation, 0, Settings.MaxAttenuation, "  -dB");
