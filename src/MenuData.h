@@ -190,22 +190,22 @@ PROGMEM const MenuItem ctlMenu_List_3[] = {{mnuCmdIR_ONOFF, ctlMenu_3_1}, {mnuCm
 
 PROGMEM const char ctlMenu_4_1[] = "Trigger 1";
 PROGMEM const char ctlMenu_4_2[] = "Trigger 2";
-PROGMEM const char ctlMenu_4_3[] = "Standby Timer";
+PROGMEM const char ctlMenu_4_3[] = "Standby timer";
 PROGMEM const MenuItem ctlMenu_List_4[] = {{mnuCmdTRIG1_MENU, ctlMenu_4_1, ctlMenu_List_4_1, menuCount(ctlMenu_List_4_1)}, {mnuCmdTRIG2_MENU, ctlMenu_4_2, ctlMenu_List_4_2, menuCount(ctlMenu_List_4_2)}, {mnuCmdTRIGGER_INACT_TIMER, ctlMenu_4_3}, {mnuCmdBack, ctlMenu_back}};
 
 PROGMEM const char ctlMenu_5_1[] = "Screen saver";
 PROGMEM const char ctlMenu_5_2[] = "On Level";
 PROGMEM const char ctlMenu_5_3[] = "Dim Level";
 PROGMEM const char ctlMenu_5_4[] = "Timeout";
-PROGMEM const char ctlMenu_5_5[] = "Show Volume";
-PROGMEM const char ctlMenu_5_6[] = "Show Input";
-PROGMEM const char ctlMenu_5_7[] = "Show Temp 1";
-PROGMEM const char ctlMenu_5_8[] = "Show Temp 2";
+PROGMEM const char ctlMenu_5_5[] = "Volume display";
+PROGMEM const char ctlMenu_5_6[] = "Input display";
+PROGMEM const char ctlMenu_5_7[] = "Temp 1 display";
+PROGMEM const char ctlMenu_5_8[] = "Temp 2 display";
 PROGMEM const MenuItem ctlMenu_List_5[] = {{mnuCmdDISP_SAVER_ACTIVE, ctlMenu_5_1}, {mnuCmdDISP_ON_LEVEL, ctlMenu_5_2}, {mnuCmdDISP_DIM_LEVEL, ctlMenu_5_3}, {mnuCmdDISP_DIM_TIMEOUT, ctlMenu_5_4}, {mnuCmdDISP_VOL, ctlMenu_5_5}, {mnuCmdDISP_INPUT, ctlMenu_5_6}, {mnuCmdDISP_TEMP1, ctlMenu_5_7}, {mnuCmdDISP_TEMP2, ctlMenu_5_8}, {mnuCmdBack, ctlMenu_back}};
 
 PROGMEM const char ctlMenu_7_1[] = "Save user setup";
 PROGMEM const char ctlMenu_7_2[] = "Load user setup";
-PROGMEM const char ctlMenu_7_3[] = "Reset default";
+PROGMEM const char ctlMenu_7_3[] = "Factory reset";
 PROGMEM const MenuItem ctlMenu_List_7[] = {{mnuCmdSAVE_CUST, ctlMenu_7_1}, {mnuCmdLOAD_CUST, ctlMenu_7_2}, {mnuCmdLOAD_DEFAULT, ctlMenu_7_3}, {mnuCmdBack, ctlMenu_back}};
 
 PROGMEM const char ctlMenu_1[] = "Volume";
@@ -214,7 +214,7 @@ PROGMEM const char ctlMenu_3[] = "Learn IR";
 PROGMEM const char ctlMenu_4[] = "Triggers";
 PROGMEM const char ctlMenu_5[] = "Display";
 PROGMEM const char ctlMenu_6[] = "About";
-PROGMEM const char ctlMenu_7[] = "Reset";
+PROGMEM const char ctlMenu_7[] = "Save/load/reset";
 PROGMEM const MenuItem ctlMenu_Root[] = {{mnuCmdVOLUME_MENU, ctlMenu_1, ctlMenu_List_1, menuCount(ctlMenu_List_1)}, {mnuCmdINPUT_MENU, ctlMenu_2, ctlMenu_List_2, menuCount(ctlMenu_List_2)}, {mnuCmdIR_MENU, ctlMenu_3, ctlMenu_List_3, menuCount(ctlMenu_List_3)}, {mnuCmdPWR_CTL_MENU, ctlMenu_4, ctlMenu_List_4, menuCount(ctlMenu_List_4)}, {mnuCmdDISP_MENU, ctlMenu_5, ctlMenu_List_5, menuCount(ctlMenu_List_5)}, {mnuCmdABOUT, ctlMenu_6}, {mnuCmdRESET_MENU, ctlMenu_7, ctlMenu_List_7, menuCount(ctlMenu_List_7)}, {mnuCmdBack, ctlMenu_exit}};
 
 /*
@@ -454,7 +454,7 @@ case mnuCmdLOAD_DEFAULT :
                         <Item Id="TRIGGER1_TYPE" Name="Moment./Latch"/>
                         <Item Id="TRIGGER1_MODE" Name="Std./SmartON"/>
                         <Item Id="TRIGGER1_ON_DELAY" Name="On delay"/>
-                        <Item Id="TRIGGER1_TEMP" Name="Temp Ctrl"/>
+                        <Item Id="TRIGGER1_TEMP" Name="Temp control"/>
                     </MenuItems>
                 </Item>
                 <Item Id="TRIG2_MENU" Name="Trigger 2">
@@ -462,11 +462,11 @@ case mnuCmdLOAD_DEFAULT :
                         <Item Id="TRIGGER2_ACTIVE" Name="Active"/>
                         <Item Id="TRIGGER2_TYPE" Name="Moment./Latch"/>
                         <Item Id="TRIGGER2_MODE" Name="Std./SmartON"/>
-                        <Item Id="TRIGGER2_ON_DELAY" Name="On Delay"/>
-                        <Item Id="TRIGGER2_TEMP" Name="Temp Ctrl"/>
+                        <Item Id="TRIGGER2_ON_DELAY" Name="On delay"/>
+                        <Item Id="TRIGGER2_TEMP" Name="Temp control"/>
                     </MenuItems>
                 </Item>
-                <Item Id="TRIGGER_INACT_TIMER" Name="Standby Timer"/>
+                <Item Id="TRIGGER_INACT_TIMER" Name="Standby timer"/>
 
             </MenuItems>
         </Item>
@@ -476,18 +476,18 @@ case mnuCmdLOAD_DEFAULT :
                 <Item Id="DISP_ON_LEVEL" Name="On Level"/>
                 <Item Id="DISP_DIM_LEVEL" Name="Dim Level"/>
                 <Item Id="DISP_DIM_TIMEOUT" Name="Timeout"/>
-                <Item Id="DISP_VOL" Name="Show Volume"/>
-                <Item Id="DISP_INPUT" Name="Show Input"/>
-                <Item Id="DISP_TEMP1" Name="Show Temp 1"/>
-                <Item Id="DISP_TEMP2" Name="Show Temp 2"/>
+                <Item Id="DISP_VOL" Name="Volume display"/>
+                <Item Id="DISP_INPUT" Name="Input display"/>
+                <Item Id="DISP_TEMP1" Name="Temp 1 display"/>
+                <Item Id="DISP_TEMP2" Name="Temp 2 display"/>
             </MenuItems>
         </Item>
         <Item Id="ABOUT" Name="About"/>
-        <Item Id="RESET_MENU" Name="Reset">
+        <Item Id="RESET_MENU" Name="Save/load/reset">
             <MenuItems>
                 <Item Id="SAVE_CUST" Name="Save user setup"/>
                 <Item Id="LOAD_CUST" Name="Load user setup"/>
-                <Item Id="LOAD_DEFAULT" Name="Reset default"/>
+                <Item Id="LOAD_DEFAULT" Name="Factory reset"/>
             </MenuItems>
         </Item>
     </MenuItems>
