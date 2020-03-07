@@ -8,7 +8,7 @@
 **
 */ 
 
-#define VERSION 0.92
+#define VERSION 0.93
 
 #include "Wire.h"
 #include <Adafruit_MCP23008.h>
@@ -98,7 +98,7 @@ typedef union {
     struct InputSettings Input[6]; // Settings for all 6 inputs
     byte Trigger1Active;           // 0 = the trigger is not active, 1 = the trigger is active
     byte Trigger1Type;             // 0 = momentary, 1 = latching
-    byte Trigger1Mode;             // 0 = standard, 1 = intelligent (with measurement of NTC+LDR value)
+    byte Trigger1Mode;             // 0 = standard, 1 = intelligent/SmartON (with measurement of NTC+LDR value)
     byte Trigger1OnDelay;          // Seconds from controller power up to activation of trigger. The default delay allows time for the output relay of the Mezmerize to be activated before we turn on the power amps. The selection of an input of the Mezmerize will also be delayed.
     byte Trigger1Temp;             // Temperature protection: if the temperature is measured to the set number of degrees Celcius (via the LDRs), the controller will attempt to trigger a shutdown of the connected power amps (if set to 0, the temperature protection is not active
     byte Trigger2Active;           // 0 = the trigger is not active, 1 = the trigger is active
@@ -380,8 +380,8 @@ byte getUserInput()
         appMode = APP_STANDBY_MODE;
         toStandbyMode();
       }
-      else                       // wake from standby - we do it by restarting the sketch (a bit hardcore, but it works ;-)
-        asm volatile("  jmp 0"); // Restarts the sketch
+      else                       // wake from standby
+        startUp();
     }
   }
 
@@ -460,8 +460,6 @@ void startUp()
     oled.print(F("settings..."));
     delay(2000);
     writeDefaultSettingsToEEPROM();
-    readSettingsFromEEPROM();
-    readRuntimeSettingsFromEEPROM();
   }
 
   // Settings read from EEPROM are read and are valid so let's move on!
@@ -477,6 +475,8 @@ void startUp()
   displayInput();
   displayTemperatures();
   appMode = APP_NORMAL_MODE;
+  UIkey = KEY_NONE;
+  lastReceivedInput = KEY_NONE;
 }
 
 void setTrigger1On()
@@ -488,7 +488,7 @@ void setTrigger1On()
       relayController.digitalWrite(6, HIGH);
       if (Settings.Trigger1Type == 0) // Momentary
       {
-        delay(50);
+        delay(100);
         relayController.digitalWrite(6, LOW);
       }
     }
@@ -499,7 +499,7 @@ void setTrigger1On()
         relayController.digitalWrite(6, HIGH);
         if (Settings.Trigger1Type == 0) // Momentary
         {
-          delay(50);
+          delay(100);
           relayController.digitalWrite(6, LOW);
         }
       }
@@ -516,7 +516,7 @@ void setTrigger2On()
       relayController.digitalWrite(7, HIGH);
       if (Settings.Trigger2Type == 0) // Momentary
       {
-        delay(50);
+        delay(100);
         relayController.digitalWrite(7, LOW);
       }
     }
@@ -527,7 +527,7 @@ void setTrigger2On()
         relayController.digitalWrite(7, HIGH);
         if (Settings.Trigger2Type == 0) // Momentary
         {
-          delay(50);
+          delay(100);
           relayController.digitalWrite(7, LOW);
         }
       }
@@ -675,7 +675,7 @@ void displayMute()
 
 void setInput(uint8_t NewInput)
 {
-  mute();
+  if (!RuntimeSettings.Muted) mute();
 
   //Unselect currently selected input
   relayController.digitalWrite(RuntimeSettings.CurrentInput, LOW);
@@ -693,7 +693,9 @@ void setInput(uint8_t NewInput)
     RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MaxVol;
   else if (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MinVol)
     RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol;
-  unmute();
+  setVolume();
+  if (RuntimeSettings.Muted) unmute();
+  displayVolume();
   displayInput();
 }
 
@@ -1079,8 +1081,8 @@ void toStandbyMode()
   oled.clear();
   oled.setCursor(0, 1);
   oled.print(F("Going to sleep!"));
-  oled.setCursor(0, 3);
-  oled.print(F("           ...zzzZZZ"));
+  oled.setCursor(11, 3);
+  oled.print(F("...zzzZZZ"));
   mute();
   setTrigger1Off();
   setTrigger2Off();
@@ -1088,6 +1090,7 @@ void toStandbyMode()
   oled.PowerDown();
   while (getUserInput() != KEY_ONOFF)
     ;
+  oled.PowerUp();
   startUp();
 }
 
@@ -1323,11 +1326,11 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdTRIGGER1_TYPE:
-    editOptionValue(Settings.Trigger1Mode, 2, "Moment.", "Latching", "", "");
+    editOptionValue(Settings.Trigger1Type, 2, "Moment.", "Latching", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER1_MODE:
-    editOptionValue(Settings.Trigger1Type, 2, "Standard", "SmartON", "", "");
+    editOptionValue(Settings.Trigger1Mode, 2, "Standard", "SmartON", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER1_ON_DELAY:
@@ -1343,11 +1346,11 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdTRIGGER2_TYPE:
-    editOptionValue(Settings.Trigger2Mode, 2, "Moment.", "Latching", "", "");
+    editOptionValue(Settings.Trigger2Type, 2, "Moment.", "Latching", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER2_MODE:
-    editOptionValue(Settings.Trigger2Type, 2, "Standard", "SmartON", "", "");
+    editOptionValue(Settings.Trigger2Mode, 2, "Standard", "SmartON", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER2_ON_DELAY:
@@ -2052,12 +2055,14 @@ void setSettingsToDefault()
   strcpy(Settings.Input[5].Name, "Input 6   ");
   Settings.Input[5].MaxVol = Settings.VolumeSteps;
   Settings.Input[5].MinVol = 0;
-  Settings.Trigger1Type = false;
-  Settings.Trigger1Mode = true;
+  Settings.Trigger1Active = 1;
+  Settings.Trigger1Type = 0;
+  Settings.Trigger1Mode = 1;
   Settings.Trigger1OnDelay = 10;
   Settings.Trigger1Temp = 60;
-  Settings.Trigger2Type = false;
-  Settings.Trigger2Mode = true;
+  Settings.Trigger2Active = 1;
+  Settings.Trigger2Type = 0;
+  Settings.Trigger2Mode = 1;
   Settings.Trigger2OnDelay = 10;
   Settings.Trigger2Temp = 60;
   Settings.TriggerInactOffTimer = 0;
