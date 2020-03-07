@@ -8,9 +8,10 @@
 **
 */
 
-#define VERSION 0.91
+#define VERSION 0.92
 
 #include "Wire.h"
+#include <Adafruit_MCP23008.h>
 #include "OLedI2C.h"
 #include "extEEPROM.h"
 #include "ClickEncoder.h"
@@ -19,7 +20,40 @@
 #include "Muses72320.h"
 #include "MenuManager.h"
 #include "MenuData.h"
-#include "RelayController.h"
+
+// Declarations
+void startUp(void);
+void setTrigger1On(void);
+void setTrigger2On(void);
+void setTrigger1Off(void);
+void setTrigger2Off(void);
+void displayTemperatures(void);
+float getTemperature(uint8_t);
+void displayInput(void);
+void displayVolume(void);
+void displayMute(void);
+uint8_t getAttenuation(uint8_t, uint8_t, uint8_t, uint8_t);
+void setVolume(void);
+void mute(void);
+void unmute(void);
+void setInput(uint8_t);
+void readSettingsFromEEPROM(void);
+void writeSettingsToEEPROM(void);
+void writeDefaultSettingsToEEPROM(void);
+void readRuntimeSettingsFromEEPROM(void);
+void writeRuntimeSettingsToEEPROM(void);
+void readUserSettingsFromEEPROM(void);
+void writeUserSettingsToEEPROM(void);
+void editInputName(uint8_t InputNumber);
+void drawEditInputNameScreen(bool isUpperCase);
+bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit[5]);
+bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const char Option2[9], const char Option3[9], const char Option4[9]);
+bool editIRCode(HashIR_data_t &Value);
+void drawMenu();
+void refreshMenuDisplay(byte refreshMode);
+byte processMenuCommand(byte cmdId);
+byte getNavAction();
+byte menuIndex = 0;
 
 unsigned long mil_On = millis(); // Holds the millis from last power on (or reboot)
 
@@ -84,10 +118,10 @@ typedef union {
     float Version;                 // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
   };
   byte data[]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
-} Settings;
+} mySettings;
 
-Settings CurrentSettings; // Holds all the current settings
-void setCurrentSettingsToDefault(void);
+mySettings Settings; // Holds all the current settings
+void setSettingsToDefault(void);
 
 typedef union {
   struct
@@ -101,9 +135,9 @@ typedef union {
     float Version;           // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
   };
   byte data[]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
-} RuntimeSettings;
+} myRuntimeSettings;
 
-RuntimeSettings CurrentRuntimeSettings;
+myRuntimeSettings RuntimeSettings;
 
 // Setup Rotary encoders ------------------------------------------------------
 ClickEncoder *encoder1 = new ClickEncoder(7, 8, 6, 4);
@@ -134,18 +168,11 @@ CHashIR IRLremote;
 Muses72320 muses(0);
 
 // Setup Relay Controller------------------------------------------------------
-RelayController relayControl;
+Adafruit_MCP23008 relayController;
 
 // Setup EEPROM ---------------------------------------------------------------
 #define EEPROM_Address 0x50
 extEEPROM eeprom(kbits_64, 1, 32); // Set to use 24C64 Eeprom - if you use another type look in the datasheet for capacity in kbits (kbits_64) and page size in bytes (32)
-void readSettingsFromEEPROM(void);
-void writeSettingsToEEPROM(void);
-void writeDefaultSettingsToEEPROM(void);
-void readRuntimeSettingsFromEEPROM(void);
-void writeRuntimeSettingsToEEPROM(void);
-void readUserSettingsFromEEPROM(void);
-void writeUserSettingsToEEPROM(void);
 
 // Setup Display ---------------------------------------------------------------
 OLedI2C oled;
@@ -171,17 +198,6 @@ enum AppModeValues
 byte appMode = APP_NORMAL_MODE;
 
 MenuManager Menu1(ctlMenu_Root, menuCount(ctlMenu_Root));
-
-void editInputName(uint8_t InputNumber);
-void drawEditInputNameScreen(bool isUpperCase);
-bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit[5]);
-bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const char Option2[9], const char Option3[9], const char Option4[9]);
-bool editIRCode(HashIR_data_t &Value);
-void drawMenu();
-void refreshMenuDisplay(byte refreshMode);
-byte menuIndex = 0;
-byte processMenuCommand(byte cmdId);
-byte getNavAction();
 
 // Return null terminated string containing a specific number (count) of specified character (chr) ---
 char *padc(char chr, unsigned char count)
@@ -312,35 +328,35 @@ byte getUserInput()
     //Serial.println(data.command, HEX);
 
     // Map the received IR input to UserInput values
-    if (data.address == CurrentSettings.IR_UP.address && data.command == CurrentSettings.IR_UP.command)
+    if (data.address == Settings.IR_UP.address && data.command == Settings.IR_UP.command)
       receivedInput = KEY_UP;
-    else if (data.address == CurrentSettings.IR_DOWN.address && data.command == CurrentSettings.IR_DOWN.command)
+    else if (data.address == Settings.IR_DOWN.address && data.command == Settings.IR_DOWN.command)
       receivedInput = KEY_DOWN;
-    else if (data.address == CurrentSettings.IR_LEFT.address && data.command == CurrentSettings.IR_LEFT.command)
+    else if (data.address == Settings.IR_LEFT.address && data.command == Settings.IR_LEFT.command)
       receivedInput = KEY_LEFT;
-    else if (data.address == CurrentSettings.IR_RIGHT.address && data.command == CurrentSettings.IR_RIGHT.command)
+    else if (data.address == Settings.IR_RIGHT.address && data.command == Settings.IR_RIGHT.command)
       receivedInput = KEY_RIGHT;
-    else if (data.address == CurrentSettings.IR_SELECT.address && data.command == CurrentSettings.IR_SELECT.command)
+    else if (data.address == Settings.IR_SELECT.address && data.command == Settings.IR_SELECT.command)
       receivedInput = KEY_SELECT;
-    else if (data.address == CurrentSettings.IR_BACK.address && data.command == CurrentSettings.IR_BACK.command)
+    else if (data.address == Settings.IR_BACK.address && data.command == Settings.IR_BACK.command)
       receivedInput = KEY_BACK;
-    else if (data.address == CurrentSettings.IR_MUTE.address && data.command == CurrentSettings.IR_MUTE.command)
+    else if (data.address == Settings.IR_MUTE.address && data.command == Settings.IR_MUTE.command)
       receivedInput = KEY_MUTE;
-    else if (data.address == CurrentSettings.IR_ONOFF.address && data.command == CurrentSettings.IR_ONOFF.command)
+    else if (data.address == Settings.IR_ONOFF.address && data.command == Settings.IR_ONOFF.command)
       receivedInput = KEY_ONOFF;
-    else if (data.address == CurrentSettings.IR_1.address && data.command == CurrentSettings.IR_1.command)
+    else if (data.address == Settings.IR_1.address && data.command == Settings.IR_1.command)
       receivedInput = KEY_1;
-    else if (data.address == CurrentSettings.IR_2.address && data.command == CurrentSettings.IR_2.command)
+    else if (data.address == Settings.IR_2.address && data.command == Settings.IR_2.command)
       receivedInput = KEY_2;
-    else if (data.address == CurrentSettings.IR_3.address && data.command == CurrentSettings.IR_3.command)
+    else if (data.address == Settings.IR_3.address && data.command == Settings.IR_3.command)
       receivedInput = KEY_3;
-    else if (data.address == CurrentSettings.IR_4.address && data.command == CurrentSettings.IR_4.command)
+    else if (data.address == Settings.IR_4.address && data.command == Settings.IR_4.command)
       receivedInput = KEY_4;
-    else if (data.address == CurrentSettings.IR_5.address && data.command == CurrentSettings.IR_5.command)
+    else if (data.address == Settings.IR_5.address && data.command == Settings.IR_5.command)
       receivedInput = KEY_5;
-    else if (data.address == CurrentSettings.IR_6.address && data.command == CurrentSettings.IR_6.command)
+    else if (data.address == Settings.IR_6.address && data.command == Settings.IR_6.command)
       receivedInput = KEY_6;
-    else if (data.address == CurrentSettings.IR_REPEAT.address && data.command == CurrentSettings.IR_REPEAT.command)
+    else if (data.address == Settings.IR_REPEAT.address && data.command == Settings.IR_REPEAT.command)
     {
       receivedInput = KEY_REPEAT;
       if (lastReceivedInput == KEY_UP)
@@ -370,14 +386,14 @@ byte getUserInput()
   }
 
   // Turn Screen Saver on/off if it is activated and if no user input has been received during the defined number of seconds
-  if (receivedInput == KEY_NONE && CurrentSettings.ScreenSaverActive && appMode != APP_STANDBY_MODE)
+  if (receivedInput == KEY_NONE && Settings.ScreenSaverActive && appMode != APP_STANDBY_MODE)
   {
-    if (!ScreenSaverIsOn && (millis() - mil_LastUserInput > (unsigned long)CurrentSettings.DisplayTimeout * 1000))
+    if (!ScreenSaverIsOn && (millis() - mil_LastUserInput > (unsigned long)Settings.DisplayTimeout * 1000))
     {
-      if (CurrentSettings.DisplayDimLevel == 0)
+      if (Settings.DisplayDimLevel == 0)
         oled.lcdOff();
       else
-        oled.backlight(CurrentSettings.DisplayDimLevel * 4 - 1);
+        oled.backlight(Settings.DisplayDimLevel * 4 - 1);
       ScreenSaverIsOn = true;
     }
   }
@@ -386,16 +402,16 @@ byte getUserInput()
     mil_LastUserInput = millis();
     if (ScreenSaverIsOn)
     {
-      if (CurrentSettings.DisplayDimLevel == 0)
+      if (Settings.DisplayDimLevel == 0)
         oled.lcdOn();
       else
-        oled.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
+        oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
       ScreenSaverIsOn = false;
     }
   }
 
   // If inactivity timer is set, go to standby if the set number of hours have passed since last user input
-  if ((appMode != APP_STANDBY_MODE) && (CurrentSettings.TriggerInactOffTimer > 0) && ((mil_LastUserInput + CurrentSettings.TriggerInactOffTimer * 3600000) < millis()))
+  if ((appMode != APP_STANDBY_MODE) && (Settings.TriggerInactOffTimer > 0) && ((mil_LastUserInput + Settings.TriggerInactOffTimer * 3600000) < millis()))
   {
     appMode = APP_STANDBY_MODE;
     toStandbyMode();
@@ -404,121 +420,245 @@ byte getUserInput()
   return (receivedInput);
 }
 
-void reboot(void);
-void displayTemperatures(void);
-float getTemperature(uint8_t);
-void displayInput(void);
-void displayVolume(void);
-void displayMute(void);
-uint8_t getAttenuation(uint8_t, uint8_t, uint8_t, uint8_t);
-void setVolume(void);
-
+// Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
   pinMode(A1, INPUT);
   pinMode(A2, INPUT);
 
-  Serial.begin(115200);
+  //Serial.begin(115200);
   Wire.begin();
+  relayController.begin();
+
   setupRotaryEncoders();
   IRLremote.begin(pinIR);
   muses.begin();
   oled.begin();
-  oled.clear();
-  relayControl.begin();
+
+  startUp();
+}
+
+void startUp()
+{
+  // Define all pins as OUTPUT and disable all relais
+  for (byte pin = 0; pin <= 7; pin++)
+  {
+    relayController.pinMode(pin, OUTPUT);
+    relayController.digitalWrite(pin, LOW);
+  }
+
   readSettingsFromEEPROM();
   readRuntimeSettingsFromEEPROM();
 
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
-  if ((CurrentSettings.Version != VERSION) || (CurrentRuntimeSettings.Version != VERSION))
+  if ((Settings.Version != VERSION) || (RuntimeSettings.Version != VERSION))
   {
-    //Serial.println(F("ERROR: Settings read from EEPROM are not ok"));
     oled.clear();
     oled.setCursor(0, 0);
     oled.print(F("Restoring default"));
     oled.setCursor(0, 1);
     oled.print(F("settings..."));
     delay(2000);
-    oled.clear();
     writeDefaultSettingsToEEPROM();
-    reboot();
+    readSettingsFromEEPROM();
+    readRuntimeSettingsFromEEPROM();
   }
-  else // Settings read from EEPROM are valid so let's move on!
+
+  // Settings read from EEPROM are read and are valid so let's move on!
+  oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
+  // TO DO if triggers are active then wait for the set number of seconds (if > 0) and turn them on with the chosen method
+  setTrigger1On();
+  setTrigger2On();
+  //----
+  oled.clear();
+  setInput(RuntimeSettings.CurrentInput);
+  setVolume();
+  displayVolume();
+  displayInput();
+  displayTemperatures();
+  appMode = APP_NORMAL_MODE;
+}
+
+void setTrigger1On()
+{
+  if (Settings.Trigger1Active)
   {
-    oled.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
-    // TO DO if triggers are active then wait for the set number of seconds (if > 0) and turn them on with the chosen method
-    // TO DO Select input relay
-    setVolume();
-    displayVolume();
-    displayInput();
-    displayTemperatures();
+    if (Settings.Trigger1Mode == 0) // Standard
+    {
+      relayController.digitalWrite(6, HIGH);
+      if (Settings.Trigger1Type == 0) // Momentary
+      {
+        delay(50);
+        relayController.digitalWrite(6, LOW);
+      }
+    }
+    else // SmartON
+    {
+      if (getTemperature(A0) < 0) // Check if device is powered off
+      {
+        relayController.digitalWrite(6, HIGH);
+        if (Settings.Trigger1Type == 0) // Momentary
+        {
+          delay(50);
+          relayController.digitalWrite(6, LOW);
+        }
+      }
+    }
   }
 }
 
-uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
+void setTrigger2On()
 {
-
-  float att_dB = max_dB - min_dB;
-  float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
-  float numberOfSmallSteps = (sizeOfLargeSteps * steps - att_dB) / (sizeOfLargeSteps / 2);
-
-  if (steps >= numberOfSmallSteps && // Profile cannot be made resolution to low
-      selStep <= steps &&            // Attenuation cannot be calculated when selected step is higher than the steps
-      sizeOfLargeSteps <= 4          // As a rule of thumb steps must not be larger than 2 db
-  )
+  if (Settings.Trigger2Active)
   {
-    //selStep = steps - selStep;
-    return (max_dB - ((min(selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max((selStep - numberOfSmallSteps), 0) * sizeOfLargeSteps))) * 2;
+    if (Settings.Trigger2Mode == 0) // Standard
+    {
+      relayController.digitalWrite(7, HIGH);
+      if (Settings.Trigger2Type == 0) // Momentary
+      {
+        delay(50);
+        relayController.digitalWrite(7, LOW);
+      }
+    }
+    else // SmartON
+    {
+      if (getTemperature(A1) < 0) // Check if device is powered off
+      {
+        relayController.digitalWrite(7, HIGH);
+        if (Settings.Trigger2Type == 0) // Momentary
+        {
+          delay(50);
+          relayController.digitalWrite(7, LOW);
+        }
+      }
+    }
   }
-  else
+}
+
+void setTrigger1Off()
+{
+  if (Settings.Trigger1Active)
   {
-    return 223; // If a attenuation cannot be calculated then select mute
+    if (Settings.Trigger1Mode == 0) // Standard
+    {
+      if (Settings.Trigger1Type == 0) // Momentary
+      {
+        relayController.digitalWrite(6, HIGH);
+        delay(50);
+      }
+      relayController.digitalWrite(6, LOW);
+    }
+    else // SmartON
+    {
+      if (getTemperature(A0) > 0) // Check if device is powered on
+      {
+        if (Settings.Trigger1Type == 0) // Momentary
+        {
+          relayController.digitalWrite(6, HIGH);
+          delay(50);
+        }
+        relayController.digitalWrite(6, LOW);
+      }
+    }
   }
+}
+
+void setTrigger2Off()
+{
+  if (Settings.Trigger2Active)
+  {
+    if (Settings.Trigger2Mode == 0) // Standard
+    {
+      if (Settings.Trigger2Type == 0) // Momentary
+      {
+        relayController.digitalWrite(7, HIGH);
+        delay(50);
+      }
+      relayController.digitalWrite(7, LOW);
+    }
+    else // SmartON
+    {
+      if (getTemperature(A1) > 0) // Check if device is powered on
+      {
+        if (Settings.Trigger2Type == 0) // Momentary
+        {
+          relayController.digitalWrite(7, HIGH);
+          delay(50);
+        }
+        relayController.digitalWrite(7, LOW);
+      }
+    }
+  }
+}
+
+uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB) 
+{
+  uint8_t att_dB = max_dB-min_dB;
+  float sizeOfLargeSteps = round(pow(2.0,att_dB/steps)-0.5);
+  uint8_t numberOfSmallSteps = (sizeOfLargeSteps*steps-att_dB)/(sizeOfLargeSteps/2);
+
+  return min((min_dB + min(steps-selStep, numberOfSmallSteps) * (sizeOfLargeSteps/2) + max(steps-numberOfSmallSteps-selStep,0) * sizeOfLargeSteps), max_dB) * 2;
 }
 
 void setVolume()
 {
-  CurrentRuntimeSettings.CurrentAttenuation = getAttenuation(CurrentSettings.VolumeSteps, CurrentRuntimeSettings.CurrentVolume, CurrentSettings.MinAttenuation, CurrentSettings.MaxAttenuation);
+  RuntimeSettings.CurrentAttenuation = getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation);
   // ToDo call muses incl. balance logic
+  if (!RuntimeSettings.Muted)
+    muses.setVolume(RuntimeSettings.CurrentAttenuation);
+}
+
+void mute()
+{
+  if (Settings.MuteLevel)
+    muses.setVolume(getAttenuation(Settings.VolumeSteps, Settings.MuteLevel, Settings.MinAttenuation, Settings.MaxAttenuation));
+  else
+    muses.setVolume(223);
+  RuntimeSettings.Muted = true;
+}
+
+void unmute()
+{
+  RuntimeSettings.Muted = false;
+  setVolume();
+  displayVolume();
 }
 
 void displayVolume()
 {
-  if (CurrentSettings.DisplayVolume)
+  if (Settings.DisplayVolume)
   {
-    // If show volume in steps
-    if (CurrentSettings.DisplayVolume == 1)
+    if (!RuntimeSettings.Muted)
     {
-      if (CurrentSettings.VolumeSteps > 100)
+      // If show volume in steps
+      if (Settings.DisplayVolume == 1)
+      {
+        if (Settings.VolumeSteps > 100)
+        {
+          oled.setCursor(17, 0);
+          oled.print(F("Vol"));
+          oled.print3x3Number(11, 1, RuntimeSettings.CurrentVolume, false); // Display volume from 000-999 with 3x3 digits
+        }
+        else
+          oled.print4x4Number(11, RuntimeSettings.CurrentVolume); // Display volume from 00-99 with 4x4 digits
+      }
+      else // Show volume in -dB (-99.9 to 0)
       {
         oled.setCursor(17, 0);
-        oled.print("Vol");
-        if (!CurrentRuntimeSettings.Muted)
-          oled.print3x3Number(11, 1, CurrentRuntimeSettings.CurrentVolume, false); // Display volume from 000-999 with 3x3 digits
-        else
-          displayMute();
-      }
-      else
-      {
-        if (!CurrentRuntimeSettings.Muted)
-          oled.print4x4Number(11, CurrentRuntimeSettings.CurrentVolume); // Display volume from 00-99 with 4x4 digits
-        else
-          displayMute();
+        oled.print(F("-dB"));
+        oled.print3x3Number(10, 1, ((float)RuntimeSettings.CurrentAttenuation / 2) * 10, true); // Display volume as -dB - RuntimeSettings.CurrentAttennuation are converted to -dB and multiplied by 10 to be able to show 0.5 dB steps
+                                                                                                // TO DO Remove as only for debug purpose
+                                                                                                /* Serial.print(F("Step: "));
+        Serial.print(RuntimeSettings.CurrentVolume);
+        Serial.print(F(" CurrentAttenuation: "));
+        Serial.print(RuntimeSettings.CurrentAttenuation);
+        Serial.print(F(" Att to display: "));
+        Serial.println(((float)RuntimeSettings.CurrentAttenuation / 2) * 10);
+      */
       }
     }
-    else // Show volume in -dB (-99.9 to 0)
-    {
-      oled.setCursor(17, 0);
-      oled.print("-dB");
-      if (!CurrentRuntimeSettings.Muted)
-      {
-        // TO DO Remove as only for debug purpose
-        oled.print3x3Number(10, 1, ((float)CurrentRuntimeSettings.CurrentAttenuation / 2) * 10, true); // Display volume as -dB - CurrentRuntimeSettings.CurrentAttennuation are converted to -dB and multiplied by 10 to be able to show 0.5 dB steps
-        Serial.print(F("Step: ")); Serial.print(CurrentRuntimeSettings.CurrentVolume); Serial.print(F(" CurrentAttenuation: ")); Serial.print(CurrentRuntimeSettings.CurrentAttenuation); Serial.print(F(" Att to display: ")); Serial.println(((float)CurrentRuntimeSettings.CurrentAttenuation / 2) * 10);
-      }
-      else
-        displayMute();
-    }
+    else
+      displayMute();
   }
 }
 
@@ -533,31 +673,55 @@ void displayMute()
   }
 }
 
+void setInput(uint8_t NewInput)
+{
+  mute();
+
+  //Unselect currently selected input
+  relayController.digitalWrite(RuntimeSettings.CurrentInput, LOW);
+
+  // Save the currently selected input to enable switching between two inputs
+  RuntimeSettings.PrevSelectedInput = RuntimeSettings.CurrentInput;
+
+  //Select new input
+  RuntimeSettings.CurrentInput = NewInput;
+  relayController.digitalWrite(NewInput, HIGH);
+
+  if (Settings.RecallSetLevel)
+    RuntimeSettings.CurrentVolume = RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput];
+  else if (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MaxVol)
+    RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MaxVol;
+  else if (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MinVol)
+    RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol;
+  unmute();
+  displayInput();
+}
+
 // Display the name of the current input (but only if it has been chosen to be so by the user)
 void displayInput()
 {
-  if (CurrentSettings.DisplaySelectedInput)
+  if (Settings.DisplaySelectedInput)
   {
     oled.setCursor(0, 0);
-    oled.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
+    oled.print(Settings.Input[RuntimeSettings.CurrentInput].Name);
   }
 }
 
 void displayTemperatures()
 {
-  if (CurrentSettings.DisplayTemperature1)
+  if (Settings.DisplayTemperature1)
   {
     float Temp = getTemperature(A0);
     float MaxTemp;
-    if (CurrentSettings.Trigger1Temp == 0)
+    if (Settings.Trigger1Temp == 0)
       MaxTemp = 60;
     else
-      MaxTemp = CurrentSettings.Trigger1Temp;
+      MaxTemp = Settings.Trigger1Temp;
     oled.setCursor(0, 3);
     if (Temp < 0)
     {
       oled.print("OFF ");
-      if (CurrentSettings.DisplayTemperature1 == 3)
+      if (Settings.DisplayTemperature1 == 3)
       {
         oled.setCursor(0, 2);
         oled.print("AMP ");
@@ -567,7 +731,7 @@ void displayTemperatures()
     {
       oled.setCursor(0, 3);
       oled.print("HIGH");
-      if (CurrentSettings.DisplayTemperature1 == 3)
+      if (Settings.DisplayTemperature1 == 3)
       {
         oled.setCursor(0, 2);
         oled.print("TEMP");
@@ -575,16 +739,16 @@ void displayTemperatures()
     }
     else
     {
-      if (CurrentSettings.DisplayTemperature1 == 1 || CurrentSettings.DisplayTemperature1 == 3)
+      if (Settings.DisplayTemperature1 == 1 || Settings.DisplayTemperature1 == 3)
       {
         oled.setCursor(0, 3);
         oled.print(int(Temp));
         oled.write(128); // Degree symbol
         oled.print(" ");
       }
-      if (CurrentSettings.DisplayTemperature1 == 2 || CurrentSettings.DisplayTemperature1 == 3)
+      if (Settings.DisplayTemperature1 == 2 || Settings.DisplayTemperature1 == 3)
       {
-        if (CurrentSettings.DisplayTemperature1 == 2)
+        if (Settings.DisplayTemperature1 == 2)
           oled.setCursor(0, 3);
         else
           oled.setCursor(0, 2);
@@ -615,16 +779,16 @@ void displayTemperatures()
     }
   }
 
-  if (CurrentSettings.DisplayTemperature2)
+  if (Settings.DisplayTemperature2)
   {
     float Temp = getTemperature(A1);
     float MaxTemp;
-    if (CurrentSettings.Trigger2Temp == 0)
+    if (Settings.Trigger2Temp == 0)
       MaxTemp = 60;
     else
-      MaxTemp = CurrentSettings.Trigger2Temp;
+      MaxTemp = Settings.Trigger2Temp;
     byte Col;
-    if (CurrentSettings.DisplayTemperature1)
+    if (Settings.DisplayTemperature1)
       Col = 5;
     else
       Col = 0;
@@ -632,7 +796,7 @@ void displayTemperatures()
     if (Temp < 0)
     {
       oled.print("OFF ");
-      if (CurrentSettings.DisplayTemperature2 == 3)
+      if (Settings.DisplayTemperature2 == 3)
       {
         oled.setCursor(Col, 2);
         oled.print("AMP ");
@@ -642,7 +806,7 @@ void displayTemperatures()
     {
       oled.setCursor(Col, 3);
       oled.print("HIGH");
-      if (CurrentSettings.DisplayTemperature2 == 3)
+      if (Settings.DisplayTemperature2 == 3)
       {
         oled.setCursor(Col, 2);
         oled.print("TEMP");
@@ -650,16 +814,16 @@ void displayTemperatures()
     }
     else
     {
-      if (CurrentSettings.DisplayTemperature2 == 1 || CurrentSettings.DisplayTemperature2 == 3)
+      if (Settings.DisplayTemperature2 == 1 || Settings.DisplayTemperature2 == 3)
       {
         oled.setCursor(Col, 3);
         oled.print(int(Temp));
         oled.write(128); // Degree symbol
         oled.print(" ");
       }
-      if (CurrentSettings.DisplayTemperature2 == 2 || CurrentSettings.DisplayTemperature2 == 3)
+      if (Settings.DisplayTemperature2 == 2 || Settings.DisplayTemperature2 == 3)
       {
-        if (CurrentSettings.DisplayTemperature2 == 2)
+        if (Settings.DisplayTemperature2 == 2)
           oled.setCursor(Col, 3);
         else
           oled.setCursor(Col, 2);
@@ -718,8 +882,6 @@ void loop()
 
   // Detect power off
   // If low power is detected the RuntimeSettings are written to EEPROM. We only write these data when power down is detected to avoid to write to the EEPROM every time the volume or input is changed (an EEPROM has a limited lifetime of about 100000 write cycles)
-  // TO DO This could be moved to getUserInput() to ensure it is always checked - maybe also set appMode to APP_STANDBY_MODE to ensure the possibility to wake up again with ONOFF if the power drop is only very brief (and not a total loss of power)
-  // TO DO The downside to checking this in getUserInput() is that it slows down but maybe it doesn't matter in practice.
   if (appMode != APP_POWERLOSS_STATE)
   {
     long vcc;
@@ -734,7 +896,8 @@ void loop()
     if (vcc > 3000 && vcc < 4600)
     {
       writeRuntimeSettingsToEEPROM();
-      // TO DO Turn off trigger relays
+      setTrigger1Off();
+      setTrigger2Off();
       appMode = APP_POWERLOSS_STATE; // Switch to APP_STATE_OFF and do nothing until power disappears completely
     }
   }
@@ -756,77 +919,26 @@ void loop()
       break;
     case KEY_UP:
       // Turn volume up if we're not muted and we'll not exceed the maximum volume set for the currently selected input
-      if (!CurrentRuntimeSettings.Muted && (CurrentRuntimeSettings.CurrentVolume < CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].MaxVol))
+      if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MaxVol))
       {
-        CurrentRuntimeSettings.CurrentVolume++;
-        CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
+        RuntimeSettings.CurrentVolume++;
+        RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput] = RuntimeSettings.CurrentVolume;
         setVolume();
-
         displayVolume();
-        // TO DO Set volume to CurrentVolume
-        // TO DO Save CurrentVolume to EEPROM
       }
       break;
     case KEY_DOWN:
       // Turn volume down if we're not muted and we'll not get below the minimum volume set for the currently selected input
-      if (!CurrentRuntimeSettings.Muted && (CurrentRuntimeSettings.CurrentVolume > CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].MinVol))
+      if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MinVol))
       {
-        CurrentRuntimeSettings.CurrentVolume--;
-        CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput] = CurrentRuntimeSettings.CurrentVolume;
+        RuntimeSettings.CurrentVolume--;
+        RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput] = RuntimeSettings.CurrentVolume;
         setVolume();
         displayVolume();
-        // TO DO Set volume to CurrentVolume
-        // TO DO Save CurrentVolume to EEPROM
       }
       break;
     case KEY_LEFT:
     case KEY_RIGHT:
-    {
-      byte nextInput;
-      if (UIkey == KEY_RIGHT) // Switch to next active input with an input number larger than the current one
-      {
-        if (CurrentRuntimeSettings.CurrentInput == 5)
-          nextInput = 0;
-        else
-          nextInput = CurrentRuntimeSettings.CurrentInput + 1;
-        while (!CurrentSettings.Input[nextInput].Active)
-        {
-          nextInput++;
-          if (nextInput > 5)
-            nextInput = 0;
-        }
-      }
-      else // Switch to next active input with an input number less than the current one
-      {
-        if (CurrentRuntimeSettings.CurrentInput == 0)
-          nextInput = 5;
-        else
-          nextInput = CurrentRuntimeSettings.CurrentInput - 1;
-        while (!CurrentSettings.Input[nextInput].Active)
-        {
-          if (CurrentRuntimeSettings.CurrentInput == 0)
-            nextInput = 5;
-          else
-            nextInput--;
-        }
-      }
-
-      if (CurrentRuntimeSettings.CurrentInput != nextInput) // Change settings if it was possible to change to another input number
-      {
-        CurrentRuntimeSettings.PrevSelectedInput = CurrentRuntimeSettings.CurrentInput; // Save the current input as the previous selected input
-        CurrentRuntimeSettings.CurrentInput = nextInput;
-        // TO DO Mute
-        // TO DO switch to nextInput
-        if (CurrentSettings.RecallSetLevel)
-          CurrentRuntimeSettings.CurrentVolume = CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput];
-
-        // TO DO set volume to CurrentSettings.CurrentVolume (remember validations against global volume levels and local volume levels)
-        // TO DO Unmute
-        displayVolume();
-        displayInput();
-      }
-    }
-    break;
     case KEY_1:
     case KEY_2:
     case KEY_3:
@@ -834,82 +946,61 @@ void loop()
     case KEY_5:
     case KEY_6:
     {
-      byte inputNumber;
-      // TO DO The switch below can be replaced by inputNumber = UIkey - KEY_1 but it is not quite as readable?
-      switch (UIkey)
+      byte nextInput;
+      if (UIkey == KEY_RIGHT) // Switch to next active input with an input number larger than the current one
       {
-      case KEY_1:
-        inputNumber = 0;
-        break;
-      case KEY_2:
-        inputNumber = 1;
-        break;
-      case KEY_3:
-        inputNumber = 2;
-        break;
-      case KEY_4:
-        inputNumber = 3;
-        break;
-      case KEY_5:
-        inputNumber = 4;
-        break;
-      case KEY_6:
-        inputNumber = 5;
-        break;
-      }
-      // Select input (if active)
-      if (CurrentSettings.Input[inputNumber].Active)
-      {
-        if (CurrentRuntimeSettings.CurrentInput != inputNumber) // Change settings
+        if (RuntimeSettings.CurrentInput == 5)
+          nextInput = 0;
+        else
+          nextInput = RuntimeSettings.CurrentInput + 1;
+        while (!Settings.Input[nextInput].Active)
         {
-          CurrentRuntimeSettings.PrevSelectedInput = CurrentRuntimeSettings.CurrentInput; // Save the current input as the previous selected input
-          CurrentRuntimeSettings.CurrentInput = inputNumber;
-          // TO DO Mute
-          // TO DO switch to nextInput
-          if (CurrentSettings.RecallSetLevel)
-            CurrentRuntimeSettings.CurrentVolume = CurrentRuntimeSettings.InputLastVol[CurrentRuntimeSettings.CurrentInput];
-
-          // TO DO set volume to CurrentSettings.CurrentVolume (remember validations against global volume levels and local volume levels)
-          displayVolume();
-          // TO DO Unmute
-          if (CurrentSettings.DisplaySelectedInput)
-          {
-            oled.setCursor(0, 0);
-            oled.print(CurrentSettings.Input[CurrentRuntimeSettings.CurrentInput].Name);
-          }
+          nextInput++;
+          if (nextInput > 5)
+            nextInput = 0;
         }
+      }
+      else // Switch to next active input with an input number less than the current one
+          if (UIkey == KEY_LEFT)
+      {
+        if (RuntimeSettings.CurrentInput == 0)
+          nextInput = 5;
+        else
+          nextInput = RuntimeSettings.CurrentInput - 1;
+        while (!Settings.Input[nextInput].Active)
+        {
+          if (RuntimeSettings.CurrentInput == 0)
+            nextInput = 5;
+          else
+            nextInput--;
+        }
+      }
+      else // KEY_1 - KEY_6 received
+      {
+        nextInput = UIkey - KEY_1; // As KEY_1 - KEY_6 are enums we can calculate inputNumber (0-5) by detracting KEY_1 from UIkey
+      }
+
+      if (RuntimeSettings.CurrentInput != nextInput) // Change settings if it was possible to change to another input number
+      {
+        RuntimeSettings.PrevSelectedInput = RuntimeSettings.CurrentInput; // Save the current input as the previous selected input
+        RuntimeSettings.CurrentInput = nextInput;
+        setInput(nextInput);
       }
     }
     break;
     case KEY_PREVIOUS:
-      // TO DO Switch to previous selected input
+      // Switch to previous selected input
+      setInput(RuntimeSettings.PrevSelectedInput);
       break;
     case KEY_MUTE:
       // toggle mute
-      if (CurrentRuntimeSettings.Muted)
-      {
-        if (CurrentSettings.MuteLevel > 0)
-        {
-          // TODO Set volume to CurrentVolume
-        }
-        else
-        {
-          // TO DO Unmute the Muses volume control
-        }
-      }
+      if (RuntimeSettings.Muted)
+        unmute();
       else
       {
-        if (CurrentSettings.MuteLevel > 0)
-        {
-          // TO DO Set volume to CurrentSettings.MuteLevel
-        }
-        else
-        {
-          // TO DO Mute the Muses volume control
-        }
+        mute();
+        displayMute();
       }
-      CurrentRuntimeSettings.Muted = !CurrentRuntimeSettings.Muted;
-      displayVolume();
       break;
     }
     break;
@@ -946,10 +1037,10 @@ void loop()
     break;
   }
   case APP_STANDBY_MODE:
-    // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart/reboot is done by getUserInput(). By the way: you don't need an IR remote to be set up - a doubleclick on encoder_2 is also KEY_ONOFF
+    // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart/reboot is done by getUserInput(). By the way: you don't need an IR remote: a doubleclick on encoder_2 is also KEY_ONOFF
     break;
   case APP_POWERLOSS_STATE: // Only active if power drop is detected
-    Serial.println("In APP_POWERLOSS_STATE");
+    oled.lcdOn();
     oled.clear();
     oled.setCursor(0, 1);
     oled.print("ATTENTION:");
@@ -968,10 +1059,8 @@ void loop()
       vcc = ADCL;
       vcc |= ADCH << 8;
       vcc = 1126400L / vcc;
-      Serial.print("Voltage: ");
-      Serial.println(vcc);
     } while (vcc < 4700); // Wait until power is completely gone or reboot if it returns
-    reboot();
+    startUp();
     break;
   }
 }
@@ -981,10 +1070,10 @@ void toStandbyMode()
   writeRuntimeSettingsToEEPROM();
   if (ScreenSaverIsOn)
   {
-    if (CurrentSettings.DisplayDimLevel == 0)
+    if (Settings.DisplayDimLevel == 0)
       oled.lcdOn();
     else
-      oled.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
+      oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
     ScreenSaverIsOn = false;
   }
   oled.clear();
@@ -992,12 +1081,14 @@ void toStandbyMode()
   oled.print(F("Going to sleep!"));
   oled.setCursor(0, 3);
   oled.print(F("           ...zzzZZZ"));
-  // TO DO Mute output
-  // TO DO Turn of triggers
+  mute();
+  setTrigger1Off();
+  setTrigger2Off();
   delay(2000);
   oled.PowerDown();
   while (getUserInput() != KEY_ONOFF)
     ;
+  startUp();
 }
 
 //----------------------------------------------------------------------
@@ -1016,55 +1107,53 @@ byte processMenuCommand(byte cmdId)
   {
   case mnuCmdVOL_STEPS:
   {
-    if (editNumericValue(CurrentSettings.VolumeSteps, 1, 179, "Steps"))
+    if (editNumericValue(Settings.VolumeSteps, 1, 179, "Steps"))
     {
       // Validate if changed MaxVol > VolumeSteps for any inputs - if so, change MaxVol to VolumeSteps
       for (uint8_t i = 0; i < 6; i++)
-        if (CurrentSettings.Input[i].MaxVol > CurrentSettings.VolumeSteps)
-          CurrentSettings.Input[i].MaxVol = CurrentSettings.VolumeSteps;
+        if (Settings.Input[i].MaxVol > Settings.VolumeSteps)
+          Settings.Input[i].MaxVol = Settings.VolumeSteps;
       // Validate if changed MinVol > VolumeSteps for any inputs - if so, change MinVol to VolumeSteps
       for (uint8_t i = 0; i < 6; i++)
-        if (CurrentSettings.Input[i].MinVol > CurrentSettings.VolumeSteps)
-          CurrentSettings.Input[i].MinVol = CurrentSettings.VolumeSteps;
+        if (Settings.Input[i].MinVol > Settings.VolumeSteps)
+          Settings.Input[i].MinVol = Settings.VolumeSteps;
       // Validate if changed MaxStartVolume > VolumeStepsMaxStartVolume - if so, change MaxStartVolume to VolumeSteps
-      if (CurrentSettings.MaxStartVolume > CurrentSettings.VolumeSteps)
-        CurrentSettings.MaxStartVolume = CurrentSettings.VolumeSteps;
+      if (Settings.MaxStartVolume > Settings.VolumeSteps)
+        Settings.MaxStartVolume = Settings.VolumeSteps;
       // Validate if changed CurrentVolume > VolumeSteps - if so, change CurrentVolume to VolumeSteps
-      if (CurrentRuntimeSettings.CurrentVolume > CurrentSettings.VolumeSteps)
-      {
-        CurrentRuntimeSettings.CurrentVolume = CurrentSettings.VolumeSteps;
-        if (!CurrentRuntimeSettings.Muted)
-          setVolume();
-        writeSettingsToEEPROM();
-        writeRuntimeSettingsToEEPROM();
-      }
+      RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol; // Turn the volume down to the minimum set for the current input (just in case)
+      setVolume();
       complete = true;
       break;
     }
   }
   case mnuCmdMIN_ATT:
-    editNumericValue(CurrentSettings.MinAttenuation, 0, CurrentSettings.MaxAttenuation, "  -dB");
+    editNumericValue(Settings.MinAttenuation, 0, Settings.MaxAttenuation, "  -dB");
+    RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol; // Turn the volume down to the minimum set for the current input (just in case)
+    setVolume();
     complete = true;
     break;
   case mnuCmdMAX_ATT:
-    editNumericValue(CurrentSettings.MaxAttenuation, CurrentSettings.MinAttenuation + 1, 90, "  -dB");
+    editNumericValue(Settings.MaxAttenuation, Settings.MinAttenuation + 1, 90, "  -dB");
+    RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol; // Turn the volume down to the minimum set for the current input (just in case)
+    setVolume();
     complete = true;
     break;
   case mnuCmdMAX_START_VOL:
-    editNumericValue(CurrentSettings.MaxStartVolume, 0, CurrentSettings.VolumeSteps, " Step");
+    editNumericValue(Settings.MaxStartVolume, 0, Settings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdMUTE_LVL:
-    editNumericValue(CurrentSettings.MuteLevel, 0, CurrentSettings.MaxAttenuation, " Step");
+    editNumericValue(Settings.MuteLevel, 0, Settings.MaxAttenuation, " Step");
     complete = true;
     break;
   case mnuCmdSTORE_LVL:
-    editOptionValue(CurrentSettings.RecallSetLevel, 2, "No", "Yes", "", "");
+    editOptionValue(Settings.RecallSetLevel, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT1_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 0)
-      editOptionValue(CurrentSettings.Input[0].Active, 2, "No", "Yes", "", "");
+    if (RuntimeSettings.CurrentInput != 0)
+      editOptionValue(Settings.Input[0].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT1_NAME:
@@ -1072,16 +1161,16 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT1_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[0].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
+    editNumericValue(Settings.Input[0].MaxVol, 0, Settings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT1_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[0].MinVol, 0, CurrentSettings.Input[0].MaxVol, " Step");
+    editNumericValue(Settings.Input[0].MinVol, 0, Settings.Input[0].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdINPUT2_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 1)
-      editOptionValue(CurrentSettings.Input[1].Active, 2, "No", "Yes", "", "");
+    if (RuntimeSettings.CurrentInput != 1)
+      editOptionValue(Settings.Input[1].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT2_NAME:
@@ -1089,16 +1178,16 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT2_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[1].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
+    editNumericValue(Settings.Input[1].MaxVol, 0, Settings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT2_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[1].MinVol, 0, CurrentSettings.Input[1].MaxVol, " Step");
+    editNumericValue(Settings.Input[1].MinVol, 0, Settings.Input[1].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdINPUT3_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 2)
-      editOptionValue(CurrentSettings.Input[2].Active, 2, "No", "Yes", "", "");
+    if (RuntimeSettings.CurrentInput != 2)
+      editOptionValue(Settings.Input[2].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT3_NAME:
@@ -1106,16 +1195,16 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT3_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[2].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
+    editNumericValue(Settings.Input[2].MaxVol, 0, Settings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT3_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[2].MinVol, 0, CurrentSettings.Input[2].MaxVol, " Step");
+    editNumericValue(Settings.Input[2].MinVol, 0, Settings.Input[2].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdINPUT4_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 3)
-      editOptionValue(CurrentSettings.Input[3].Active, 2, "No", "Yes", "", "");
+    if (RuntimeSettings.CurrentInput != 3)
+      editOptionValue(Settings.Input[3].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT4_NAME:
@@ -1123,16 +1212,16 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT4_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[3].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
+    editNumericValue(Settings.Input[3].MaxVol, 0, Settings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT4_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[3].MinVol, 0, CurrentSettings.Input[3].MaxVol, " Step");
+    editNumericValue(Settings.Input[3].MinVol, 0, Settings.Input[3].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdINPUT5_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 4)
-      editOptionValue(CurrentSettings.Input[4].Active, 2, "No", "Yes", "", "");
+    if (RuntimeSettings.CurrentInput != 4)
+      editOptionValue(Settings.Input[4].Active, 2, "No", "Yes", "", "");
     complete = true;
     break;
   case mnuCmdINPUT5_NAME:
@@ -1140,16 +1229,16 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT5_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[4].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
+    editNumericValue(Settings.Input[4].MaxVol, 0, Settings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT5_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[4].MinVol, 0, CurrentSettings.Input[4].MaxVol, " Step");
+    editNumericValue(Settings.Input[4].MinVol, 0, Settings.Input[4].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdINPUT6_ACTIVE:
-    if (CurrentRuntimeSettings.CurrentInput != 5)
-      editOptionValue(CurrentSettings.Input[5].Active, 2, "No", "Yes", "", "");
+    if (RuntimeSettings.CurrentInput != 5)
+      editOptionValue(Settings.Input[5].Active, 2, "No", "Yes", "", "");
     // TO DO Might be implemented as: if this input is not selected then "HT", "Yes", "No" else only allow to select "HT", "Yes"
     complete = true;
     break;
@@ -1158,158 +1247,158 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdINPUT6_MAX_VOL:
-    editNumericValue(CurrentSettings.Input[5].MaxVol, 0, CurrentSettings.VolumeSteps, " Step");
+    editNumericValue(Settings.Input[5].MaxVol, 0, Settings.VolumeSteps, " Step");
     complete = true;
     break;
   case mnuCmdINPUT6_MIN_VOL:
-    editNumericValue(CurrentSettings.Input[5].MinVol, 0, CurrentSettings.Input[5].MaxVol, " Step");
+    editNumericValue(Settings.Input[5].MinVol, 0, Settings.Input[5].MaxVol, " Step");
     complete = true;
     break;
   case mnuCmdIR_ONOFF:
-    editIRCode(CurrentSettings.IR_ONOFF);
+    editIRCode(Settings.IR_ONOFF);
     complete = true;
     break;
   case mnuCmdIR_UP:
-    editIRCode(CurrentSettings.IR_UP);
+    editIRCode(Settings.IR_UP);
     complete = true;
     break;
   case mnuCmdIR_DOWN:
-    editIRCode(CurrentSettings.IR_DOWN);
+    editIRCode(Settings.IR_DOWN);
     complete = true;
     break;
   case mnuCmdIR_REPEAT:
-    editIRCode(CurrentSettings.IR_REPEAT);
+    editIRCode(Settings.IR_REPEAT);
     complete = true;
     break;
   case mnuCmdIR_LEFT:
-    editIRCode(CurrentSettings.IR_LEFT);
+    editIRCode(Settings.IR_LEFT);
     complete = true;
     break;
   case mnuCmdIR_RIGHT:
-    editIRCode(CurrentSettings.IR_RIGHT);
+    editIRCode(Settings.IR_RIGHT);
     complete = true;
     break;
   case mnuCmdIR_SELECT:
-    editIRCode(CurrentSettings.IR_SELECT);
+    editIRCode(Settings.IR_SELECT);
     complete = true;
     break;
   case mnuCmdIR_BACK:
-    editIRCode(CurrentSettings.IR_BACK);
+    editIRCode(Settings.IR_BACK);
     complete = true;
     break;
   case mnuCmdIR_MUTE:
-    editIRCode(CurrentSettings.IR_MUTE);
+    editIRCode(Settings.IR_MUTE);
     complete = true;
     break;
   case mnuCmdIR_PREV:
-    editIRCode(CurrentSettings.IR_PREVIOUS);
+    editIRCode(Settings.IR_PREVIOUS);
     complete = true;
     break;
   case mnuCmdIR_1:
-    editIRCode(CurrentSettings.IR_1);
+    editIRCode(Settings.IR_1);
     complete = true;
     break;
   case mnuCmdIR_2:
-    editIRCode(CurrentSettings.IR_2);
+    editIRCode(Settings.IR_2);
     complete = true;
     break;
   case mnuCmdIR_3:
-    editIRCode(CurrentSettings.IR_3);
+    editIRCode(Settings.IR_3);
     complete = true;
     break;
   case mnuCmdIR_4:
-    editIRCode(CurrentSettings.IR_4);
+    editIRCode(Settings.IR_4);
     complete = true;
     break;
   case mnuCmdIR_5:
-    editIRCode(CurrentSettings.IR_5);
+    editIRCode(Settings.IR_5);
     complete = true;
     break;
   case mnuCmdIR_6:
-    editIRCode(CurrentSettings.IR_6);
+    editIRCode(Settings.IR_6);
     complete = true;
     break;
   case mnuCmdTRIGGER1_ACTIVE:
-    editOptionValue(CurrentSettings.Trigger1Active, 2, "Inactive", "Active", "", "");
+    editOptionValue(Settings.Trigger1Active, 2, "Inactive", "Active", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER1_TYPE:
-    editOptionValue(CurrentSettings.Trigger1Mode, 2, "Moment.", "Latching", "", "");
+    editOptionValue(Settings.Trigger1Mode, 2, "Moment.", "Latching", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER1_MODE:
-    editOptionValue(CurrentSettings.Trigger1Type, 2, "Standard", "SmartON", "", "");
+    editOptionValue(Settings.Trigger1Type, 2, "Standard", "SmartON", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER1_ON_DELAY:
-    editNumericValue(CurrentSettings.Trigger1OnDelay, 0, 90, "Secs.");
+    editNumericValue(Settings.Trigger1OnDelay, 0, 90, "Secs.");
     complete = true;
     break;
   case mnuCmdTRIGGER1_TEMP:
-    editNumericValue(CurrentSettings.Trigger1Temp, 0, 90, "Deg C");
+    editNumericValue(Settings.Trigger1Temp, 0, 90, "Deg C");
     complete = true;
     break;
   case mnuCmdTRIGGER2_ACTIVE:
-    editOptionValue(CurrentSettings.Trigger2Active, 2, "Inactive", "Active", "", "");
+    editOptionValue(Settings.Trigger2Active, 2, "Inactive", "Active", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER2_TYPE:
-    editOptionValue(CurrentSettings.Trigger2Mode, 2, "Moment.", "Latching", "", "");
+    editOptionValue(Settings.Trigger2Mode, 2, "Moment.", "Latching", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER2_MODE:
-    editOptionValue(CurrentSettings.Trigger2Type, 2, "Standard", "SmartON", "", "");
+    editOptionValue(Settings.Trigger2Type, 2, "Standard", "SmartON", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER2_ON_DELAY:
-    editNumericValue(CurrentSettings.Trigger2OnDelay, 0, 90, "Secs.");
+    editNumericValue(Settings.Trigger2OnDelay, 0, 90, "Secs.");
     complete = true;
     break;
   case mnuCmdTRIGGER2_TEMP:
-    editNumericValue(CurrentSettings.Trigger2Temp, 0, 90, "Deg C");
+    editNumericValue(Settings.Trigger2Temp, 0, 90, "Deg C");
     complete = true;
     break;
   case mnuCmdTRIGGER_INACT_TIMER:
-    editNumericValue(CurrentSettings.TriggerInactOffTimer, 0, 24, "Hours");
+    editNumericValue(Settings.TriggerInactOffTimer, 0, 24, "Hours");
     complete = true;
     break;
   case mnuCmdDISP_SAVER_ACTIVE:
-    editOptionValue(CurrentSettings.ScreenSaverActive, 2, "Off", "On", "", "");
+    editOptionValue(Settings.ScreenSaverActive, 2, "Off", "On", "", "");
     complete = true;
     break;
   case mnuCmdDISP_ON_LEVEL:
-    editOptionValue(CurrentSettings.DisplayOnLevel, 4, "25%", "50%", "75%", "100%");
-    oled.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
+    editOptionValue(Settings.DisplayOnLevel, 4, "25%", "50%", "75%", "100%");
+    oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
     complete = true;
     break;
   case mnuCmdDISP_DIM_LEVEL:
-    editNumericValue(CurrentSettings.DisplayDimLevel, 0, 32, "     ");
-    if (CurrentSettings.DisplayDimLevel != 0)
+    editNumericValue(Settings.DisplayDimLevel, 0, 32, "     ");
+    if (Settings.DisplayDimLevel != 0)
     {
-      oled.backlight(CurrentSettings.DisplayDimLevel * 4 - 1);
+      oled.backlight(Settings.DisplayDimLevel * 4 - 1);
       delay(2000);
-      oled.backlight((CurrentSettings.DisplayOnLevel + 1) * 64 - 1);
+      oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
     }
     complete = true;
     break;
   case mnuCmdDISP_DIM_TIMEOUT:
-    editNumericValue(CurrentSettings.DisplayTimeout, 0, 90, "Secs.");
+    editNumericValue(Settings.DisplayTimeout, 0, 90, "Secs.");
     complete = true;
     break;
   case mnuCmdDISP_VOL:
-    editOptionValue(CurrentSettings.DisplayVolume, 3, "Hide", "Steps", "-dB", "");
+    editOptionValue(Settings.DisplayVolume, 3, "Hide", "Steps", "-dB", "");
     complete = true;
     break;
   case mnuCmdDISP_INPUT:
-    editOptionValue(CurrentSettings.DisplaySelectedInput, 2, "Hide", "Show", "", "");
+    editOptionValue(Settings.DisplaySelectedInput, 2, "Hide", "Show", "", "");
     complete = true;
     break;
   case mnuCmdDISP_TEMP1:
-    editOptionValue(CurrentSettings.DisplayTemperature1, 4, "None", "Degrees", "Bar", "Both");
+    editOptionValue(Settings.DisplayTemperature1, 4, "None", "Degrees", "Bar", "Both");
     complete = true;
     break;
   case mnuCmdDISP_TEMP2:
-    editOptionValue(CurrentSettings.DisplayTemperature2, 4, "None", "Degrees", "Bar", "Both");
+    editOptionValue(Settings.DisplayTemperature2, 4, "None", "Degrees", "Bar", "Both");
     complete = true;
     break;
   case mnuCmdABOUT:
@@ -1337,12 +1426,12 @@ byte processMenuCommand(byte cmdId)
     readUserSettingsFromEEPROM();
     writeSettingsToEEPROM();
     writeRuntimeSettingsToEEPROM();
-    reboot();
+    startUp();
     complete = true;
     break;
   case mnuCmdLOAD_DEFAULT:
     writeDefaultSettingsToEEPROM();
-    reboot();
+    startUp();
     complete = true;
     break;
   }
@@ -1521,8 +1610,7 @@ void refreshMenuDisplay(byte refreshMode)
 void editInputName(uint8_t InputNumber)
 {
   bool complete = false;
-  bool isUpperCase = true;
-  // TO DO Maybe replace / character with symbol to allow for switching between upper and lower case letters?
+  bool isUpperCase = true;     // show upper or lower case characters
   int arrowX = 1;              // text edit arrow start X position on selection line
   int arrowPointingUpDown = 0; // text edit arrow start direction: up == 0, down == 1
   String newInputName = "          ";
@@ -1536,7 +1624,7 @@ void editInputName(uint8_t InputNumber)
 
   oled.setCursor(arrowX, 2);
   oled.write(byte(26 + arrowPointingUpDown)); // 26 is arrow up, 27 is arrow down
-  newInputName = CurrentSettings.Input[InputNumber].Name;
+  newInputName = Settings.Input[InputNumber].Name;
   newInputName.trim();
   oled.setCursor(9, 0);
   oled.print(newInputName);
@@ -1601,16 +1689,16 @@ void editInputName(uint8_t InputNumber)
         {
           newInputName.trim();
           if (newInputName == "") // If no characters in new name then reset to original name
-            newInputName = CurrentSettings.Input[InputNumber].Name;
+            newInputName = Settings.Input[InputNumber].Name;
           else
           {
-            // Save new name to CurrentSettings
+            // Save new name to Settings
             for (uint8_t i = 0; i < newInputName.length(); i++)
-              CurrentSettings.Input[InputNumber].Name[i] = newInputName.charAt(i);
+              Settings.Input[InputNumber].Name[i] = newInputName.charAt(i);
             // Pad Name with spaces - makes it easier to display
             for (uint8_t i = newInputName.length(); i < 10; i++)
-              CurrentSettings.Input[InputNumber].Name[i] = ' ';
-            CurrentSettings.Input[InputNumber].Name[10] = '\0';
+              Settings.Input[InputNumber].Name[i] = ' ';
+            Settings.Input[InputNumber].Name[10] = '\0';
             // Save to EEPROM
             writeSettingsToEEPROM();
           }
@@ -1854,7 +1942,7 @@ bool editIRCode(HashIR_data_t &Value)
   oled.setCursor(10, 3);
   oled.print(NewValue.command, HEX);
 
-  // As we don't want to react to received IR code while learning new code we temporaryly disable the current code in the CurrentSettings (we save a copy in OldValue)
+  // As we don't want to react to received IR code while learning new code we temporaryly disable the current code in the Settings (we save a copy in OldValue)
   OldValue.address = Value.address;
   OldValue.command = Value.command;
   Value.address = 0x00;
@@ -1899,125 +1987,125 @@ bool editIRCode(HashIR_data_t &Value)
   return result;
 }
 
-// Loads default settings into CurrentSettings and CurrentRuntimeSettings - this is only done when the EEPROM does not contain valid settings or when reset is chosen by user in the menu
-void setCurrentSettingsToDefault()
+// Loads default settings into Settings and RuntimeSettings - this is only done when the EEPROM does not contain valid settings or when reset is chosen by user in the menu
+void setSettingsToDefault()
 {
-  CurrentSettings.VolumeSteps = 60;
-  CurrentSettings.MinAttenuation = 0;
-  CurrentSettings.MaxAttenuation = 60;
-  CurrentSettings.MaxStartVolume = CurrentSettings.VolumeSteps;
-  CurrentSettings.MuteLevel = 0;
-  CurrentSettings.RecallSetLevel = true;
-  CurrentSettings.IR_UP.address = 0x24;
-  CurrentSettings.IR_UP.command = 0x3AEA5A5F;
-  CurrentSettings.IR_DOWN.address = 0x24;
-  CurrentSettings.IR_DOWN.command = 0xE64E6057;
-  CurrentSettings.IR_REPEAT.address = 0x00;
-  CurrentSettings.IR_REPEAT.command = 0x00;
-  CurrentSettings.IR_LEFT.address = 0x24;
-  CurrentSettings.IR_LEFT.command = 0x4C7A8423;
-  CurrentSettings.IR_RIGHT.address = 0x24;
-  CurrentSettings.IR_RIGHT.command = 0xA1167E2B;
-  CurrentSettings.IR_SELECT.address = 0x24;
-  CurrentSettings.IR_SELECT.command = 0x91998CA3;
-  CurrentSettings.IR_BACK.address = 0x24;
-  CurrentSettings.IR_BACK.command = 0xE28395C7;
-  CurrentSettings.IR_MUTE.address = 0x24;
-  CurrentSettings.IR_MUTE.command = 0x41C09D23;
-  CurrentSettings.IR_PREVIOUS.address = 0x24;
-  CurrentSettings.IR_PREVIOUS.command = 0x5A3E996B;
-  CurrentSettings.IR_ONOFF.address = 0x24;
-  CurrentSettings.IR_ONOFF.command = 0x41D976CF;
-  CurrentSettings.IR_1.address = 0x24;
-  CurrentSettings.IR_1.command = 0xC43587C7;
-  CurrentSettings.IR_2.address = 0x24;
-  CurrentSettings.IR_2.command = 0x6F998DBF;
-  CurrentSettings.IR_3.address = 0x24;
-  CurrentSettings.IR_3.command = 0xB9947A73;
-  CurrentSettings.IR_4.address = 0x24;
-  CurrentSettings.IR_4.command = 0x64F8806B;
-  CurrentSettings.IR_5.address = 0x24;
-  CurrentSettings.IR_5.command = 0x1FC09E3F;
-  CurrentSettings.IR_6.address = 0x24;
-  CurrentSettings.IR_6.command = 0xCB24A437;
-  CurrentSettings.Input[0].Active = true;
-  strcpy(CurrentSettings.Input[0].Name, "Input 1   ");
-  CurrentSettings.Input[0].MaxVol = CurrentSettings.VolumeSteps;
-  CurrentSettings.Input[0].MinVol = 0;
-  CurrentSettings.Input[1].Active = true;
-  strcpy(CurrentSettings.Input[1].Name, "Input 2   ");
-  CurrentSettings.Input[1].MaxVol = CurrentSettings.VolumeSteps;
-  CurrentSettings.Input[1].MinVol = 0;
-  CurrentSettings.Input[2].Active = true;
-  strcpy(CurrentSettings.Input[2].Name, "Input 3   ");
-  CurrentSettings.Input[2].MaxVol = CurrentSettings.VolumeSteps;
-  CurrentSettings.Input[2].MinVol = 0;
-  CurrentSettings.Input[3].Active = true;
-  strcpy(CurrentSettings.Input[3].Name, "Input 4   ");
-  CurrentSettings.Input[3].MaxVol = CurrentSettings.VolumeSteps;
-  CurrentSettings.Input[3].MinVol = 0;
-  CurrentSettings.Input[4].Active = true;
-  strcpy(CurrentSettings.Input[4].Name, "Input 5   ");
-  CurrentSettings.Input[4].MaxVol = CurrentSettings.VolumeSteps;
-  CurrentSettings.Input[4].MinVol = 0;
-  CurrentSettings.Input[5].Active = true;
-  strcpy(CurrentSettings.Input[5].Name, "Input 6   ");
-  CurrentSettings.Input[5].MaxVol = CurrentSettings.VolumeSteps;
-  CurrentSettings.Input[5].MinVol = 0;
-  CurrentSettings.Trigger1Type = false;
-  CurrentSettings.Trigger1Mode = true;
-  CurrentSettings.Trigger1OnDelay = 10;
-  CurrentSettings.Trigger1Temp = 60;
-  CurrentSettings.Trigger2Type = false;
-  CurrentSettings.Trigger2Mode = true;
-  CurrentSettings.Trigger2OnDelay = 10;
-  CurrentSettings.Trigger2Temp = 60;
-  CurrentSettings.TriggerInactOffTimer = 0;
-  CurrentSettings.ScreenSaverActive = true;
-  CurrentSettings.DisplayOnLevel = 3;
-  CurrentSettings.DisplayDimLevel = 0;
-  CurrentSettings.DisplayTimeout = 30;
-  CurrentSettings.DisplayVolume = 1;
-  CurrentSettings.DisplaySelectedInput = true;
-  CurrentSettings.DisplayTemperature1 = 3;
-  CurrentSettings.DisplayTemperature2 = 3;
-  CurrentSettings.Version = VERSION;
+  Settings.VolumeSteps = 60;
+  Settings.MinAttenuation = 0;
+  Settings.MaxAttenuation = 60;
+  Settings.MaxStartVolume = Settings.VolumeSteps;
+  Settings.MuteLevel = 0;
+  Settings.RecallSetLevel = true;
+  Settings.IR_UP.address = 0x24;
+  Settings.IR_UP.command = 0x3AEA5A5F;
+  Settings.IR_DOWN.address = 0x24;
+  Settings.IR_DOWN.command = 0xE64E6057;
+  Settings.IR_REPEAT.address = 0x00;
+  Settings.IR_REPEAT.command = 0x00;
+  Settings.IR_LEFT.address = 0x24;
+  Settings.IR_LEFT.command = 0x4C7A8423;
+  Settings.IR_RIGHT.address = 0x24;
+  Settings.IR_RIGHT.command = 0xA1167E2B;
+  Settings.IR_SELECT.address = 0x24;
+  Settings.IR_SELECT.command = 0x91998CA3;
+  Settings.IR_BACK.address = 0x24;
+  Settings.IR_BACK.command = 0xE28395C7;
+  Settings.IR_MUTE.address = 0x24;
+  Settings.IR_MUTE.command = 0x41C09D23;
+  Settings.IR_PREVIOUS.address = 0x24;
+  Settings.IR_PREVIOUS.command = 0x5A3E996B;
+  Settings.IR_ONOFF.address = 0x24;
+  Settings.IR_ONOFF.command = 0x41D976CF;
+  Settings.IR_1.address = 0x24;
+  Settings.IR_1.command = 0xC43587C7;
+  Settings.IR_2.address = 0x24;
+  Settings.IR_2.command = 0x6F998DBF;
+  Settings.IR_3.address = 0x24;
+  Settings.IR_3.command = 0xB9947A73;
+  Settings.IR_4.address = 0x24;
+  Settings.IR_4.command = 0x64F8806B;
+  Settings.IR_5.address = 0x24;
+  Settings.IR_5.command = 0x1FC09E3F;
+  Settings.IR_6.address = 0x24;
+  Settings.IR_6.command = 0xCB24A437;
+  Settings.Input[0].Active = true;
+  strcpy(Settings.Input[0].Name, "Input 1   ");
+  Settings.Input[0].MaxVol = Settings.VolumeSteps;
+  Settings.Input[0].MinVol = 0;
+  Settings.Input[1].Active = true;
+  strcpy(Settings.Input[1].Name, "Input 2   ");
+  Settings.Input[1].MaxVol = Settings.VolumeSteps;
+  Settings.Input[1].MinVol = 0;
+  Settings.Input[2].Active = true;
+  strcpy(Settings.Input[2].Name, "Input 3   ");
+  Settings.Input[2].MaxVol = Settings.VolumeSteps;
+  Settings.Input[2].MinVol = 0;
+  Settings.Input[3].Active = true;
+  strcpy(Settings.Input[3].Name, "Input 4   ");
+  Settings.Input[3].MaxVol = Settings.VolumeSteps;
+  Settings.Input[3].MinVol = 0;
+  Settings.Input[4].Active = true;
+  strcpy(Settings.Input[4].Name, "Input 5   ");
+  Settings.Input[4].MaxVol = Settings.VolumeSteps;
+  Settings.Input[4].MinVol = 0;
+  Settings.Input[5].Active = true;
+  strcpy(Settings.Input[5].Name, "Input 6   ");
+  Settings.Input[5].MaxVol = Settings.VolumeSteps;
+  Settings.Input[5].MinVol = 0;
+  Settings.Trigger1Type = false;
+  Settings.Trigger1Mode = true;
+  Settings.Trigger1OnDelay = 10;
+  Settings.Trigger1Temp = 60;
+  Settings.Trigger2Type = false;
+  Settings.Trigger2Mode = true;
+  Settings.Trigger2OnDelay = 10;
+  Settings.Trigger2Temp = 60;
+  Settings.TriggerInactOffTimer = 0;
+  Settings.ScreenSaverActive = true;
+  Settings.DisplayOnLevel = 3;
+  Settings.DisplayDimLevel = 0;
+  Settings.DisplayTimeout = 30;
+  Settings.DisplayVolume = 1;
+  Settings.DisplaySelectedInput = true;
+  Settings.DisplayTemperature1 = 3;
+  Settings.DisplayTemperature2 = 3;
+  Settings.Version = VERSION;
 
-  CurrentRuntimeSettings.CurrentInput = 0;
-  CurrentRuntimeSettings.CurrentVolume = 0;
-  CurrentRuntimeSettings.CurrentAttenuation = 0;
-  CurrentRuntimeSettings.Muted = 0;
-  CurrentRuntimeSettings.InputLastVol[0] = 0;
-  CurrentRuntimeSettings.InputLastVol[1] = 0;
-  CurrentRuntimeSettings.InputLastVol[2] = 0;
-  CurrentRuntimeSettings.InputLastVol[3] = 0;
-  CurrentRuntimeSettings.InputLastVol[4] = 0;
-  CurrentRuntimeSettings.InputLastVol[5] = 0;
-  CurrentRuntimeSettings.PrevSelectedInput = 0;
-  CurrentRuntimeSettings.Version = VERSION;
+  RuntimeSettings.CurrentInput = 0;
+  RuntimeSettings.CurrentVolume = 0;
+  RuntimeSettings.CurrentAttenuation = 0;
+  RuntimeSettings.Muted = 0;
+  RuntimeSettings.InputLastVol[0] = 0;
+  RuntimeSettings.InputLastVol[1] = 0;
+  RuntimeSettings.InputLastVol[2] = 0;
+  RuntimeSettings.InputLastVol[3] = 0;
+  RuntimeSettings.InputLastVol[4] = 0;
+  RuntimeSettings.InputLastVol[5] = 0;
+  RuntimeSettings.PrevSelectedInput = 0;
+  RuntimeSettings.Version = VERSION;
 }
 
-// Write CurrentSettings to EEPROM
+// Write Settings to EEPROM
 void writeSettingsToEEPROM()
 {
   // Write the settings to the EEPROM
   eeprom.begin(extEEPROM::twiClock400kHz);
-  eeprom.write(0, CurrentSettings.data, sizeof(CurrentSettings));
+  eeprom.write(0, Settings.data, sizeof(Settings));
 }
 
-// Read CurrentSettings from EEPROM
+// Read Settings from EEPROM
 void readSettingsFromEEPROM()
 {
   // Read settings from EEPROM
   eeprom.begin(extEEPROM::twiClock400kHz);
-  eeprom.read(0, CurrentSettings.data, sizeof(CurrentSettings));
+  eeprom.read(0, Settings.data, sizeof(Settings));
 }
 
 // Write Default Settings and RuntimeSettings to EEPROM - called if the EEPROM data is not valid or if the user chooses to reset all settings to default value
 void writeDefaultSettingsToEEPROM()
 {
-  // Read default settings into CurrentSettings
-  setCurrentSettingsToDefault();
+  // Read default settings into Settings
+  setSettingsToDefault();
   // Write the settings to the EEPROM
   writeSettingsToEEPROM();
   // Write the runtime settings to the EEPROM
@@ -2029,7 +2117,7 @@ void writeRuntimeSettingsToEEPROM()
 {
   // Write the settings to the EEPROM
   eeprom.begin(extEEPROM::twiClock400kHz);
-  eeprom.write(sizeof(CurrentSettings) + 1, CurrentRuntimeSettings.data, sizeof(CurrentRuntimeSettings));
+  eeprom.write(sizeof(Settings) + 1, RuntimeSettings.data, sizeof(RuntimeSettings));
 }
 
 // Read the last runtime settings from EEPROM
@@ -2037,7 +2125,7 @@ void readRuntimeSettingsFromEEPROM()
 {
   // Read the settings from the EEPROM
   eeprom.begin(extEEPROM::twiClock400kHz);
-  eeprom.read(sizeof(CurrentSettings) + 1, CurrentRuntimeSettings.data, sizeof(CurrentRuntimeSettings));
+  eeprom.read(sizeof(Settings) + 1, RuntimeSettings.data, sizeof(RuntimeSettings));
 }
 
 // Read the user defined settings from EEPROM
@@ -2045,7 +2133,7 @@ void readUserSettingsFromEEPROM()
 {
   // Read the settings from the EEPROM
   eeprom.begin(extEEPROM::twiClock400kHz);
-  eeprom.read(sizeof(CurrentSettings) + sizeof(CurrentRuntimeSettings) + 1, CurrentSettings.data, sizeof(CurrentSettings));
+  eeprom.read(sizeof(Settings) + sizeof(RuntimeSettings) + 1, Settings.data, sizeof(Settings));
 }
 
 // Read the user defined settings from EEPROM
@@ -2053,18 +2141,5 @@ void writeUserSettingsToEEPROM()
 {
   // Write the user settings to the EEPROM
   eeprom.begin(extEEPROM::twiClock400kHz);
-  eeprom.write(sizeof(CurrentSettings) + sizeof(CurrentRuntimeSettings) + 1, CurrentSettings.data, sizeof(CurrentSettings));
-}
-
-// Reboots the sketch - used after restoring default settings
-void reboot()
-{
-  // TO DO Unselect all inputs (unless all inputs are deactivated by the MCP23008 during reboot - has to be tested)
-  // TO DO Mute volume control)
-  oled.clear();
-  oled.setCursor(0, 1);
-  oled.print("REBOOTING...");
-  delay(2000);
-  oled.clear();
-  asm volatile("  jmp 0"); // Restarts the sketch
+  eeprom.write(sizeof(Settings) + sizeof(RuntimeSettings) + 1, Settings.data, sizeof(Settings));
 }
