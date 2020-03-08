@@ -363,6 +363,8 @@ byte getUserInput()
       receivedInput = KEY_5;
     else if (data.address == Settings.IR_6.address && data.command == Settings.IR_6.command)
       receivedInput = KEY_6;
+   else if (data.address == Settings.IR_PREVIOUS.address && data.command == Settings.IR_PREVIOUS.command)
+      receivedInput = KEY_PREVIOUS;
     else if (data.address == Settings.IR_REPEAT.address && data.command == Settings.IR_REPEAT.command)
     {
       receivedInput = KEY_REPEAT;
