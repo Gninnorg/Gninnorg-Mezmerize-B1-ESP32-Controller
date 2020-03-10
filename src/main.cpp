@@ -8,7 +8,7 @@
 **
 */
 
-#define VERSION 0.93
+#define VERSION 0.94
 
 #include "Wire.h"
 #include <Adafruit_MCP23008.h>
@@ -363,7 +363,7 @@ byte getUserInput()
       receivedInput = KEY_5;
     else if (data.address == Settings.IR_6.address && data.command == Settings.IR_6.command)
       receivedInput = KEY_6;
-   else if (data.address == Settings.IR_PREVIOUS.address && data.command == Settings.IR_PREVIOUS.command)
+    else if (data.address == Settings.IR_PREVIOUS.address && data.command == Settings.IR_PREVIOUS.command)
       receivedInput = KEY_PREVIOUS;
     else if (data.address == Settings.IR_REPEAT.address && data.command == Settings.IR_REPEAT.command)
     {
@@ -413,8 +413,7 @@ byte getUserInput()
     {
       if (Settings.DisplayDimLevel == 0)
         oled.lcdOn();
-      else
-        oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
+      oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
       ScreenSaverIsOn = false;
     }
   }
@@ -911,7 +910,14 @@ void loop()
   {
   case APP_NORMAL_MODE:
     if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
+    {
       displayTemperatures();
+      if (((Settings.Trigger1Temp != 0) && (getTemperature(A0) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(A1) >= Settings.Trigger2Temp)))
+      {
+        toStandbyMode();
+        UIkey = KEY_NONE;
+      }
+    }
 
     switch (UIkey)
     {
@@ -1070,8 +1076,7 @@ void toStandbyMode()
   {
     if (Settings.DisplayDimLevel == 0)
       oled.lcdOn();
-    else
-      oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
+    oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
     ScreenSaverIsOn = false;
   }
   oled.clear();
@@ -1082,7 +1087,7 @@ void toStandbyMode()
   mute();
   setTrigger1Off();
   setTrigger2Off();
-  delay(2000);
+  delay(3000);
   oled.lcdOff();
   while (getUserInput() != KEY_ONOFF) // getUserInput will take care of wakeup when KEY_ONOFF is received
     ;
