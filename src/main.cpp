@@ -147,11 +147,11 @@ typedef union {
 myRuntimeSettings RuntimeSettings;
 
 // Setup Rotary encoders ------------------------------------------------------
-ClickEncoder *encoder1 = new ClickEncoder(7, 8, 6, 4);
+ClickEncoder *encoder1 = new ClickEncoder(8, 7, 6, 4);
 ClickEncoder::Button button1;
 int16_t e1last, e1value;
 
-ClickEncoder *encoder2 = new ClickEncoder(4, 5, 3, 4);
+ClickEncoder *encoder2 = new ClickEncoder(5, 4, 3, 4);
 ClickEncoder::Button button2;
 int16_t e2last, e2value;
 
@@ -434,7 +434,7 @@ void setup()
   pinMode(A1, INPUT);
   pinMode(A2, INPUT);
 
-  //Serial.begin(115200);
+  Serial.begin(115200);
   Wire.begin();
   relayController.begin();
 
@@ -638,11 +638,15 @@ void setTrigger2Off()
 
 uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
 {
+  Serial.print("Antal steps: "); Serial.println(steps);
+  Serial.print("Valgt steps: "); Serial.println(selStep);
+  Serial.print("Min dB: "); Serial.println(min_dB);
+  Serial.print("Max dB: "); Serial.println(max_dB);
   uint8_t att_dB = max_dB - min_dB;
   float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
   uint8_t numberOfSmallSteps = (sizeOfLargeSteps * steps - att_dB) / (sizeOfLargeSteps / 2);
-
-  return min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * 2;
+  Serial.print("Attenuation: "); Serial.println(min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * 2); 
+  return min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * -2;
 }
 
 void setVolume(int16_t newVolumeStep)
@@ -1152,7 +1156,7 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdINPUT1_ACTIVE:
     if (RuntimeSettings.CurrentInput != 0) // If this input is selected then only allow to select "HT", "Yes". If not "HT", "Yes", "No" is allowed as options
-      editOptionValue(Settings.Input[0].Active, 2, "HT", "Yes", "No", "");
+      editOptionValue(Settings.Input[0].Active, 3, "HT", "Yes", "No", "");
     else
       editOptionValue(Settings.Input[0].Active, 2, "HT", "Yes", "", "");
     complete = true;
@@ -1171,7 +1175,7 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdINPUT2_ACTIVE:
     if (RuntimeSettings.CurrentInput != 1) // If this input is selected then only allow to select "HT", "Yes". If not "HT", "Yes", "No" is allowed as options
-      editOptionValue(Settings.Input[1].Active, 2, "HT", "Yes", "No", "");
+      editOptionValue(Settings.Input[1].Active, 3, "HT", "Yes", "No", "");
     else
       editOptionValue(Settings.Input[1].Active, 2, "HT", "Yes", "", "");
     complete = true;
@@ -1190,7 +1194,7 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdINPUT3_ACTIVE:
     if (RuntimeSettings.CurrentInput != 2) // If this input is selected then only allow to select "HT", "Yes". If not "HT", "Yes", "No" is allowed as options
-      editOptionValue(Settings.Input[2].Active, 2, "HT", "Yes", "No", "");
+      editOptionValue(Settings.Input[2].Active, 3, "HT", "Yes", "No", "");
     else
       editOptionValue(Settings.Input[2].Active, 2, "HT", "Yes", "", "");
     complete = true;
@@ -1209,7 +1213,7 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdINPUT4_ACTIVE:
     if (RuntimeSettings.CurrentInput != 3) // If this input is selected then only allow to select "HT", "Yes". If not "HT", "Yes", "No" is allowed as options
-      editOptionValue(Settings.Input[3].Active, 2, "HT", "Yes", "No", "");
+      editOptionValue(Settings.Input[3].Active, 3, "HT", "Yes", "No", "");
     else
       editOptionValue(Settings.Input[3].Active, 2, "HT", "Yes", "", "");
     complete = true;
@@ -1228,7 +1232,7 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdINPUT5_ACTIVE:
     if (RuntimeSettings.CurrentInput != 4) // If this input is selected then only allow to select "HT", "Yes". If not "HT", "Yes", "No" is allowed as options
-      editOptionValue(Settings.Input[4].Active, 2, "HT", "Yes", "No", "");
+      editOptionValue(Settings.Input[4].Active, 3, "HT", "Yes", "No", "");
     else
       editOptionValue(Settings.Input[4].Active, 2, "HT", "Yes", "", "");
     complete = true;
@@ -1247,7 +1251,7 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdINPUT6_ACTIVE:
     if (RuntimeSettings.CurrentInput != 5) // If this input is selected then only allow to select "HT", "Yes". If not "HT", "Yes", "No" is allowed as options
-      editOptionValue(Settings.Input[5].Active, 2, "HT", "Yes", "No", "");
+      editOptionValue(Settings.Input[5].Active, 3, "HT", "Yes", "No", "");
     else
       editOptionValue(Settings.Input[5].Active, 2, "HT", "Yes", "", "");
     complete = true;
