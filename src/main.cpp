@@ -960,9 +960,11 @@ void loop()
           nextInput = RuntimeSettings.CurrentInput + 1;
         while (Settings.Input[nextInput].Active == INPUT_INACTIVATED)
         {
-          nextInput++;
-          if (nextInput > 5)
+          if (nextInput > 5) {
             nextInput = 0;
+          } else {
+            nextInput++;
+          }
         }
       }
       else // Switch to next active input with an input number less than the current one
@@ -974,10 +976,17 @@ void loop()
           nextInput = RuntimeSettings.CurrentInput - 1;
         while (Settings.Input[nextInput].Active == INPUT_INACTIVATED)
         {
-          if (RuntimeSettings.CurrentInput == 0)
-            nextInput = 5;
-          else
-            nextInput--;
+            if (nextInput == 0) {
+              nextInput = 5;
+            } else {
+              nextInput--;
+            }
+            
+            // old code
+            //if (RuntimeSettings.CurrentInput == 0)
+            //  nextInput = 5;
+            //else
+            //  nextInput--;
         }
       }
       else                         // KEY_1 - KEY_6 received
