@@ -37,7 +37,7 @@ uint8_t getAttenuation(uint8_t, uint8_t, uint8_t, uint8_t);
 void setVolume(int16_t);
 void mute(void);
 void unmute(void);
-void setInput(uint8_t);
+boolean setInput(uint8_t);
 void readSettingsFromEEPROM(void);
 void writeSettingsToEEPROM(void);
 void writeDefaultSettingsToEEPROM(void);
@@ -725,34 +725,40 @@ void displayMute()
   }
 }
 
-void setInput(uint8_t NewInput)
-{
-  if (Settings.Input[NewInput].Active != INPUT_INACTIVATED)
+boolean setInput(uint8_t NewInput)
+{  
+  if (Settings.Input[NewInput].Active != INPUT_INACTIVATED && NewInput >= 0 && NewInput <= 5)
   {
-    if (!RuntimeSettings.Muted)
-      mute();
+    if (RuntimeSettings.CurrentInput != NewInput) 
+    {
+      if (!RuntimeSettings.Muted)
+        mute();
 
-    //Unselect currently selected input
-    relayController.digitalWrite(RuntimeSettings.CurrentInput, LOW);
+      //Unselect currently selected input
+      relayController.digitalWrite(RuntimeSettings.CurrentInput, LOW);
 
-    // Save the currently selected input to enable switching between two inputs
-    RuntimeSettings.PrevSelectedInput = RuntimeSettings.CurrentInput;
+      // Save the currently selected input to enable switching between two inputs
+      RuntimeSettings.PrevSelectedInput = RuntimeSettings.CurrentInput;
 
-    //Select new input
-    RuntimeSettings.CurrentInput = NewInput;
-    relayController.digitalWrite(NewInput, HIGH);
+      //Select new input
+      RuntimeSettings.CurrentInput = NewInput;
+      relayController.digitalWrite(NewInput, HIGH);
 
-    if (Settings.RecallSetLevel)
-      RuntimeSettings.CurrentVolume = RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput];
-    else if (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MaxVol)
-      RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MaxVol;
-    else if (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MinVol)
-      RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol;
-    setVolume(RuntimeSettings.CurrentVolume);
-    if (RuntimeSettings.Muted)
-      unmute();
-    displayInput();
+      if (Settings.RecallSetLevel)
+        RuntimeSettings.CurrentVolume = RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput];
+      else if (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MaxVol)
+        RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MaxVol;
+      else if (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MinVol)
+        RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol;
+      setVolume(RuntimeSettings.CurrentVolume);
+      if (RuntimeSettings.Muted)
+        unmute();
+      displayInput();
+    }
+    Serial.println(NewInput);
+    return true;
   }
+  return false;
 }
 
 // Display the name of the current input (but only if it has been chosen to be so by the user)
@@ -923,6 +929,10 @@ void loop()
       }
     }
 
+    // Suggestion make control less sensitive by only handling command no faster than 2 pr. second
+    // Insert code here :
+    // ..
+    // ..
     switch (UIkey)
     {
     case KEY_NONE:
@@ -943,14 +953,28 @@ void loop()
         setVolume(RuntimeSettings.CurrentVolume - 1);
       break;
     case KEY_LEFT:
+      {// add new code here
+        byte nextInput = (RuntimeSettings.CurrentInput == 0) ? 5 : RuntimeSettings.CurrentInput - 1;
+        while(!setInput(nextInput)) {
+          nextInput = (nextInput==0) ? 5 : nextInput - 1;
+        }
+        break;
+      }
     case KEY_RIGHT:
+      {// add new code here
+        byte nextInput = (RuntimeSettings.CurrentInput == 5) ? 0 : RuntimeSettings.CurrentInput + 1;
+        while(!setInput(nextInput)) {
+          nextInput = (nextInput>5) ? 0 : nextInput + 1;
+        }
+        break;
+      }
     case KEY_1:
     case KEY_2:
     case KEY_3:
     case KEY_4:
     case KEY_5:
     case KEY_6:
-    {
+    { /* 
       byte nextInput;
       if (UIkey == KEY_RIGHT) // Switch to next active input with an input number larger than the current one
       {
@@ -989,11 +1013,11 @@ void loop()
             //  nextInput--;
         }
       }
-      else                         // KEY_1 - KEY_6 received
-        nextInput = UIkey - KEY_1; // As KEY_1 - KEY_6 are enums we can calculate inputNumber (0-5) by detracting KEY_1 from UIkey
+      else */                         // KEY_1 - KEY_6 received
+      //nextInput = UIkey - KEY_1; // As KEY_1 - KEY_6 are enums we can calculate inputNumber (0-5) by detracting KEY_1 from UIkey
 
-      if (RuntimeSettings.CurrentInput != nextInput) // Change settings if it was possible to change to another input number
-        setInput(nextInput);
+      //if (RuntimeSettings.CurrentInput != nextInput) // Change settings if it was possible to change to another input number
+        setInput(UIkey - KEY_1);
     }
     break;
     case KEY_PREVIOUS:
