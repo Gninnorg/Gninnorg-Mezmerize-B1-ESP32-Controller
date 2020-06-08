@@ -328,11 +328,14 @@ byte getUserInput()
   {
     // Get the new data from the remote
     auto data = IRLremote.read();
+    
+    //Strangely this line solves the problem with double reads
+    if (IRLremote.receiving()) Serial.println("modtager");
 
-    //Serial.print(F("Address: 0x"));
-    //Serial.println(data.address, HEX);
-    //Serial.print(F("Command: 0x"));
-    //Serial.println(data.command, HEX);
+    Serial.print(F("1. Address: 0x"));
+    Serial.println(data.address, HEX);
+    Serial.print(F("1. Command: 0x"));
+    Serial.println(data.command, HEX);
 
     // Map the received IR input to UserInput values
     if (data.address == Settings.IR_UP.address && data.command == Settings.IR_UP.command)
@@ -424,7 +427,7 @@ byte getUserInput()
     appMode = APP_STANDBY_MODE;
     toStandbyMode();
   }
-
+  
   return (receivedInput);
 }
 
@@ -638,14 +641,14 @@ void setTrigger2Off()
 
 uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
 {
-  Serial.print("Antal steps: "); Serial.println(steps);
-  Serial.print("Valgt steps: "); Serial.println(selStep);
-  Serial.print("Min dB: "); Serial.println(min_dB);
-  Serial.print("Max dB: "); Serial.println(max_dB);
+  //Serial.print("Antal steps: "); Serial.println(steps);
+  //Serial.print("Valgt steps: "); Serial.println(selStep);
+  //Serial.print("Min dB: "); Serial.println(min_dB);
+  //Serial.print("Max dB: "); Serial.println(max_dB);
   uint8_t att_dB = max_dB - min_dB;
   float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
   uint8_t numberOfSmallSteps = (sizeOfLargeSteps * steps - att_dB) / (sizeOfLargeSteps / 2);
-  Serial.print("Attenuation: "); Serial.println(min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * 2); 
+  //Serial.print("Attenuation: "); Serial.println(min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * 2); 
   return min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * -2;
 }
 
@@ -755,7 +758,7 @@ boolean setInput(uint8_t NewInput)
         unmute();
       displayInput();
     }
-    Serial.println(NewInput);
+    //Serial.println(NewInput);
     return true;
   }
   return false;
@@ -918,191 +921,147 @@ void loop()
 
   switch (appMode)
   {
-  case APP_NORMAL_MODE:
-    if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
-    {
-      displayTemperatures();
-      if (((Settings.Trigger1Temp != 0) && (getTemperature(A0) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(A1) >= Settings.Trigger2Temp)))
+    case APP_NORMAL_MODE:
+      if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
       {
-        toStandbyMode();
-        UIkey = KEY_NONE;
+        displayTemperatures();
+        if (((Settings.Trigger1Temp != 0) && (getTemperature(A0) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(A1) >= Settings.Trigger2Temp)))
+        {
+          toStandbyMode();
+          UIkey = KEY_NONE;
+        }
       }
-    }
 
-    // Suggestion make control less sensitive by only handling command no faster than 2 pr. second
-    // Insert code here :
-    // ..
-    // ..
-    switch (UIkey)
-    {
-    case KEY_NONE:
-      break;
-    case KEY_BACK:
-      appMode = APP_MENU_MODE;
-      menuIndex = 0;
-      refreshMenuDisplay(REFRESH_DESCEND);
-      break;
-    case KEY_UP:
-      // Turn volume up if we're not muted and we'll not exceed the maximum volume set for the currently selected input
-      if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MaxVol))
-        setVolume(RuntimeSettings.CurrentVolume + 1);
-      break;
-    case KEY_DOWN:
-      // Turn volume down if we're not muted and we'll not get below the minimum volume set for the currently selected input
-      if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MinVol))
-        setVolume(RuntimeSettings.CurrentVolume - 1);
-      break;
-    case KEY_LEFT:
-      {// add new code here
-        byte nextInput = (RuntimeSettings.CurrentInput == 0) ? 5 : RuntimeSettings.CurrentInput - 1;
-        while(!setInput(nextInput)) {
-          nextInput = (nextInput==0) ? 5 : nextInput - 1;
-        }
-        break;
-      }
-    case KEY_RIGHT:
-      {// add new code here
-        byte nextInput = (RuntimeSettings.CurrentInput == 5) ? 0 : RuntimeSettings.CurrentInput + 1;
-        while(!setInput(nextInput)) {
-          nextInput = (nextInput>5) ? 0 : nextInput + 1;
-        }
-        break;
-      }
-    case KEY_1:
-    case KEY_2:
-    case KEY_3:
-    case KEY_4:
-    case KEY_5:
-    case KEY_6:
-    { /* 
-      byte nextInput;
-      if (UIkey == KEY_RIGHT) // Switch to next active input with an input number larger than the current one
+      switch (UIkey)
       {
-        if (RuntimeSettings.CurrentInput == 5)
-          nextInput = 0;
-        else
-          nextInput = RuntimeSettings.CurrentInput + 1;
-        while (Settings.Input[nextInput].Active == INPUT_INACTIVATED)
-        {
-          if (nextInput > 5) {
-            nextInput = 0;
-          } else {
-            nextInput++;
-          }
-        }
-      }
-      else // Switch to next active input with an input number less than the current one
-          if (UIkey == KEY_LEFT)
-      {
-        if (RuntimeSettings.CurrentInput == 0)
-          nextInput = 5;
-        else
-          nextInput = RuntimeSettings.CurrentInput - 1;
-        while (Settings.Input[nextInput].Active == INPUT_INACTIVATED)
-        {
-            if (nextInput == 0) {
-              nextInput = 5;
-            } else {
-              nextInput--;
+        case KEY_NONE:
+          break;
+        case KEY_BACK:
+          appMode = APP_MENU_MODE;
+          menuIndex = 0;
+          refreshMenuDisplay(REFRESH_DESCEND);
+          break;
+        case KEY_UP:
+          // Turn volume up if we're not muted and we'll not exceed the maximum volume set for the currently selected input
+          if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MaxVol))
+            setVolume(RuntimeSettings.CurrentVolume + 1);
+          break;
+        case KEY_DOWN:
+          // Turn volume down if we're not muted and we'll not get below the minimum volume set for the currently selected input
+          if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MinVol))
+            setVolume(RuntimeSettings.CurrentVolume - 1);
+          break;
+        case KEY_LEFT:
+          {// add new code here
+            byte nextInput = (RuntimeSettings.CurrentInput == 0) ? 5 : RuntimeSettings.CurrentInput - 1;
+            while(!setInput(nextInput)) {
+              nextInput = (nextInput==0) ? 5 : nextInput - 1;
             }
-            
-            // old code
-            //if (RuntimeSettings.CurrentInput == 0)
-            //  nextInput = 5;
-            //else
-            //  nextInput--;
-        }
-      }
-      else */                         // KEY_1 - KEY_6 received
-      //nextInput = UIkey - KEY_1; // As KEY_1 - KEY_6 are enums we can calculate inputNumber (0-5) by detracting KEY_1 from UIkey
-
-      //if (RuntimeSettings.CurrentInput != nextInput) // Change settings if it was possible to change to another input number
-        setInput(UIkey - KEY_1);
+            break;
+          }
+        case KEY_RIGHT:
+          {// add new code here
+            byte nextInput = (RuntimeSettings.CurrentInput == 5) ? 0 : RuntimeSettings.CurrentInput + 1;
+            while(!setInput(nextInput)) {
+              nextInput = (nextInput>5) ? 0 : nextInput + 1;
+            }
+            break;
+          }
+        case KEY_1:
+        case KEY_2:
+        case KEY_3:
+        case KEY_4:
+        case KEY_5:
+        case KEY_6:
+          setInput(UIkey - KEY_1);
+          break;
+        case KEY_PREVIOUS:
+          // Switch to previous selected input if it is not inactivated
+          setInput(RuntimeSettings.PrevSelectedInput);
+          break;
+        case KEY_MUTE:
+          // toggle mute
+          if (RuntimeSettings.Muted)
+            unmute();
+          else
+          {
+            mute();
+            displayMute();
+          }
+          break;
     }
-    break;
-    case KEY_PREVIOUS:
-      // Switch to previous selected input if it is not inactivated
-      setInput(RuntimeSettings.PrevSelectedInput);
-      break;
-    case KEY_MUTE:
-      // toggle mute
-      if (RuntimeSettings.Muted)
-        unmute();
-      else
+      break;    
+
+    case APP_MENU_MODE:
+    { // Brackets to avoid warning: "jump to case label [-fpermissive]"
+      byte menuMode = Menu1.handleNavigation(getNavAction, refreshMenuDisplay);
+
+      if (menuMode == MENU_EXIT)
       {
-        mute();
-        displayMute();
+        // Back to APP_NORMAL_MODE
+        oled.clear();
+        displayInput();
+        displayVolume();
+        displayTemperatures();
+        appMode = APP_NORMAL_MODE;
+      }
+      else if (menuMode == MENU_INVOKE_ITEM) // TO DO MENU_INVOKE_ITEM seems to be superfluous after my other changes
+      {
+        appMode = APP_PROCESS_MENU_CMD;
+      }
+      break;
+  }
+    
+    case APP_PROCESS_MENU_CMD:
+    {
+      byte processingComplete = processMenuCommand(Menu1.getCurrentItemCmdId());
+
+      if (processingComplete == ABANDON)
+      {
+        // Back to APP_NORMAL_MODE
+        oled.clear();
+        displayInput();
+        displayVolume();
+        displayTemperatures();
+        appMode = APP_NORMAL_MODE;
+        Menu1.reset();
+      }
+      else if (processingComplete == true)
+      {
+        appMode = APP_MENU_MODE;
+        drawMenu();
       }
       break;
     }
-    break;
-
-  case APP_MENU_MODE:
-  { // Brackets to avoid warning: "jump to case label [-fpermissive]"
-    byte menuMode = Menu1.handleNavigation(getNavAction, refreshMenuDisplay);
-
-    if (menuMode == MENU_EXIT)
-    {
-      // Back to APP_NORMAL_MODE
-      oled.clear();
-      displayInput();
-      displayVolume();
-      displayTemperatures();
-      appMode = APP_NORMAL_MODE;
-    }
-    else if (menuMode == MENU_INVOKE_ITEM) // TO DO MENU_INVOKE_ITEM seems to be superfluous after my other changes
-    {
-      appMode = APP_PROCESS_MENU_CMD;
-    }
-    break;
-  }
-  case APP_PROCESS_MENU_CMD:
-  {
-    byte processingComplete = processMenuCommand(Menu1.getCurrentItemCmdId());
-
-    if (processingComplete == ABANDON)
-    {
-      // Back to APP_NORMAL_MODE
-      oled.clear();
-      displayInput();
-      displayVolume();
-      displayTemperatures();
-      appMode = APP_NORMAL_MODE;
-      Menu1.reset();
-    }
-    else if (processingComplete == true)
-    {
-      appMode = APP_MENU_MODE;
-      drawMenu();
-    }
-    break;
-  }
-  case APP_STANDBY_MODE:
+  
+    case APP_STANDBY_MODE:
     // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart is done by getUserInput(). By the way: you don't need an IR remote: a doubleclick on encoder_2 is also KEY_ONOFF
-    break;
-  case APP_POWERLOSS_STATE: // Only active if power drop is detected
-    oled.lcdOn();
-    oled.clear();
-    oled.setCursor(0, 1);
-    oled.print("ATTENTION:");
-    oled.setCursor(0, 2);
-    oled.print("Check power supply!");
-    delay(2000);
-    oled.clear();
-    long vcc;
-    do
+      break;
+
+    case APP_POWERLOSS_STATE: // Only active if power drop is detected
     {
-      ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-      delay(2);
-      ADCSRA |= _BV(ADSC);
-      while (bit_is_set(ADCSRA, ADSC))
-        ;
-      vcc = ADCL;
-      vcc |= ADCH << 8;
-      vcc = 1126400L / vcc;
-    } while (vcc < 4700); // Wait until power is completely gone or restart if it returns
-    startUp();
-    break;
+      oled.lcdOn();
+      oled.clear();
+      oled.setCursor(0, 1);
+      oled.print("ATTENTION:");
+      oled.setCursor(0, 2);
+      oled.print("Check power supply!");
+      delay(2000);
+      oled.clear();
+      long vcc;
+      do
+      {
+        ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+        delay(2);
+        ADCSRA |= _BV(ADSC);
+        while (bit_is_set(ADCSRA, ADSC));
+        vcc = ADCL;
+        vcc |= ADCH << 8;
+        vcc = 1126400L / vcc;
+      } while (vcc < 4700); // Wait until power is completely gone or restart if it returns
+      startUp();
+      break;
+    }
   }
 }
 
