@@ -328,14 +328,21 @@ byte getUserInput()
   {
     // Get the new data from the remote
     auto data = IRLremote.read();
-    
-    //Strangely this line solves the problem with double reads
-    if (IRLremote.receiving()) Serial.println("modtager");
 
-    Serial.print(F("1. Address: 0x"));
+    //Often the IR remote is to sensitive, reset reading if its to fast, but only if IR code is not REPEAT
+    if (millis() - mil_LastUserInput < 100 && (data.address != Settings.IR_REPEAT.address && data.command != Settings.IR_REPEAT.command)) {
+      data.address = 0;
+      data.command = 0;
+    }
+    
+    /*
+    Serial.print(F("Address: 0x"));
     Serial.println(data.address, HEX);
-    Serial.print(F("1. Command: 0x"));
+    Serial.print(F("Command: 0x"));
     Serial.println(data.command, HEX);
+    Serial.print("Last command ");
+    Serial.println(millis());
+    */
 
     // Map the received IR input to UserInput values
     if (data.address == Settings.IR_UP.address && data.command == Settings.IR_UP.command)
