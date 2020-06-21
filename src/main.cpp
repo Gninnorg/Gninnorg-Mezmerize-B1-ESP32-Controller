@@ -335,16 +335,7 @@ byte getUserInput()
       data.command = 0;
       receivedInput = KEY_NONE;
     }
-    
-    /*
-    Serial.print(F("Address: 0x"));
-    Serial.println(data.address, HEX);
-    Serial.print(F("Command: 0x"));
-    Serial.println(data.command, HEX);
-    Serial.print("Last command ");
-    Serial.println(millis());
-    */
-
+    else
     // Map the received IR input to UserInput values
     if (data.address == Settings.IR_UP.address && data.command == Settings.IR_UP.command)
       receivedInput = KEY_UP;
@@ -550,7 +541,7 @@ void startUp()
   oled.clear();
   setInput(RuntimeSettings.CurrentInput);
   RuntimeSettings.CurrentVolume = min(RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput], Settings.MaxStartVolume); // Avoid setting volume higher than MaxStartVol
-  setVolume(RuntimeSettings.CurrentVolume);
+  unmute();
   displayInput();
   displayTemperatures();
 
@@ -709,7 +700,7 @@ void mute()
   if (Settings.MuteLevel)
     muses.setVolume(getAttenuation(Settings.VolumeSteps, Settings.MuteLevel, Settings.MinAttenuation, Settings.MaxAttenuation));
   else
-    muses.setVolume(223);
+    muses.mute();
   RuntimeSettings.Muted = true;
 }
 
@@ -764,8 +755,6 @@ boolean setInput(uint8_t NewInput)
 {  
   if (Settings.Input[NewInput].Active != INPUT_INACTIVATED && NewInput >= 0 && NewInput <= 5)
   {
-    if (RuntimeSettings.CurrentInput != NewInput) 
-    {
       if (!RuntimeSettings.Muted)
         mute();
 
@@ -789,8 +778,6 @@ boolean setInput(uint8_t NewInput)
       if (RuntimeSettings.Muted)
         unmute();
       displayInput();
-    }
-    //Serial.println(NewInput);
     return true;
   }
   return false;
