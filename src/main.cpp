@@ -396,30 +396,6 @@ byte getUserInput()
     }
   }
 
-  /* Turn Screen Saver on/off if it is activated and if no user input has been received during the defined number of seconds
-  if (receivedInput == KEY_NONE && Settings.ScreenSaverActive && appMode != APP_STANDBY_MODE)
-  {
-    if (!ScreenSaverIsOn && (millis() - mil_LastUserInput > (unsigned long)Settings.DisplayTimeout * 1000))
-    {
-      if (Settings.DisplayDimLevel == 0)
-        oled.lcdOff();
-      else
-        oled.backlight(Settings.DisplayDimLevel * 4 - 1);
-      ScreenSaverIsOn = true;
-    }
-  }
-  else
-  {
-    mil_LastUserInput = millis();
-    if (ScreenSaverIsOn)
-    {
-      if (Settings.DisplayDimLevel == 0)
-        oled.lcdOn();
-      oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
-      ScreenSaverIsOn = false;
-    }
-  } */
-
   // Turn Screen Saver on/off if it is activated and if no user input has been received during the defined number of seconds
   if (receivedInput == KEY_NONE)
   {
@@ -435,7 +411,7 @@ byte getUserInput()
   else
   {
     mil_LastUserInput = millis();
-    if (ScreenSaverIsOn)
+    if (ScreenSaverIsOn && appMode != APP_STANDBY_MODE)
     {
       if (Settings.DisplayDimLevel == 0)
         oled.lcdOn();
