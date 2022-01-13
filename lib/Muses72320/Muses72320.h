@@ -23,6 +23,10 @@
 #ifndef INCLUDED_MUSES_72320
 #define INCLUDED_MUSES_72320
 
+#ifndef min
+#define min(a,b) ((a)<(b)?(a):(b))
+#endif 
+
 #include <Arduino.h>
 
 class Muses72320

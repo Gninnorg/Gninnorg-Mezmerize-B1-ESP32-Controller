@@ -1,5 +1,8 @@
 #include "MenuManager.h"
-#include <avr/pgmspace.h>
+#include <pgmspace.h>
+
+#include <cstring>
+#include <iostream>
 
 MenuManager::MenuManager(const MenuItem *root, unsigned char itemCount)
 {

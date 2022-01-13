@@ -1,7 +1,7 @@
 #ifndef _ctlMenu_
 #define _ctlMenu_
 #include "MenuManager.h"
-#include <avr/pgmspace.h>
+#include <pgmspace.h>
 
 /*
 

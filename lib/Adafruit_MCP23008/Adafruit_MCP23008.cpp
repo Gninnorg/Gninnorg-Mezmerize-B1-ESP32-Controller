@@ -17,7 +17,7 @@
  #include "WProgram.h"
 #endif
 #include <Wire.h>
-#include <avr/pgmspace.h>
+#include <pgmspace.h>
 #include "Adafruit_MCP23008.h"
 
 

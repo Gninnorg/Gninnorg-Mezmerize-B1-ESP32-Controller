@@ -10,16 +10,21 @@
 
 #define VERSION 0.94
 
-#include "Wire.h"
+//#undef max
+//#define max(a,b) ((a)>(b)?(a):(b))
+
+#undef min
+#ifndef min
+#define min(a,b) ((a)<(b)?(a):(b))
+#endif // min
+
+#include <Wire.h>
 #include <Adafruit_MCP23008.h>
-#include "OLedI2C.h"
-#include "extEEPROM.h"
-#include "ClickEncoder.h"
-#include "TimerOne.h"
-#include "IRLremote.h"
-#include "Muses72320.h"
-#include "MenuManager.h"
-#include "MenuData.h"
+#include <OLedI2C.h>
+#include <extEEPROM.h>
+#include <Muses72320.h>
+#include <MenuManager.h>
+#include <MenuData.h>
 
 // Declarations
 void startUp(void);
@@ -49,7 +54,18 @@ void editInputName(uint8_t InputNumber);
 void drawEditInputNameScreen(bool isUpperCase);
 bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit[5]);
 bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const char Option2[9], const char Option3[9], const char Option4[9]);
+
+typedef uint8_t HashIR_address_t;
+typedef uint32_t HashIR_command_t;
+
+// Struct that is returned by the read() function
+struct HashIR_data_t
+{
+    HashIR_address_t address;
+    HashIR_command_t command;
+};
 bool editIRCode(HashIR_data_t &Value);
+
 void drawMenu();
 void refreshMenuDisplay(byte refreshMode);
 byte processMenuCommand(byte cmdId);
@@ -87,6 +103,7 @@ typedef union {
     byte MaxStartVolume;           // If StoreSetLevel is true, then limit the volume to the specified value when the controller is powered on
     byte MuteLevel;                // The level to be set when Mute is activated by the user. The Mute function of the Muses72320 is activated if 0 is specified
     byte RecallSetLevel;           // Remember/store the volume level for each separate input
+    
     HashIR_data_t IR_ONOFF;        // IR data to be interpreted as ON/OFF - switch between running and suspend mode (and turn triggers off)
     HashIR_data_t IR_UP;           // IR data to be interpreted as UP
     HashIR_data_t IR_DOWN;         // IR data to be interpreted as DOWN
@@ -147,29 +164,30 @@ typedef union {
 myRuntimeSettings RuntimeSettings;
 
 // Setup Rotary encoders ------------------------------------------------------
-ClickEncoder *encoder1 = new ClickEncoder(8, 7, 6, 4);
-ClickEncoder::Button button1;
-int16_t e1last, e1value;
+// REPLACE
+//ClickEncoder *encoder1 = new ClickEncoder(8, 7, 6, 4);
+//ClickEncoder::Button button1;
+//int16_t e1last, e1value;
 
-ClickEncoder *encoder2 = new ClickEncoder(5, 4, 3, 4);
-ClickEncoder::Button button2;
-int16_t e2last, e2value;
+//ClickEncoder *encoder2 = new ClickEncoder(5, 4, 3, 4);
+//ClickEncoder::Button button2;
+//int16_t e2last, e2value;
 
 void timerIsr()
 {
-  encoder1->service();
-  encoder2->service();
+  //encoder1->service();
+  //encoder2->service();
 }
 
 void setupRotaryEncoders()
 {
-  Timer1.initialize(1000);
-  Timer1.attachInterrupt(timerIsr);
+  //Timer1.initialize(1000);
+  //Timer1.attachInterrupt(timerIsr);
 }
 
-// Setup IR -------------------------------------------------------------------
-#define pinIR 2
-CHashIR IRLremote;
+// REPLACE Setup IR -------------------------------------------------------------------
+//#define pinIR 2
+//CHashIR IRLremote;
 
 // Setup Muses72320 -----------------------------------------------------------
 Muses72320 muses(0);
@@ -274,7 +292,7 @@ byte getUserInput()
 {
   byte receivedInput = KEY_NONE;
 
-  // Read input from encoder 1
+  /* REPLACE Read input from encoder 1
   e1value += encoder1->getValue();
 
   if (e1value != e1last)
@@ -377,7 +395,7 @@ byte getUserInput()
     }
     lastReceivedInput = receivedInput;
   }
-
+*/
   // Cancel received KEY_ONOFF if it has been received before within the last 5 seconds
   if (receivedInput == KEY_ONOFF)
   {
@@ -433,15 +451,16 @@ byte getUserInput()
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
-  pinMode(A1, INPUT);
-  pinMode(A2, INPUT);
+  //REPLACE PINS
+  pinMode(10, INPUT);
+  pinMode(11, INPUT);
 
   //Serial.begin(115200);
   Wire.begin();
   relayController.begin();
 
   setupRotaryEncoders();
-  IRLremote.begin(pinIR);
+  //REPLACE IRLremote.begin(pinIR);
   muses.begin();
   oled.begin();
 
@@ -569,7 +588,8 @@ void setTrigger2On()
     }
     else // SmartON
     {
-      if (getTemperature(A1) < 0) // Check if device is powered off
+      // REPLACE PIN
+      if (getTemperature(11) < 0) // Check if device is powered off
       {
         relayController.digitalWrite(7, HIGH);
         if (Settings.Trigger2Type == 0) // Momentary
@@ -597,7 +617,8 @@ void setTrigger1Off()
     }
     else // SmartON
     {
-      if (getTemperature(A0) > 0) // Check if device is powered on
+      // REPLACE PIN
+      if (getTemperature(10) > 0) // Check if device is powered on
       {
         if (Settings.Trigger1Type == 0) // Momentary
         {
@@ -625,7 +646,8 @@ void setTrigger2Off()
     }
     else // SmartON
     {
-      if (getTemperature(A1) > 0) // Check if device is powered on
+      //REPLACE PIN
+      if (getTemperature(11) > 0) // Check if device is powered on
       {
         if (Settings.Trigger2Type == 0) // Momentary
         {
@@ -773,7 +795,8 @@ void displayTemperatures()
 {
   if (Settings.DisplayTemperature1)
   {
-    float Temp = getTemperature(A0);
+    //REPLACE PIN
+    float Temp = getTemperature(10);
     float MaxTemp;
     if (Settings.Trigger1Temp == 0)
       MaxTemp = 60;
@@ -784,7 +807,8 @@ void displayTemperatures()
 
   if (Settings.DisplayTemperature2)
   {
-    float Temp = getTemperature(A1);
+    //REPLACE PIN
+    float Temp = getTemperature(11);
     float MaxTemp;
     if (Settings.Trigger2Temp == 0)
       MaxTemp = 60;
@@ -894,6 +918,7 @@ void loop()
 
   // Detect power off
   // If low power is detected the RuntimeSettings are written to EEPROM. We only write these data when power down is detected to avoid to write to the EEPROM every time the volume or input is changed (an EEPROM has a limited lifetime of about 100000 write cycles)
+  /* REPLACE
   if (appMode != APP_POWERLOSS_STATE)
   {
     long vcc;
@@ -913,14 +938,15 @@ void loop()
       appMode = APP_POWERLOSS_STATE; // Switch to APP_STATE_OFF and do nothing until power disappears completely
     }
   }
-
+  */
   switch (appMode)
   {
     case APP_NORMAL_MODE:
       if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
       {
         displayTemperatures();
-        if (((Settings.Trigger1Temp != 0) && (getTemperature(A0) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(A1) >= Settings.Trigger2Temp)))
+        //REPLACE PIN
+        if (((Settings.Trigger1Temp != 0) && (getTemperature(10) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(11) >= Settings.Trigger2Temp)))
         {
           toStandbyMode();
           UIkey = KEY_NONE;
@@ -1035,6 +1061,7 @@ void loop()
 
     case APP_POWERLOSS_STATE: // Only active if power drop is detected
     {
+      /* REPLACE
       oled.lcdOn();
       oled.clear();
       oled.setCursor(0, 1);
@@ -1054,6 +1081,7 @@ void loop()
         vcc |= ADCH << 8;
         vcc = 1126400L / vcc;
       } while (vcc < 4700); // Wait until power is completely gone or restart if it returns
+      */
       startUp();
       break;
     }
@@ -1979,10 +2007,10 @@ bool editIRCode(HashIR_data_t &Value)
     default:
       break;
     }
-    if (IRLremote.available())
+    if (true/* REPLACE IRLremote.available()*/)
     {
       // Get the new data from the remote
-      NewValue = IRLremote.read();
+      // REPLACE NewValue = IRLremote.read();
       oled.setCursor(10, 2);
       oled.print(F("          "));
       oled.setCursor(10, 2);
