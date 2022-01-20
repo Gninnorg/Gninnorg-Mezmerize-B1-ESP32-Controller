@@ -26,6 +26,21 @@
 #include <MenuManager.h>
 #include <MenuData.h>
 
+
+#include "AiEsp32RotaryEncoder.h"
+
+
+#define ROTARY_ENCODER_STEPS 4
+
+
+#include <irmpSelectMain15Protocols.h>  // This enables 15 main protocols
+#define IR_INPUT_PIN    2
+
+//#define IRMP_SUPPORT_NEC_PROTOCOL        1 // this enables only one protocol
+
+#include <irmp.hpp>
+
+
 // Declarations
 void startUp(void);
 void setTrigger1On(void);
@@ -55,16 +70,18 @@ void drawEditInputNameScreen(bool isUpperCase);
 bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit[5]);
 bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const char Option2[9], const char Option3[9], const char Option4[9]);
 
-typedef uint8_t HashIR_address_t;
+/*typedef uint8_t HashIR_address_t;
 typedef uint32_t HashIR_command_t;
 
 // Struct that is returned by the read() function
-struct HashIR_data_t
+struct IRMP_DATA
 {
     HashIR_address_t address;
     HashIR_command_t command;
-};
-bool editIRCode(HashIR_data_t &Value);
+};*/
+
+IRMP_DATA irmp_data;
+bool editIRCode(IRMP_DATA &Value);
 
 void drawMenu();
 void refreshMenuDisplay(byte refreshMode);
@@ -104,22 +121,22 @@ typedef union {
     byte MuteLevel;                // The level to be set when Mute is activated by the user. The Mute function of the Muses72320 is activated if 0 is specified
     byte RecallSetLevel;           // Remember/store the volume level for each separate input
     
-    HashIR_data_t IR_ONOFF;        // IR data to be interpreted as ON/OFF - switch between running and suspend mode (and turn triggers off)
-    HashIR_data_t IR_UP;           // IR data to be interpreted as UP
-    HashIR_data_t IR_DOWN;         // IR data to be interpreted as DOWN
-    HashIR_data_t IR_REPEAT;       // IR data to be interpreted as REPEAT (ie Apple remotes sends a specific code, if a key is held down to indicate repeat of the previously sent code
-    HashIR_data_t IR_LEFT;         // IR data to be interpreted as LEFT
-    HashIR_data_t IR_RIGHT;        // IR data to be interpreted as RIGHT
-    HashIR_data_t IR_SELECT;       // IR data to be interpreted as SELECT
-    HashIR_data_t IR_BACK;         // IR data to be interpreted as BACK
-    HashIR_data_t IR_MUTE;         // IR data to be interpreted as MUTE
-    HashIR_data_t IR_PREVIOUS;     // IR data to be interpreted as "switch to previous selected input"
-    HashIR_data_t IR_1;            // IR data to be interpreted as 1 (to select input 1 directly)
-    HashIR_data_t IR_2;            // IR data to be interpreted as 2
-    HashIR_data_t IR_3;            // IR data to be interpreted as 3
-    HashIR_data_t IR_4;            // IR data to be interpreted as 4
-    HashIR_data_t IR_5;            // IR data to be interpreted as 5
-    HashIR_data_t IR_6;            // IR data to be interpreted as 6
+    IRMP_DATA IR_ONOFF;        // IR data to be interpreted as ON/OFF - switch between running and suspend mode (and turn triggers off)
+    IRMP_DATA IR_UP;           // IR data to be interpreted as UP
+    IRMP_DATA IR_DOWN;         // IR data to be interpreted as DOWN
+    IRMP_DATA IR_REPEAT;       // IR data to be interpreted as REPEAT (ie Apple remotes sends a specific code, if a key is held down to indicate repeat of the previously sent code
+    IRMP_DATA IR_LEFT;         // IR data to be interpreted as LEFT
+    IRMP_DATA IR_RIGHT;        // IR data to be interpreted as RIGHT
+    IRMP_DATA IR_SELECT;       // IR data to be interpreted as SELECT
+    IRMP_DATA IR_BACK;         // IR data to be interpreted as BACK
+    IRMP_DATA IR_MUTE;         // IR data to be interpreted as MUTE
+    IRMP_DATA IR_PREVIOUS;     // IR data to be interpreted as "switch to previous selected input"
+    IRMP_DATA IR_1;            // IR data to be interpreted as 1 (to select input 1 directly)
+    IRMP_DATA IR_2;            // IR data to be interpreted as 2
+    IRMP_DATA IR_3;            // IR data to be interpreted as 3
+    IRMP_DATA IR_4;            // IR data to be interpreted as 4
+    IRMP_DATA IR_5;            // IR data to be interpreted as 5
+    IRMP_DATA IR_6;            // IR data to be interpreted as 6
     struct InputSettings Input[6]; // Settings for all 6 inputs
     byte Trigger1Active;           // 0 = the trigger is not active, 1 = the trigger is active
     byte Trigger1Type;             // 0 = momentary, 1 = latching
@@ -163,31 +180,21 @@ typedef union {
 
 myRuntimeSettings RuntimeSettings;
 
+
+AiEsp32RotaryEncoder encoder1 = AiEsp32RotaryEncoder(8, 7, 6, -1, ROTARY_ENCODER_STEPS);
+AiEsp32RotaryEncoder encoder2 = AiEsp32RotaryEncoder(5, 4, 3, -1, ROTARY_ENCODER_STEPS);
+
+
 // Setup Rotary encoders ------------------------------------------------------
 // REPLACE
 //ClickEncoder *encoder1 = new ClickEncoder(8, 7, 6, 4);
 //ClickEncoder::Button button1;
-//int16_t e1last, e1value;
+long e1last, e1value;
 
 //ClickEncoder *encoder2 = new ClickEncoder(5, 4, 3, 4);
 //ClickEncoder::Button button2;
-//int16_t e2last, e2value;
+long e2last, e2value;
 
-void timerIsr()
-{
-  //encoder1->service();
-  //encoder2->service();
-}
-
-void setupRotaryEncoders()
-{
-  //Timer1.initialize(1000);
-  //Timer1.attachInterrupt(timerIsr);
-}
-
-// REPLACE Setup IR -------------------------------------------------------------------
-//#define pinIR 2
-//CHashIR IRLremote;
 
 // Setup Muses72320 -----------------------------------------------------------
 Muses72320 muses(0);
@@ -292,8 +299,8 @@ byte getUserInput()
 {
   byte receivedInput = KEY_NONE;
 
-  /* REPLACE Read input from encoder 1
-  e1value += encoder1->getValue();
+   //REPLACE Read input from encoder 1
+   e1value += encoder1.readEncoder();
 
   if (e1value != e1last)
   {
@@ -305,18 +312,10 @@ byte getUserInput()
   }
 
   // Check if button on encoder 1 is clicked
-  button1 = encoder1->getButton();
-  switch (button1)
-  {
-  case ClickEncoder::Clicked:
-    receivedInput = KEY_SELECT;
-    break;
-  default:
-    break;
-  }
+  if(encoder1.isEncoderButtonClicked()) receivedInput = KEY_SELECT;
 
   // Read input from encoder 2
-  e2value += encoder2->getValue();
+  e2value += encoder2.readEncoder();
 
   if (e2value != e2last)
   {
@@ -328,64 +327,52 @@ byte getUserInput()
   }
 
   // Check if button on encoder 2 is clicked
-  button2 = encoder2->getButton();
-  switch (button2)
-  {
-  case ClickEncoder::Clicked:
-    receivedInput = KEY_BACK;
-    break;
-  case ClickEncoder::DoubleClicked:
-    receivedInput = KEY_ONOFF;
-    break;
-  default:
-    break;
-  }
+  if(encoder2.isEncoderButtonClicked()) receivedInput = KEY_BACK;
+  
 
   // Check if any input from the IR remote
-  if (IRLremote.available())
+  if (irmp_get_data(&irmp_data))
   {
-    // Get the new data from the remote
-    auto data = IRLremote.read();
-
+    
     //Often the IR remote is to sensitive, reset reading if its to fast, but only if IR code is not REPEAT
-    if (millis() - mil_LastUserInput < 100 && (data.address != Settings.IR_REPEAT.address && data.command != Settings.IR_REPEAT.command)) {
-      data.address = 0;
-      data.command = 0;
+    if (millis() - mil_LastUserInput < 100 && (irmp_data.address != Settings.IR_REPEAT.address && irmp_data.command != Settings.IR_REPEAT.command)) {
+      irmp_data.address = 0;
+      irmp_data.command = 0;
       receivedInput = KEY_NONE;
     }
     else
     // Map the received IR input to UserInput values
-    if (data.address == Settings.IR_UP.address && data.command == Settings.IR_UP.command)
+    if (irmp_data.address == Settings.IR_UP.address && irmp_data.command == Settings.IR_UP.command)
       receivedInput = KEY_UP;
-    else if (data.address == Settings.IR_DOWN.address && data.command == Settings.IR_DOWN.command)
+    else if (irmp_data.address == Settings.IR_DOWN.address && irmp_data.command == Settings.IR_DOWN.command)
       receivedInput = KEY_DOWN;
-    else if (data.address == Settings.IR_LEFT.address && data.command == Settings.IR_LEFT.command)
+    else if (irmp_data.address == Settings.IR_LEFT.address && irmp_data.command == Settings.IR_LEFT.command)
       receivedInput = KEY_LEFT;
-    else if (data.address == Settings.IR_RIGHT.address && data.command == Settings.IR_RIGHT.command)
+    else if (irmp_data.address == Settings.IR_RIGHT.address && irmp_data.command == Settings.IR_RIGHT.command)
       receivedInput = KEY_RIGHT;
-    else if (data.address == Settings.IR_SELECT.address && data.command == Settings.IR_SELECT.command)
+    else if (irmp_data.address == Settings.IR_SELECT.address && irmp_data.command == Settings.IR_SELECT.command)
       receivedInput = KEY_SELECT;
-    else if (data.address == Settings.IR_BACK.address && data.command == Settings.IR_BACK.command)
+    else if (irmp_data.address == Settings.IR_BACK.address && irmp_data.command == Settings.IR_BACK.command)
       receivedInput = KEY_BACK;
-    else if (data.address == Settings.IR_MUTE.address && data.command == Settings.IR_MUTE.command)
+    else if (irmp_data.address == Settings.IR_MUTE.address && irmp_data.command == Settings.IR_MUTE.command)
       receivedInput = KEY_MUTE;
-    else if (data.address == Settings.IR_ONOFF.address && data.command == Settings.IR_ONOFF.command)
+    else if (irmp_data.address == Settings.IR_ONOFF.address && irmp_data.command == Settings.IR_ONOFF.command)
       receivedInput = KEY_ONOFF;
-    else if (data.address == Settings.IR_1.address && data.command == Settings.IR_1.command)
+    else if (irmp_data.address == Settings.IR_1.address && irmp_data.command == Settings.IR_1.command)
       receivedInput = KEY_1;
-    else if (data.address == Settings.IR_2.address && data.command == Settings.IR_2.command)
+    else if (irmp_data.address == Settings.IR_2.address && irmp_data.command == Settings.IR_2.command)
       receivedInput = KEY_2;
-    else if (data.address == Settings.IR_3.address && data.command == Settings.IR_3.command)
+    else if (irmp_data.address == Settings.IR_3.address && irmp_data.command == Settings.IR_3.command)
       receivedInput = KEY_3;
-    else if (data.address == Settings.IR_4.address && data.command == Settings.IR_4.command)
+    else if (irmp_data.address == Settings.IR_4.address && irmp_data.command == Settings.IR_4.command)
       receivedInput = KEY_4;
-    else if (data.address == Settings.IR_5.address && data.command == Settings.IR_5.command)
+    else if (irmp_data.address == Settings.IR_5.address && irmp_data.command == Settings.IR_5.command)
       receivedInput = KEY_5;
-    else if (data.address == Settings.IR_6.address && data.command == Settings.IR_6.command)
+    else if (irmp_data.address == Settings.IR_6.address && irmp_data.command == Settings.IR_6.command)
       receivedInput = KEY_6;
-    else if (data.address == Settings.IR_PREVIOUS.address && data.command == Settings.IR_PREVIOUS.command)
+    else if (irmp_data.address == Settings.IR_PREVIOUS.address && irmp_data.command == Settings.IR_PREVIOUS.command)
       receivedInput = KEY_PREVIOUS;
-    else if (data.address == Settings.IR_REPEAT.address && data.command == Settings.IR_REPEAT.command)
+    else if (irmp_data.address == Settings.IR_REPEAT.address && irmp_data.command == Settings.IR_REPEAT.command)
     {
       receivedInput = KEY_REPEAT;
       if (lastReceivedInput == KEY_UP)
@@ -395,7 +382,7 @@ byte getUserInput()
     }
     lastReceivedInput = receivedInput;
   }
-*/
+
   // Cancel received KEY_ONOFF if it has been received before within the last 5 seconds
   if (receivedInput == KEY_ONOFF)
   {
@@ -459,10 +446,11 @@ void setup()
   Wire.begin();
   relayController.begin();
 
-  setupRotaryEncoders();
-  //REPLACE IRLremote.begin(pinIR);
   muses.begin();
   oled.begin();
+
+  //Start IR reader
+  irmp_init();
 
   startUp();
 }
@@ -1951,13 +1939,13 @@ bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const 
   return result;
 }
 
-bool editIRCode(HashIR_data_t &Value)
+bool editIRCode(IRMP_DATA &Value)
 {
   bool complete = false;
   bool result = false;
   char nameBuf[11];
 
-  HashIR_data_t NewValue, OldValue;
+  IRMP_DATA NewValue, OldValue;
   NewValue.address = 0;
   NewValue.command = 0;
 
@@ -2034,37 +2022,37 @@ void setSettingsToDefault()
   Settings.MuteLevel = 0;
   Settings.RecallSetLevel = true;
   Settings.IR_UP.address = 0x24;
-  Settings.IR_UP.command = 0x3AEA5A5F;
+  Settings.IR_UP.command = 0x0;
   Settings.IR_DOWN.address = 0x24;
-  Settings.IR_DOWN.command = 0xE64E6057;
+  Settings.IR_DOWN.command = 0x0;
   Settings.IR_REPEAT.address = 0x00;
   Settings.IR_REPEAT.command = 0x00;
   Settings.IR_LEFT.address = 0x24;
-  Settings.IR_LEFT.command = 0x4C7A8423;
+  Settings.IR_LEFT.command = 0x0;
   Settings.IR_RIGHT.address = 0x24;
-  Settings.IR_RIGHT.command = 0xA1167E2B;
+  Settings.IR_RIGHT.command = 0x0;
   Settings.IR_SELECT.address = 0x24;
-  Settings.IR_SELECT.command = 0x91998CA3;
+  Settings.IR_SELECT.command = 0x0;
   Settings.IR_BACK.address = 0x24;
-  Settings.IR_BACK.command = 0xE28395C7;
+  Settings.IR_BACK.command = 0x0;
   Settings.IR_MUTE.address = 0x24;
-  Settings.IR_MUTE.command = 0x41C09D23;
+  Settings.IR_MUTE.command = 0x0;
   Settings.IR_PREVIOUS.address = 0x24;
-  Settings.IR_PREVIOUS.command = 0x5A3E996B;
+  Settings.IR_PREVIOUS.command = 0x0;
   Settings.IR_ONOFF.address = 0x24;
-  Settings.IR_ONOFF.command = 0x41D976CF;
+  Settings.IR_ONOFF.command = 0x0;
   Settings.IR_1.address = 0x24;
-  Settings.IR_1.command = 0xC43587C7;
+  Settings.IR_1.command = 0x0;
   Settings.IR_2.address = 0x24;
-  Settings.IR_2.command = 0x6F998DBF;
+  Settings.IR_2.command = 0x0;
   Settings.IR_3.address = 0x24;
-  Settings.IR_3.command = 0xB9947A73;
+  Settings.IR_3.command = 0x0;
   Settings.IR_4.address = 0x24;
-  Settings.IR_4.command = 0x64F8806B;
+  Settings.IR_4.command = 0x0;
   Settings.IR_5.address = 0x24;
-  Settings.IR_5.command = 0x1FC09E3F;
+  Settings.IR_5.command = 0x0;
   Settings.IR_6.address = 0x24;
-  Settings.IR_6.command = 0xCB24A437;
+  Settings.IR_6.command = 0x0;
   Settings.Input[0].Active = INPUT_NORMAL;
   strcpy(Settings.Input[0].Name, "Input 1   ");
   Settings.Input[0].MaxVol = Settings.VolumeSteps;
