@@ -52,7 +52,7 @@ static inline data_t volume_to_attenuation(volume_t volume)
 	// |    0.0 dB | in: [  0] -> 0b00010000 |
 	// | -111.5 dB | in: [223] -> 0b11101111 |
 	// #=====================================#
-	return static_cast<data_t>(min(-volume, 223) + 0x10);
+	return static_cast<data_t>(std::min((int)-volume, 223) + 0x10);
 }
 
 static inline data_t volume_to_gain(volume_t gain)
@@ -62,7 +62,7 @@ static inline data_t volume_to_gain(volume_t gain)
 	// |     0 dB | in: [ 0] -> 0b00000000 |
 	// | +31.5 dB | in: [63] -> 0b01111111 |
 	// #===================================#
-	return static_cast<data_t>(min(gain, 63));
+	return static_cast<data_t>(std::min((int)gain, 63));
 }
 
 Self::Muses72320(address_t chip_address) :
