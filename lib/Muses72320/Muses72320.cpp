@@ -42,7 +42,7 @@ static const data_t s_state_bit_zero_crossing = 5;
 static const data_t s_state_bit_gain          = 6;
 static const data_t s_state_bit_attenuation   = 7;
 
-static const int s_slave_select_pin = 10;
+static const int s_slave_select_pin = SS;
 static const SPISettings s_muses_spi_settings(250000, MSBFIRST, SPI_MODE2);
 
 static inline data_t volume_to_attenuation(volume_t volume)

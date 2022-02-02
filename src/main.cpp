@@ -34,7 +34,15 @@
 
 
 #include <irmpSelectMain15Protocols.h>  // This enables 15 main protocols
-#define IR_INPUT_PIN    2
+#define IR_INPUT_PIN    25
+#define NTC1_PIN 26
+#define NTC2_PIN 27
+#define ROTARY1_CW_PIN 36
+#define ROTARY1_CCW_PIN 39
+#define ROTARY1_SW_PIN 34
+#define ROTARY2_CW_PIN 35
+#define ROTARY2_CCW_PIN 32
+#define ROTARY2_SW_PIN 33
 
 //#define IRMP_SUPPORT_NEC_PROTOCOL        1 // this enables only one protocol
 
@@ -180,19 +188,12 @@ typedef union {
 
 myRuntimeSettings RuntimeSettings;
 
-
-AiEsp32RotaryEncoder encoder1 = AiEsp32RotaryEncoder(8, 7, 6, -1, ROTARY_ENCODER_STEPS);
-AiEsp32RotaryEncoder encoder2 = AiEsp32RotaryEncoder(5, 4, 3, -1, ROTARY_ENCODER_STEPS);
-
-
 // Setup Rotary encoders ------------------------------------------------------
 // REPLACE
-//ClickEncoder *encoder1 = new ClickEncoder(8, 7, 6, 4);
-//ClickEncoder::Button button1;
+AiEsp32RotaryEncoder encoder1 = AiEsp32RotaryEncoder(ROTARY1_CW_PIN, ROTARY1_CCW_PIN, ROTARY1_SW_PIN, -1, ROTARY_ENCODER_STEPS);
 long e1last, e1value;
 
-//ClickEncoder *encoder2 = new ClickEncoder(5, 4, 3, 4);
-//ClickEncoder::Button button2;
+AiEsp32RotaryEncoder encoder2 = AiEsp32RotaryEncoder(ROTARY2_CW_PIN, ROTARY2_CCW_PIN, ROTARY2_SW_PIN, -1, ROTARY_ENCODER_STEPS);
 long e2last, e2value;
 
 
@@ -439,8 +440,8 @@ byte getUserInput()
 void setup()
 {
   //REPLACE PINS
-  pinMode(10, INPUT);
-  pinMode(11, INPUT);
+  pinMode(NTC1_PIN, INPUT);
+  pinMode(NTC2_PIN, INPUT);
 
   //Serial.begin(115200);
   Wire.begin();
@@ -548,7 +549,7 @@ void setTrigger1On()
     }
     else // SmartON
     {
-      if (getTemperature(A0) < 0) // Check if device is powered off
+      if (getTemperature(NTC1_PIN) < 0) // Check if device is powered off
       {
         relayController.digitalWrite(6, HIGH);
         if (Settings.Trigger1Type == 0) // Momentary
@@ -577,7 +578,7 @@ void setTrigger2On()
     else // SmartON
     {
       // REPLACE PIN
-      if (getTemperature(11) < 0) // Check if device is powered off
+      if (getTemperature(NTC2_PIN) < 0) // Check if device is powered off
       {
         relayController.digitalWrite(7, HIGH);
         if (Settings.Trigger2Type == 0) // Momentary
@@ -606,7 +607,7 @@ void setTrigger1Off()
     else // SmartON
     {
       // REPLACE PIN
-      if (getTemperature(10) > 0) // Check if device is powered on
+      if (getTemperature(NTC1_PIN) > 0) // Check if device is powered on
       {
         if (Settings.Trigger1Type == 0) // Momentary
         {
@@ -635,7 +636,7 @@ void setTrigger2Off()
     else // SmartON
     {
       //REPLACE PIN
-      if (getTemperature(11) > 0) // Check if device is powered on
+      if (getTemperature(NTC2_PIN) > 0) // Check if device is powered on
       {
         if (Settings.Trigger2Type == 0) // Momentary
         {
@@ -784,7 +785,7 @@ void displayTemperatures()
   if (Settings.DisplayTemperature1)
   {
     //REPLACE PIN
-    float Temp = getTemperature(10);
+    float Temp = getTemperature(NTC1_PIN);
     float MaxTemp;
     if (Settings.Trigger1Temp == 0)
       MaxTemp = 60;
@@ -796,7 +797,7 @@ void displayTemperatures()
   if (Settings.DisplayTemperature2)
   {
     //REPLACE PIN
-    float Temp = getTemperature(11);
+    float Temp = getTemperature(NTC2_PIN);
     float MaxTemp;
     if (Settings.Trigger2Temp == 0)
       MaxTemp = 60;
@@ -934,7 +935,7 @@ void loop()
       {
         displayTemperatures();
         //REPLACE PIN
-        if (((Settings.Trigger1Temp != 0) && (getTemperature(10) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(11) >= Settings.Trigger2Temp)))
+        if (((Settings.Trigger1Temp != 0) && (getTemperature(NTC1_PIN) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(NTC2_PIN) >= Settings.Trigger2Temp)))
         {
           toStandbyMode();
           UIkey = KEY_NONE;
