@@ -8,7 +8,7 @@
 **
 */
 
-#define VERSION 0.94
+#define VERSION (float)0.95
 
 //#undef max
 //#define max(a,b) ((a)>(b)?(a):(b))
@@ -436,15 +436,43 @@ byte getUserInput()
   return (receivedInput);
 }
 
+void Scanner ()
+{
+  Serial.println ();
+  Serial.println ("I2C scanner. Scanning ...");
+  byte count = 0;
+
+  Wire.begin();
+  for (byte i = 8; i < 120; i++)
+  {
+    Wire.beginTransmission (i);          // Begin I2C transmission Address (i)
+    if (Wire.endTransmission () == 0)  // Receive 0 = success (ACK response) 
+    {
+      Serial.print ("Found address: ");
+      Serial.print (i, DEC);
+      Serial.print (" (0x");
+      Serial.print (i, HEX);     // PCF8574 7 bit address
+      Serial.println (")");
+      count++;
+    }
+  }
+  Serial.print ("Found ");      
+  Serial.print (count, DEC);        // numbers of devices
+  Serial.println (" device(s).");
+}
+
+
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
   //REPLACE PINS
-  pinMode(NTC1_PIN, INPUT);
-  pinMode(NTC2_PIN, INPUT);
+  //pinMode(NTC1_PIN, INPUT);
+  //pinMode(NTC2_PIN, INPUT);
 
-  //Serial.begin(115200);
+  Serial.begin(115200);
+  Serial.println("setup start");
   Wire.begin();
+  Scanner();
   relayController.begin();
 
   muses.begin();
@@ -458,8 +486,9 @@ void setup()
 
 void startUp()
 {
+  Serial.println("startUp start");
   oled.lcdOn();
-
+  Serial.println("startUp start 2");
   // Define all pins as OUTPUT and disable all relais
   for (byte pin = 0; pin <= 7; pin++)
   {
@@ -471,17 +500,20 @@ void startUp()
   readRuntimeSettingsFromEEPROM();
 
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
+  Serial.println(Settings.Version);
+  Serial.println(RuntimeSettings.Version);
   if ((Settings.Version != VERSION) || (RuntimeSettings.Version != VERSION))
   {
+    Serial.println("startUp start 2a");
     oled.clear();
     oled.setCursor(0, 0);
-    oled.print(F("Restoring default"));
+    oled.print("Restoring default");
     oled.setCursor(0, 1);
     oled.print(F("settings..."));
     delay(2000);
     writeDefaultSettingsToEEPROM();
   }
-
+  Serial.println("startUp start 3");
   // Settings read from EEPROM are read and are valid so let's move on!
   mil_On = millis();
   oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
