@@ -299,37 +299,43 @@ void toStandbyMode(void);
 byte getUserInput()
 {
   byte receivedInput = KEY_NONE;
-
-   //REPLACE Read input from encoder 1
-   e1value += encoder1.readEncoder();
-
-  if (e1value != e1last)
+  
+  // Read input from encoder 1
+  if(encoder1.encoderChanged())
   {
-    if (e1value > e1last)
-      receivedInput = KEY_UP;
-    if (e1value < e1last)
-      receivedInput = KEY_DOWN;
-    e1last = e1value;
-  }
+    //REPLACE Read input from encoder 1
+    e1value += encoder1.readEncoder();
 
-  // Check if button on encoder 1 is clicked
-  if(encoder1.isEncoderButtonClicked()) receivedInput = KEY_SELECT;
+    if (e1value != e1last)
+    {
+      if (e1value > e1last)
+        receivedInput = KEY_UP;
+      if (e1value < e1last)
+        receivedInput = KEY_DOWN;
+      e1last = e1value;
+    }
+
+    // Check if button on encoder 1 is clicked
+    if(encoder1.isEncoderButtonClicked()) receivedInput = KEY_SELECT;
+  }
 
   // Read input from encoder 2
-  e2value += encoder2.readEncoder();
-
-  if (e2value != e2last)
+  if(encoder2.encoderChanged())
   {
-    if (e2value > e2last)
-      receivedInput = KEY_RIGHT;
-    if (e2value < e2last)
-      receivedInput = KEY_LEFT;
-    e2last = e2value;
-  }
+    e2value += encoder2.readEncoder();
 
-  // Check if button on encoder 2 is clicked
-  if(encoder2.isEncoderButtonClicked()) receivedInput = KEY_BACK;
-  
+    if (e2value != e2last)
+    {
+      if (e2value > e2last)
+        receivedInput = KEY_RIGHT;
+      if (e2value < e2last)
+        receivedInput = KEY_LEFT;
+      e2last = e2value;
+    }
+
+    // Check if button on encoder 2 is clicked
+    if(encoder2.isEncoderButtonClicked()) receivedInput = KEY_BACK;
+  }
 
   // Check if any input from the IR remote
   if (irmp_get_data(&irmp_data))
@@ -436,6 +442,18 @@ byte getUserInput()
   return (receivedInput);
 }
 
+// CAG - 16.02.22 Start
+void IRAM_ATTR readEncoder1ISR()
+{
+	encoder1.readEncoder_ISR();
+}
+
+void IRAM_ATTR readEncoder2ISR()
+{
+	encoder2.readEncoder_ISR();
+}
+// CAG - 16.02.22 End
+
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
@@ -445,8 +463,15 @@ void setup()
 
   //Serial.begin(115200);
   Wire.begin();
-  relayController.begin();
+  
+  // CAG - 16.02.22 Start
+  encoder1.begin();
+  encoder1.setup(readEncoder1ISR);
+  encoder2.begin();
+  encoder2.setup(readEncoder2ISR);
+  // CAG - 16.02.22 end
 
+  relayController.begin();
   muses.begin();
   oled.begin();
 
@@ -471,7 +496,7 @@ void startUp()
   readRuntimeSettingsFromEEPROM();
 
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
-  if ((Settings.Version != VERSION) || (RuntimeSettings.Version != VERSION))
+  if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
   {
     oled.clear();
     oled.setCursor(0, 0);
