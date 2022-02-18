@@ -492,7 +492,7 @@ byte getUserInput()
     toStandbyMode();
   }
   
-  receivedInput = KEY_BACK
+  if(receivedInput == KEY_BACK) Serial.println("key_back");
   return (receivedInput);
 }
 
@@ -1067,7 +1067,7 @@ void loop()
 
     case APP_MENU_MODE:
     { // Brackets to avoid warning: "jump to case label [-fpermissive]"
-      byte menuMode = Menu1.handleNavigation(getNavAction, refreshMenuDisplay);
+      //byte menuMode = Menu1.handleNavigation(getNavAction, refreshMenuDisplay);
 
       if (menuMode == MENU_EXIT)
       {

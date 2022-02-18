@@ -156,7 +156,7 @@ unsigned char MenuManager::handleNavigation(unsigned char (*getNavAction)(), voi
 {
   unsigned char menuMode = MENU_REMAIN;
   unsigned char action = getNavAction();
-
+    
   if (action == MENU_ITEM_SELECT || action == MENU_BACK)      // enter menu item, or sub menu, or ascend to parent, or cancel.
   {
     if (getCurrentItemCmdId() == 0 || action == MENU_BACK)
