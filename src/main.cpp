@@ -8,7 +8,11 @@
 **
 */
 
+<<<<<<< HEAD
 #define VERSION (float)0.95
+=======
+#define VERSION 0.96
+>>>>>>> 7823a23bd58092a83cfa3e6d108c3667c10418c9
 
 //#undef max
 //#define max(a,b) ((a)>(b)?(a):(b))
@@ -27,22 +31,20 @@
 #include <MenuData.h>
 
 
-#include "AiEsp32RotaryEncoder.h"
-
-
+#include <ClickEncoder.h>
 #define ROTARY_ENCODER_STEPS 4
 
 
 #include <irmpSelectMain15Protocols.h>  // This enables 15 main protocols
-#define IR_INPUT_PIN    25
-#define NTC1_PIN 26
-#define NTC2_PIN 27
-#define ROTARY1_CW_PIN 36
-#define ROTARY1_CCW_PIN 39
-#define ROTARY1_SW_PIN 34
-#define ROTARY2_CW_PIN 35
-#define ROTARY2_CCW_PIN 32
-#define ROTARY2_SW_PIN 33
+#define IR_INPUT_PIN    32
+#define NTC1_PIN 36
+#define NTC2_PIN 39
+#define ROTARY2_CW_PIN 14
+#define ROTARY2_CCW_PIN 12
+#define ROTARY2_SW_PIN 13
+#define ROTARY1_CW_PIN 25
+#define ROTARY1_CCW_PIN 26
+#define ROTARY1_SW_PIN 27
 
 //#define IRMP_SUPPORT_NEC_PROTOCOL        1 // this enables only one protocol
 
@@ -190,12 +192,38 @@ myRuntimeSettings RuntimeSettings;
 
 // Setup Rotary encoders ------------------------------------------------------
 // REPLACE
-AiEsp32RotaryEncoder encoder1 = AiEsp32RotaryEncoder(ROTARY1_CW_PIN, ROTARY1_CCW_PIN, ROTARY1_SW_PIN, -1, ROTARY_ENCODER_STEPS);
-long e1last, e1value;
 
-AiEsp32RotaryEncoder encoder2 = AiEsp32RotaryEncoder(ROTARY2_CW_PIN, ROTARY2_CCW_PIN, ROTARY2_SW_PIN, -1, ROTARY_ENCODER_STEPS);
-long e2last, e2value;
+ClickEncoder *encoder1 = new ClickEncoder(ROTARY1_CW_PIN, ROTARY1_CCW_PIN, ROTARY1_SW_PIN, ROTARY_ENCODER_STEPS, LOW);
+ClickEncoder::Button button1;
+int16_t e1last, e1value;
 
+ClickEncoder *encoder2 = new ClickEncoder(ROTARY2_CW_PIN, ROTARY2_CCW_PIN, ROTARY2_SW_PIN, ROTARY_ENCODER_STEPS, LOW);
+ClickEncoder::Button button2;
+int16_t e2last, e2value;
+
+volatile int interruptCounter;
+int totalInterruptCounter;
+
+hw_timer_t * timer = NULL;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
+//https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
+void IRAM_ATTR timerIsr()
+{
+  encoder1->service();
+  encoder2->service();
+  portENTER_CRITICAL_ISR(&timerMux);
+  interruptCounter++;
+  portEXIT_CRITICAL_ISR(&timerMux);
+}
+
+void setupRotaryEncoders()
+{
+  timer = timerBegin(0,80,true);
+  timerAttachInterrupt(timer, &timerIsr, true);
+  timerAlarmWrite(timer,1000, true);
+  timerAlarmEnable(timer);
+}
 
 // Setup Muses72320 -----------------------------------------------------------
 Muses72320 muses(0);
@@ -298,10 +326,24 @@ void toStandbyMode(void);
 // Returns input from the user - enumerated to be the same value no matter if input is from encoders or IR remote
 byte getUserInput()
 {
-  byte receivedInput = KEY_NONE;
 
-   //REPLACE Read input from encoder 1
-   e1value += encoder1.readEncoder();
+    if (interruptCounter > 0) {
+ 
+      portENTER_CRITICAL(&timerMux);
+      interruptCounter--;
+      portEXIT_CRITICAL(&timerMux);
+  
+      totalInterruptCounter++;
+  
+      //Serial.print("An interrupt as occurred. Total number: ");
+      //Serial.println(totalInterruptCounter);
+  
+   }
+  
+  byte receivedInput = KEY_NONE;
+  
+  // Read input from encoder 1
+  e1value += encoder1->getValue();
 
   if (e1value != e1last)
   {
@@ -313,10 +355,19 @@ byte getUserInput()
   }
 
   // Check if button on encoder 1 is clicked
-  if(encoder1.isEncoderButtonClicked()) receivedInput = KEY_SELECT;
+  button1 = encoder1->getButton();
+  switch (button1)
+  {
+  case ClickEncoder::Clicked:
+    receivedInput = KEY_SELECT;
+    Serial.println("Encoder 1 - button");
+    break;
+  default:
+    break;
+  }
 
   // Read input from encoder 2
-  e2value += encoder2.readEncoder();
+  e2value += encoder2->getValue();
 
   if (e2value != e2last)
   {
@@ -328,8 +379,20 @@ byte getUserInput()
   }
 
   // Check if button on encoder 2 is clicked
-  if(encoder2.isEncoderButtonClicked()) receivedInput = KEY_BACK;
-  
+  button2 = encoder2->getButton();
+  switch (button2)
+  {
+  case ClickEncoder::Clicked:
+    receivedInput = KEY_BACK;
+    Serial.println("Encoder 2 - button");
+    break;
+  case ClickEncoder::DoubleClicked:
+    receivedInput = KEY_ONOFF;
+    Serial.println("Encoder 1 - button*2");
+    break;
+  default:
+    break;
+  }
 
   // Check if any input from the IR remote
   if (irmp_get_data(&irmp_data))
@@ -433,6 +496,7 @@ byte getUserInput()
     toStandbyMode();
   }
   
+  receivedInput = KEY_BACK
   return (receivedInput);
 }
 
@@ -465,16 +529,24 @@ void Scanner ()
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
+
+  Serial.begin(115200);
+  Serial.println("Setup()");
+  Wire.begin();
+  
+  setupRotaryEncoders();
   //REPLACE PINS
   //pinMode(NTC1_PIN, INPUT);
   //pinMode(NTC2_PIN, INPUT);
 
+<<<<<<< HEAD
   Serial.begin(115200);
   Serial.println("setup start");
   Wire.begin();
   Scanner();
+=======
+>>>>>>> 7823a23bd58092a83cfa3e6d108c3667c10418c9
   relayController.begin();
-
   muses.begin();
   oled.begin();
 
@@ -500,9 +572,13 @@ void startUp()
   readRuntimeSettingsFromEEPROM();
 
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
+<<<<<<< HEAD
   Serial.println(Settings.Version);
   Serial.println(RuntimeSettings.Version);
   if ((Settings.Version != VERSION) || (RuntimeSettings.Version != VERSION))
+=======
+  if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
+>>>>>>> 7823a23bd58092a83cfa3e6d108c3667c10418c9
   {
     Serial.println("startUp start 2a");
     oled.clear();
@@ -936,7 +1012,7 @@ float getTemperature(uint8_t pinNmbr)
 void loop()
 {
   UIkey = getUserInput();
-
+  
   // Detect power off
   // If low power is detected the RuntimeSettings are written to EEPROM. We only write these data when power down is detected to avoid to write to the EEPROM every time the volume or input is changed (an EEPROM has a limited lifetime of about 100000 write cycles)
   /* REPLACE
@@ -2113,13 +2189,13 @@ void setSettingsToDefault()
   Settings.Trigger1Active = 1;
   Settings.Trigger1Type = 0;
   Settings.Trigger1Mode = 1;
-  Settings.Trigger1OnDelay = 10;
-  Settings.Trigger1Temp = 60;
+  Settings.Trigger1OnDelay = 0;
+  Settings.Trigger1Temp = 0;
   Settings.Trigger2Active = 1;
   Settings.Trigger2Type = 0;
   Settings.Trigger2Mode = 1;
-  Settings.Trigger2OnDelay = 10;
-  Settings.Trigger2Temp = 60;
+  Settings.Trigger2OnDelay = 0;
+  Settings.Trigger2Temp = 00;
   Settings.TriggerInactOffTimer = 0;
   Settings.ScreenSaverActive = true;
   Settings.DisplayOnLevel = 3;
