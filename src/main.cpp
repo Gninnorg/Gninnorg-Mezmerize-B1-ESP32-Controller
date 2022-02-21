@@ -8,11 +8,7 @@
 **
 */
 
-<<<<<<< HEAD
-#define VERSION (float)0.95
-=======
-#define VERSION 0.96
->>>>>>> 7823a23bd58092a83cfa3e6d108c3667c10418c9
+#define VERSION (float)0.96
 
 //#undef max
 //#define max(a,b) ((a)>(b)?(a):(b))
@@ -29,7 +25,6 @@
 #include <Muses72320.h>
 #include <MenuManager.h>
 #include <MenuData.h>
-
 
 #include <ClickEncoder.h>
 #define ROTARY_ENCODER_STEPS 4
@@ -259,6 +254,7 @@ enum AppModeValues
 byte appMode = APP_NORMAL_MODE;
 
 MenuManager Menu1(ctlMenu_Root, menuCount(ctlMenu_Root));
+byte menuMode = 0;
 
 // Return null terminated string containing a specific number (count) of specified character (chr) ---
 char *padc(char chr, unsigned char count)
@@ -539,13 +535,6 @@ void setup()
   //pinMode(NTC1_PIN, INPUT);
   //pinMode(NTC2_PIN, INPUT);
 
-<<<<<<< HEAD
-  Serial.begin(115200);
-  Serial.println("setup start");
-  Wire.begin();
-  Scanner();
-=======
->>>>>>> 7823a23bd58092a83cfa3e6d108c3667c10418c9
   relayController.begin();
   muses.begin();
   oled.begin();
@@ -572,13 +561,7 @@ void startUp()
   readRuntimeSettingsFromEEPROM();
 
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
-<<<<<<< HEAD
-  Serial.println(Settings.Version);
-  Serial.println(RuntimeSettings.Version);
-  if ((Settings.Version != VERSION) || (RuntimeSettings.Version != VERSION))
-=======
   if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
->>>>>>> 7823a23bd58092a83cfa3e6d108c3667c10418c9
   {
     Serial.println("startUp start 2a");
     oled.clear();
