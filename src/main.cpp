@@ -1,6 +1,6 @@
 /*
 **
-**    Controller for Mezmerize B1 Buffer using Muses72320 potentiometer 
+**    Controller for Mezmerize B1 Buffer using Muses72320 potentiometer
 **
 **    Copyright (c) 2020 Carsten Grønning, Jan Abkjer Tofft
 **
@@ -15,7 +15,7 @@
 
 #undef min
 #ifndef min
-#define min(a,b) ((a)<(b)?(a):(b))
+#define min(a, b) ((a) < (b) ? (a) : (b))
 #endif // min
 
 #include <Wire.h>
@@ -29,9 +29,8 @@
 #include <ClickEncoder.h>
 #define ROTARY_ENCODER_STEPS 4
 
-
-#include <irmpSelectMain15Protocols.h>  // This enables 15 main protocols
-#define IR_INPUT_PIN    32
+#include <irmpSelectMain15Protocols.h> // This enables 15 main protocols
+#define IR_INPUT_PIN 32
 #define NTC1_PIN 36
 #define NTC2_PIN 39
 #define ROTARY2_CW_PIN 14
@@ -44,7 +43,6 @@
 //#define IRMP_SUPPORT_NEC_PROTOCOL        1 // this enables only one protocol
 
 #include <irmp.hpp>
-
 
 // Declarations
 void startUp(void);
@@ -116,32 +114,33 @@ struct InputSettings
 // The settings can be changed from the menu and the user can also chose to reset to default values if something goes wrong
 // On startup of the controller it is checked if the EEPROM contains valid data by checking if the Version field equals the VERSION defined by the source code. If they are not the same default values will be written to EEPROM
 // This is created as a union to be able to serialize/deserialize the data when writing and reading to/from the EEPROM
-typedef union {
+typedef union
+{
   struct
   {
-    byte VolumeSteps;              // The number of steps of the volume control
-    byte MinAttenuation;           // Minimum attenuation in -dB (as 0 db equals no attenuation this is equal to the highest volume allowed)
-    byte MaxAttenuation;           // Maximum attenuation in -dB (as -111.5 db is the limit of the Muses72320 this is equal to the lowest volume possible). We only keep this setting as a positive number, and we do also only allow the user to set the value in 1 dB steps
-    byte MaxStartVolume;           // If StoreSetLevel is true, then limit the volume to the specified value when the controller is powered on
-    byte MuteLevel;                // The level to be set when Mute is activated by the user. The Mute function of the Muses72320 is activated if 0 is specified
-    byte RecallSetLevel;           // Remember/store the volume level for each separate input
-    
-    IRMP_DATA IR_ONOFF;        // IR data to be interpreted as ON/OFF - switch between running and suspend mode (and turn triggers off)
-    IRMP_DATA IR_UP;           // IR data to be interpreted as UP
-    IRMP_DATA IR_DOWN;         // IR data to be interpreted as DOWN
-    IRMP_DATA IR_REPEAT;       // IR data to be interpreted as REPEAT (ie Apple remotes sends a specific code, if a key is held down to indicate repeat of the previously sent code
-    IRMP_DATA IR_LEFT;         // IR data to be interpreted as LEFT
-    IRMP_DATA IR_RIGHT;        // IR data to be interpreted as RIGHT
-    IRMP_DATA IR_SELECT;       // IR data to be interpreted as SELECT
-    IRMP_DATA IR_BACK;         // IR data to be interpreted as BACK
-    IRMP_DATA IR_MUTE;         // IR data to be interpreted as MUTE
-    IRMP_DATA IR_PREVIOUS;     // IR data to be interpreted as "switch to previous selected input"
-    IRMP_DATA IR_1;            // IR data to be interpreted as 1 (to select input 1 directly)
-    IRMP_DATA IR_2;            // IR data to be interpreted as 2
-    IRMP_DATA IR_3;            // IR data to be interpreted as 3
-    IRMP_DATA IR_4;            // IR data to be interpreted as 4
-    IRMP_DATA IR_5;            // IR data to be interpreted as 5
-    IRMP_DATA IR_6;            // IR data to be interpreted as 6
+    byte VolumeSteps;    // The number of steps of the volume control
+    byte MinAttenuation; // Minimum attenuation in -dB (as 0 db equals no attenuation this is equal to the highest volume allowed)
+    byte MaxAttenuation; // Maximum attenuation in -dB (as -111.5 db is the limit of the Muses72320 this is equal to the lowest volume possible). We only keep this setting as a positive number, and we do also only allow the user to set the value in 1 dB steps
+    byte MaxStartVolume; // If StoreSetLevel is true, then limit the volume to the specified value when the controller is powered on
+    byte MuteLevel;      // The level to be set when Mute is activated by the user. The Mute function of the Muses72320 is activated if 0 is specified
+    byte RecallSetLevel; // Remember/store the volume level for each separate input
+
+    IRMP_DATA IR_ONOFF;            // IR data to be interpreted as ON/OFF - switch between running and suspend mode (and turn triggers off)
+    IRMP_DATA IR_UP;               // IR data to be interpreted as UP
+    IRMP_DATA IR_DOWN;             // IR data to be interpreted as DOWN
+    IRMP_DATA IR_REPEAT;           // IR data to be interpreted as REPEAT (ie Apple remotes sends a specific code, if a key is held down to indicate repeat of the previously sent code
+    IRMP_DATA IR_LEFT;             // IR data to be interpreted as LEFT
+    IRMP_DATA IR_RIGHT;            // IR data to be interpreted as RIGHT
+    IRMP_DATA IR_SELECT;           // IR data to be interpreted as SELECT
+    IRMP_DATA IR_BACK;             // IR data to be interpreted as BACK
+    IRMP_DATA IR_MUTE;             // IR data to be interpreted as MUTE
+    IRMP_DATA IR_PREVIOUS;         // IR data to be interpreted as "switch to previous selected input"
+    IRMP_DATA IR_1;                // IR data to be interpreted as 1 (to select input 1 directly)
+    IRMP_DATA IR_2;                // IR data to be interpreted as 2
+    IRMP_DATA IR_3;                // IR data to be interpreted as 3
+    IRMP_DATA IR_4;                // IR data to be interpreted as 4
+    IRMP_DATA IR_5;                // IR data to be interpreted as 5
+    IRMP_DATA IR_6;                // IR data to be interpreted as 6
     struct InputSettings Input[6]; // Settings for all 6 inputs
     byte Trigger1Active;           // 0 = the trigger is not active, 1 = the trigger is active
     byte Trigger1Type;             // 0 = momentary, 1 = latching
@@ -170,7 +169,8 @@ typedef union {
 mySettings Settings; // Holds all the current settings
 void setSettingsToDefault(void);
 
-typedef union {
+typedef union
+{
   struct
   {
     byte CurrentInput;      // The number of the currently set input
@@ -199,10 +199,10 @@ int16_t e2last, e2value;
 volatile int interruptCounter;
 int totalInterruptCounter;
 
-hw_timer_t * timer = NULL;
+hw_timer_t *timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
-//https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
+// https://techtutorialsx.com/2017/10/07/esp32-arduino-timer-interrupts/
 void IRAM_ATTR timerIsr()
 {
   encoder1->service();
@@ -214,9 +214,9 @@ void IRAM_ATTR timerIsr()
 
 void setupRotaryEncoders()
 {
-  timer = timerBegin(0,80,true);
+  timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &timerIsr, true);
-  timerAlarmWrite(timer,1000, true);
+  timerAlarmWrite(timer, 1000, true);
   timerAlarmEnable(timer);
 }
 
@@ -254,7 +254,6 @@ enum AppModeValues
 byte appMode = APP_NORMAL_MODE;
 
 MenuManager Menu1(ctlMenu_Root, menuCount(ctlMenu_Root));
-byte menuMode = 0;
 
 // Return null terminated string containing a specific number (count) of specified character (chr) ---
 char *padc(char chr, unsigned char count)
@@ -323,21 +322,21 @@ void toStandbyMode(void);
 byte getUserInput()
 {
 
-    if (interruptCounter > 0) {
- 
-      portENTER_CRITICAL(&timerMux);
-      interruptCounter--;
-      portEXIT_CRITICAL(&timerMux);
-  
-      totalInterruptCounter++;
-  
-      //Serial.print("An interrupt as occurred. Total number: ");
-      //Serial.println(totalInterruptCounter);
-  
-   }
-  
+  if (interruptCounter > 0)
+  {
+
+    portENTER_CRITICAL(&timerMux);
+    interruptCounter--;
+    portEXIT_CRITICAL(&timerMux);
+
+    totalInterruptCounter++;
+
+    // Serial.print("An interrupt as occurred. Total number: ");
+    // Serial.println(totalInterruptCounter);
+  }
+
   byte receivedInput = KEY_NONE;
-  
+
   // Read input from encoder 1
   e1value += encoder1->getValue();
 
@@ -393,53 +392,54 @@ byte getUserInput()
   // Check if any input from the IR remote
   if (irmp_get_data(&irmp_data))
   {
-    
-    //Often the IR remote is to sensitive, reset reading if its to fast, but only if IR code is not REPEAT
-    if (millis() - mil_LastUserInput < 100 && (irmp_data.address != Settings.IR_REPEAT.address && irmp_data.command != Settings.IR_REPEAT.command)) {
+
+    // Often the IR remote is to sensitive, reset reading if its to fast, but only if IR code is not REPEAT
+    if (millis() - mil_LastUserInput < 100 && (irmp_data.address != Settings.IR_REPEAT.address && irmp_data.command != Settings.IR_REPEAT.command))
+    {
       irmp_data.address = 0;
       irmp_data.command = 0;
       receivedInput = KEY_NONE;
     }
     else
-    // Map the received IR input to UserInput values
-    if (irmp_data.address == Settings.IR_UP.address && irmp_data.command == Settings.IR_UP.command)
-      receivedInput = KEY_UP;
-    else if (irmp_data.address == Settings.IR_DOWN.address && irmp_data.command == Settings.IR_DOWN.command)
-      receivedInput = KEY_DOWN;
-    else if (irmp_data.address == Settings.IR_LEFT.address && irmp_data.command == Settings.IR_LEFT.command)
-      receivedInput = KEY_LEFT;
-    else if (irmp_data.address == Settings.IR_RIGHT.address && irmp_data.command == Settings.IR_RIGHT.command)
-      receivedInput = KEY_RIGHT;
-    else if (irmp_data.address == Settings.IR_SELECT.address && irmp_data.command == Settings.IR_SELECT.command)
-      receivedInput = KEY_SELECT;
-    else if (irmp_data.address == Settings.IR_BACK.address && irmp_data.command == Settings.IR_BACK.command)
-      receivedInput = KEY_BACK;
-    else if (irmp_data.address == Settings.IR_MUTE.address && irmp_data.command == Settings.IR_MUTE.command)
-      receivedInput = KEY_MUTE;
-    else if (irmp_data.address == Settings.IR_ONOFF.address && irmp_data.command == Settings.IR_ONOFF.command)
-      receivedInput = KEY_ONOFF;
-    else if (irmp_data.address == Settings.IR_1.address && irmp_data.command == Settings.IR_1.command)
-      receivedInput = KEY_1;
-    else if (irmp_data.address == Settings.IR_2.address && irmp_data.command == Settings.IR_2.command)
-      receivedInput = KEY_2;
-    else if (irmp_data.address == Settings.IR_3.address && irmp_data.command == Settings.IR_3.command)
-      receivedInput = KEY_3;
-    else if (irmp_data.address == Settings.IR_4.address && irmp_data.command == Settings.IR_4.command)
-      receivedInput = KEY_4;
-    else if (irmp_data.address == Settings.IR_5.address && irmp_data.command == Settings.IR_5.command)
-      receivedInput = KEY_5;
-    else if (irmp_data.address == Settings.IR_6.address && irmp_data.command == Settings.IR_6.command)
-      receivedInput = KEY_6;
-    else if (irmp_data.address == Settings.IR_PREVIOUS.address && irmp_data.command == Settings.IR_PREVIOUS.command)
-      receivedInput = KEY_PREVIOUS;
-    else if (irmp_data.address == Settings.IR_REPEAT.address && irmp_data.command == Settings.IR_REPEAT.command)
-    {
-      receivedInput = KEY_REPEAT;
-      if (lastReceivedInput == KEY_UP)
+      // Map the received IR input to UserInput values
+      if (irmp_data.address == Settings.IR_UP.address && irmp_data.command == Settings.IR_UP.command)
         receivedInput = KEY_UP;
-      else if (lastReceivedInput == KEY_DOWN)
+      else if (irmp_data.address == Settings.IR_DOWN.address && irmp_data.command == Settings.IR_DOWN.command)
         receivedInput = KEY_DOWN;
-    }
+      else if (irmp_data.address == Settings.IR_LEFT.address && irmp_data.command == Settings.IR_LEFT.command)
+        receivedInput = KEY_LEFT;
+      else if (irmp_data.address == Settings.IR_RIGHT.address && irmp_data.command == Settings.IR_RIGHT.command)
+        receivedInput = KEY_RIGHT;
+      else if (irmp_data.address == Settings.IR_SELECT.address && irmp_data.command == Settings.IR_SELECT.command)
+        receivedInput = KEY_SELECT;
+      else if (irmp_data.address == Settings.IR_BACK.address && irmp_data.command == Settings.IR_BACK.command)
+        receivedInput = KEY_BACK;
+      else if (irmp_data.address == Settings.IR_MUTE.address && irmp_data.command == Settings.IR_MUTE.command)
+        receivedInput = KEY_MUTE;
+      else if (irmp_data.address == Settings.IR_ONOFF.address && irmp_data.command == Settings.IR_ONOFF.command)
+        receivedInput = KEY_ONOFF;
+      else if (irmp_data.address == Settings.IR_1.address && irmp_data.command == Settings.IR_1.command)
+        receivedInput = KEY_1;
+      else if (irmp_data.address == Settings.IR_2.address && irmp_data.command == Settings.IR_2.command)
+        receivedInput = KEY_2;
+      else if (irmp_data.address == Settings.IR_3.address && irmp_data.command == Settings.IR_3.command)
+        receivedInput = KEY_3;
+      else if (irmp_data.address == Settings.IR_4.address && irmp_data.command == Settings.IR_4.command)
+        receivedInput = KEY_4;
+      else if (irmp_data.address == Settings.IR_5.address && irmp_data.command == Settings.IR_5.command)
+        receivedInput = KEY_5;
+      else if (irmp_data.address == Settings.IR_6.address && irmp_data.command == Settings.IR_6.command)
+        receivedInput = KEY_6;
+      else if (irmp_data.address == Settings.IR_PREVIOUS.address && irmp_data.command == Settings.IR_PREVIOUS.command)
+        receivedInput = KEY_PREVIOUS;
+      else if (irmp_data.address == Settings.IR_REPEAT.address && irmp_data.command == Settings.IR_REPEAT.command)
+      {
+        receivedInput = KEY_REPEAT;
+        if (lastReceivedInput == KEY_UP)
+          receivedInput = KEY_UP;
+        else if (lastReceivedInput == KEY_DOWN)
+          receivedInput = KEY_DOWN;
+      }
     lastReceivedInput = receivedInput;
   }
 
@@ -491,36 +491,36 @@ byte getUserInput()
     appMode = APP_STANDBY_MODE;
     toStandbyMode();
   }
-  
-  if(receivedInput == KEY_BACK) Serial.println("key_back");
+
+  if (receivedInput == KEY_BACK)
+    Serial.println("key_back");
   return (receivedInput);
 }
 
-void Scanner ()
+void Scanner()
 {
-  Serial.println ();
-  Serial.println ("I2C scanner. Scanning ...");
+  Serial.println();
+  Serial.println("I2C scanner. Scanning ...");
   byte count = 0;
 
   Wire.begin();
   for (byte i = 8; i < 120; i++)
   {
-    Wire.beginTransmission (i);          // Begin I2C transmission Address (i)
-    if (Wire.endTransmission () == 0)  // Receive 0 = success (ACK response) 
+    Wire.beginTransmission(i);       // Begin I2C transmission Address (i)
+    if (Wire.endTransmission() == 0) // Receive 0 = success (ACK response)
     {
-      Serial.print ("Found address: ");
-      Serial.print (i, DEC);
-      Serial.print (" (0x");
-      Serial.print (i, HEX);     // PCF8574 7 bit address
-      Serial.println (")");
+      Serial.print("Found address: ");
+      Serial.print(i, DEC);
+      Serial.print(" (0x");
+      Serial.print(i, HEX); // PCF8574 7 bit address
+      Serial.println(")");
       count++;
     }
   }
-  Serial.print ("Found ");      
-  Serial.print (count, DEC);        // numbers of devices
-  Serial.println (" device(s).");
+  Serial.print("Found ");
+  Serial.print(count, DEC); // numbers of devices
+  Serial.println(" device(s).");
 }
-
 
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
@@ -529,17 +529,17 @@ void setup()
   Serial.begin(115200);
   Serial.println("Setup()");
   Wire.begin();
-  
+
   setupRotaryEncoders();
-  //REPLACE PINS
-  //pinMode(NTC1_PIN, INPUT);
-  //pinMode(NTC2_PIN, INPUT);
+  // REPLACE PINS
+  // pinMode(NTC1_PIN, INPUT);
+  // pinMode(NTC2_PIN, INPUT);
 
   relayController.begin();
   muses.begin();
   oled.begin();
 
-  //Start IR reader
+  // Start IR reader
   irmp_init();
 
   startUp();
@@ -726,7 +726,7 @@ void setTrigger2Off()
     }
     else // SmartON
     {
-      //REPLACE PIN
+      // REPLACE PIN
       if (getTemperature(NTC2_PIN) > 0) // Check if device is powered on
       {
         if (Settings.Trigger2Type == 0) // Momentary
@@ -742,14 +742,14 @@ void setTrigger2Off()
 
 uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
 {
-  //Serial.print("Antal steps: "); Serial.println(steps);
-  //Serial.print("Valgt steps: "); Serial.println(selStep);
-  //Serial.print("Min dB: "); Serial.println(min_dB);
-  //Serial.print("Max dB: "); Serial.println(max_dB);
+  // Serial.print("Antal steps: "); Serial.println(steps);
+  // Serial.print("Valgt steps: "); Serial.println(selStep);
+  // Serial.print("Min dB: "); Serial.println(min_dB);
+  // Serial.print("Max dB: "); Serial.println(max_dB);
   uint8_t att_dB = max_dB - min_dB;
   float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
   uint8_t numberOfSmallSteps = (sizeOfLargeSteps * steps - att_dB) / (sizeOfLargeSteps / 2);
-  //Serial.print("Attenuation: "); Serial.println(min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * 2); 
+  // Serial.print("Attenuation: "); Serial.println(min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * 2);
   return min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * -2;
 }
 
@@ -830,32 +830,32 @@ void displayMute()
 }
 
 boolean setInput(uint8_t NewInput)
-{  
+{
   if (Settings.Input[NewInput].Active != INPUT_INACTIVATED && NewInput >= 0 && NewInput <= 5)
   {
-      if (!RuntimeSettings.Muted)
-        mute();
+    if (!RuntimeSettings.Muted)
+      mute();
 
-      //Unselect currently selected input
-      relayController.digitalWrite(RuntimeSettings.CurrentInput, LOW);
+    // Unselect currently selected input
+    relayController.digitalWrite(RuntimeSettings.CurrentInput, LOW);
 
-      // Save the currently selected input to enable switching between two inputs
-      RuntimeSettings.PrevSelectedInput = RuntimeSettings.CurrentInput;
+    // Save the currently selected input to enable switching between two inputs
+    RuntimeSettings.PrevSelectedInput = RuntimeSettings.CurrentInput;
 
-      //Select new input
-      RuntimeSettings.CurrentInput = NewInput;
-      relayController.digitalWrite(NewInput, HIGH);
+    // Select new input
+    RuntimeSettings.CurrentInput = NewInput;
+    relayController.digitalWrite(NewInput, HIGH);
 
-      if (Settings.RecallSetLevel)
-        RuntimeSettings.CurrentVolume = RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput];
-      else if (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MaxVol)
-        RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MaxVol;
-      else if (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MinVol)
-        RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol;
-      setVolume(RuntimeSettings.CurrentVolume);
-      if (RuntimeSettings.Muted)
-        unmute();
-      displayInput();
+    if (Settings.RecallSetLevel)
+      RuntimeSettings.CurrentVolume = RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput];
+    else if (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MaxVol)
+      RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MaxVol;
+    else if (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MinVol)
+      RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MinVol;
+    setVolume(RuntimeSettings.CurrentVolume);
+    if (RuntimeSettings.Muted)
+      unmute();
+    displayInput();
     return true;
   }
   return false;
@@ -875,7 +875,7 @@ void displayTemperatures()
 {
   if (Settings.DisplayTemperature1)
   {
-    //REPLACE PIN
+    // REPLACE PIN
     float Temp = getTemperature(NTC1_PIN);
     float MaxTemp;
     if (Settings.Trigger1Temp == 0)
@@ -887,7 +887,7 @@ void displayTemperatures()
 
   if (Settings.DisplayTemperature2)
   {
-    //REPLACE PIN
+    // REPLACE PIN
     float Temp = getTemperature(NTC2_PIN);
     float MaxTemp;
     if (Settings.Trigger2Temp == 0)
@@ -995,7 +995,7 @@ float getTemperature(uint8_t pinNmbr)
 void loop()
 {
   UIkey = getUserInput();
-  
+
   // Detect power off
   // If low power is detected the RuntimeSettings are written to EEPROM. We only write these data when power down is detected to avoid to write to the EEPROM every time the volume or input is changed (an EEPROM has a limited lifetime of about 100000 write cycles)
   /* REPLACE
@@ -1021,150 +1021,152 @@ void loop()
   */
   switch (appMode)
   {
-    case APP_NORMAL_MODE:
-      if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
+  case APP_NORMAL_MODE:
+    if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
+    {
+      displayTemperatures();
+      // REPLACE PIN
+      if (((Settings.Trigger1Temp != 0) && (getTemperature(NTC1_PIN) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(NTC2_PIN) >= Settings.Trigger2Temp)))
       {
-        displayTemperatures();
-        //REPLACE PIN
-        if (((Settings.Trigger1Temp != 0) && (getTemperature(NTC1_PIN) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(NTC2_PIN) >= Settings.Trigger2Temp)))
-        {
-          toStandbyMode();
-          UIkey = KEY_NONE;
-        }
+        toStandbyMode();
+        UIkey = KEY_NONE;
       }
-
-      switch (UIkey)
-      {
-        case KEY_NONE:
-          break;
-        case KEY_BACK:
-          appMode = APP_MENU_MODE;
-          menuIndex = 0;
-          refreshMenuDisplay(REFRESH_DESCEND);
-          break;
-        case KEY_UP:
-          // Turn volume up if we're not muted and we'll not exceed the maximum volume set for the currently selected input
-          if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MaxVol))
-            setVolume(RuntimeSettings.CurrentVolume + 1);
-          break;
-        case KEY_DOWN:
-          // Turn volume down if we're not muted and we'll not get below the minimum volume set for the currently selected input
-          if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MinVol))
-            setVolume(RuntimeSettings.CurrentVolume - 1);
-          break;
-        case KEY_LEFT:
-          {// add new code here
-            byte nextInput = (RuntimeSettings.CurrentInput == 0) ? 5 : RuntimeSettings.CurrentInput - 1;
-            while(!setInput(nextInput)) {
-              nextInput = (nextInput==0) ? 5 : nextInput - 1;
-            }
-            break;
-          }
-        case KEY_RIGHT:
-          {// add new code here
-            byte nextInput = (RuntimeSettings.CurrentInput == 5) ? 0 : RuntimeSettings.CurrentInput + 1;
-            while(!setInput(nextInput)) {
-              nextInput = (nextInput>5) ? 0 : nextInput + 1;
-            }
-            break;
-          }
-        case KEY_1:
-        case KEY_2:
-        case KEY_3:
-        case KEY_4:
-        case KEY_5:
-        case KEY_6:
-          setInput(UIkey - KEY_1);
-          break;
-        case KEY_PREVIOUS:
-          // Switch to previous selected input if it is not inactivated
-          setInput(RuntimeSettings.PrevSelectedInput);
-          break;
-        case KEY_MUTE:
-          // toggle mute
-          if (RuntimeSettings.Muted)
-            unmute();
-          else
-          {
-            mute();
-            displayMute();
-          }
-          break;
     }
-      break;    
 
-    case APP_MENU_MODE:
-    { // Brackets to avoid warning: "jump to case label [-fpermissive]"
-      //byte menuMode = Menu1.handleNavigation(getNavAction, refreshMenuDisplay);
-
-      if (menuMode == MENU_EXIT)
+    switch (UIkey)
+    {
+    case KEY_NONE:
+      break;
+    case KEY_BACK:
+      appMode = APP_MENU_MODE;
+      menuIndex = 0;
+      refreshMenuDisplay(REFRESH_DESCEND);
+      break;
+    case KEY_UP:
+      // Turn volume up if we're not muted and we'll not exceed the maximum volume set for the currently selected input
+      if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MaxVol))
+        setVolume(RuntimeSettings.CurrentVolume + 1);
+      break;
+    case KEY_DOWN:
+      // Turn volume down if we're not muted and we'll not get below the minimum volume set for the currently selected input
+      if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MinVol))
+        setVolume(RuntimeSettings.CurrentVolume - 1);
+      break;
+    case KEY_LEFT:
+    { // add new code here
+      byte nextInput = (RuntimeSettings.CurrentInput == 0) ? 5 : RuntimeSettings.CurrentInput - 1;
+      while (!setInput(nextInput))
       {
-        // Back to APP_NORMAL_MODE
-        oled.clear();
-        displayInput();
-        displayVolume();
-        displayTemperatures();
-        appMode = APP_NORMAL_MODE;
-      }
-      else if (menuMode == MENU_INVOKE_ITEM) // TO DO MENU_INVOKE_ITEM seems to be superfluous after my other changes
-      {
-        appMode = APP_PROCESS_MENU_CMD;
+        nextInput = (nextInput == 0) ? 5 : nextInput - 1;
       }
       break;
+    }
+    case KEY_RIGHT:
+    { // add new code here
+      byte nextInput = (RuntimeSettings.CurrentInput == 5) ? 0 : RuntimeSettings.CurrentInput + 1;
+      while (!setInput(nextInput))
+      {
+        nextInput = (nextInput > 5) ? 0 : nextInput + 1;
+      }
+      break;
+    }
+    case KEY_1:
+    case KEY_2:
+    case KEY_3:
+    case KEY_4:
+    case KEY_5:
+    case KEY_6:
+      setInput(UIkey - KEY_1);
+      break;
+    case KEY_PREVIOUS:
+      // Switch to previous selected input if it is not inactivated
+      setInput(RuntimeSettings.PrevSelectedInput);
+      break;
+    case KEY_MUTE:
+      // toggle mute
+      if (RuntimeSettings.Muted)
+        unmute();
+      else
+      {
+        mute();
+        displayMute();
+      }
+      break;
+    }
+    break;
+
+  case APP_MENU_MODE:
+  { // Brackets to avoid warning: "jump to case label [-fpermissive]"
+    byte menuMode = Menu1.handleNavigation(getNavAction, refreshMenuDisplay);
+
+    if (menuMode == MENU_EXIT)
+    {
+      // Back to APP_NORMAL_MODE
+      oled.clear();
+      displayInput();
+      displayVolume();
+      displayTemperatures();
+      appMode = APP_NORMAL_MODE;
+    }
+    else if (menuMode == MENU_INVOKE_ITEM) // TO DO MENU_INVOKE_ITEM seems to be superfluous after my other changes
+    {
+      appMode = APP_PROCESS_MENU_CMD;
+    }
+    break;
   }
-    
-    case APP_PROCESS_MENU_CMD:
-    {
-      byte processingComplete = processMenuCommand(Menu1.getCurrentItemCmdId());
 
-      if (processingComplete == ABANDON)
-      {
-        // Back to APP_NORMAL_MODE
-        oled.clear();
-        displayInput();
-        displayVolume();
-        displayTemperatures();
-        appMode = APP_NORMAL_MODE;
-        Menu1.reset();
-      }
-      else if (processingComplete == true)
-      {
-        appMode = APP_MENU_MODE;
-        drawMenu();
-      }
-      break;
+  case APP_PROCESS_MENU_CMD:
+  {
+    byte processingComplete = processMenuCommand(Menu1.getCurrentItemCmdId());
+
+    if (processingComplete == ABANDON)
+    {
+      // Back to APP_NORMAL_MODE
+      oled.clear();
+      displayInput();
+      displayVolume();
+      displayTemperatures();
+      appMode = APP_NORMAL_MODE;
+      Menu1.reset();
     }
-  
-    case APP_STANDBY_MODE:
+    else if (processingComplete == true)
+    {
+      appMode = APP_MENU_MODE;
+      drawMenu();
+    }
+    break;
+  }
+
+  case APP_STANDBY_MODE:
     // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart is done by getUserInput(). By the way: you don't need an IR remote: a doubleclick on encoder_2 is also KEY_ONOFF
-      break;
+    break;
 
-    case APP_POWERLOSS_STATE: // Only active if power drop is detected
+  case APP_POWERLOSS_STATE: // Only active if power drop is detected
+  {
+    /* REPLACE
+    oled.lcdOn();
+    oled.clear();
+    oled.setCursor(0, 1);
+    oled.print("ATTENTION:");
+    oled.setCursor(0, 2);
+    oled.print("Check power supply!");
+    delay(2000);
+    oled.clear();
+    long vcc;
+    do
     {
-      /* REPLACE
-      oled.lcdOn();
-      oled.clear();
-      oled.setCursor(0, 1);
-      oled.print("ATTENTION:");
-      oled.setCursor(0, 2);
-      oled.print("Check power supply!");
-      delay(2000);
-      oled.clear();
-      long vcc;
-      do
-      {
-        ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-        delay(2);
-        ADCSRA |= _BV(ADSC);
-        while (bit_is_set(ADCSRA, ADSC));
-        vcc = ADCL;
-        vcc |= ADCH << 8;
-        vcc = 1126400L / vcc;
-      } while (vcc < 4700); // Wait until power is completely gone or restart if it returns
-      */
-      startUp();
-      break;
-    }
+      ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+      delay(2);
+      ADCSRA |= _BV(ADSC);
+      while (bit_is_set(ADCSRA, ADSC));
+      vcc = ADCL;
+      vcc |= ADCH << 8;
+      vcc = 1126400L / vcc;
+    } while (vcc < 4700); // Wait until power is completely gone or restart if it returns
+    */
+    startUp();
+    break;
+  }
   }
 }
 
@@ -2087,7 +2089,7 @@ bool editIRCode(IRMP_DATA &Value)
     default:
       break;
     }
-    if (true/* REPLACE IRLremote.available()*/)
+    if (true /* REPLACE IRLremote.available()*/)
     {
       // Get the new data from the remote
       // REPLACE NewValue = IRLremote.read();
