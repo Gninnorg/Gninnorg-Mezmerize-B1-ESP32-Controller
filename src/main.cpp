@@ -29,8 +29,7 @@
 #include <ClickEncoder.h>
 #define ROTARY_ENCODER_STEPS 4
 
-#include <irmpSelectMain15Protocols.h> // This enables 15 main protocols
-#define IR_INPUT_PIN 32
+#define IRMP_INPUT_PIN 32
 #define NTC1_PIN 36
 #define NTC2_PIN 39
 #define ROTARY2_CW_PIN 14
@@ -40,6 +39,7 @@
 #define ROTARY1_CCW_PIN 26
 #define ROTARY1_SW_PIN 27
 
+#include <irmpSelectMain15Protocols.h>  // This enables 15 main protocols
 //#define IRMP_SUPPORT_NEC_PROTOCOL        1 // this enables only one protocol
 
 #include <irmp.hpp>
@@ -72,16 +72,6 @@ void editInputName(uint8_t InputNumber);
 void drawEditInputNameScreen(bool isUpperCase);
 bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit[5]);
 bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const char Option2[9], const char Option3[9], const char Option4[9]);
-
-/*typedef uint8_t HashIR_address_t;
-typedef uint32_t HashIR_command_t;
-
-// Struct that is returned by the read() function
-struct IRMP_DATA
-{
-    HashIR_address_t address;
-    HashIR_command_t command;
-};*/
 
 IRMP_DATA irmp_data;
 bool editIRCode(IRMP_DATA &Value);
@@ -2089,10 +2079,11 @@ bool editIRCode(IRMP_DATA &Value)
     default:
       break;
     }
-    if (true /* REPLACE IRLremote.available()*/)
+    if (irmp_get_data(&irmp_data))
     {
       // Get the new data from the remote
-      // REPLACE NewValue = IRLremote.read();
+      NewValue.address = irmp_data.address;
+      NewValue.command = irmp_data.command;
       oled.setCursor(10, 2);
       oled.print(F("          "));
       oled.setCursor(10, 2);
