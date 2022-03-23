@@ -30,8 +30,8 @@
 #define ROTARY_ENCODER_STEPS 4
 
 #define IRMP_INPUT_PIN 32
-#define NTC1_PIN 36
-#define NTC2_PIN 39
+#define NTC1_PIN 35
+#define NTC2_PIN 34
 #define ROTARY2_CW_PIN 14
 #define ROTARY2_CCW_PIN 12
 #define ROTARY2_SW_PIN 13
@@ -967,7 +967,7 @@ void displayTempDetails(float Temp, uint8_t TriggerTemp, uint8_t DispTemp, uint8
 float getTemperature(uint8_t pinNmbr)
 {
   uint16_t sensorValue = 0;
-  float Vin = 5.0;   // Input voltage 5V for Arduino Nano V3
+  float Vin = 3.3;   // Input voltage 5V for Arduino Nano V3
   float Vout = 0;    // Measured voltage
   float Rref = 4700; // Reference resistor's value in ohms
   float Rntc = 0;    // Measured resistance of NTC
@@ -975,7 +975,7 @@ float getTemperature(uint8_t pinNmbr)
 
   sensorValue = analogRead(pinNmbr); // Read Vout on analog input pin (Arduino can sense from 0-1023, 1023 is Vin)
 
-  Vout = (sensorValue * Vin) / 1024.0; // Convert Vout to volts
+  Vout = (sensorValue * Vin) / 4096.0; // Convert Vout to volts
   Rntc = Rref / ((Vin / Vout) - 1);    // Formula to calculate the resisatance of the NTC
 
   Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
