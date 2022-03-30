@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "Mezmerize_B1_Controller-rescue")(type "Legacy")(uri "${KIPRJMOD}/Mezmerize_B1_Controller-rescue.lib")(options "")(descr ""))
+)
