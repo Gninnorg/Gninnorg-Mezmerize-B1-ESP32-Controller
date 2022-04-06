@@ -1,3 +1,5 @@
 (sym_lib_table
   (lib (name "Mezmerize_B1_Controller-rescue")(type "Legacy")(uri "${KIPRJMOD}/Mezmerize_B1_Controller-rescue.lib")(options "")(descr ""))
+  (lib (name "ESP32")(type "Legacy")(uri "${KIPRJMOD}/ESP32-DEVKIT-V1/ESP32-DEVKIT-V1.lib")(options "")(descr ""))
+  (lib (name "ESP32SYM")(type "KiCad")(uri "${KIPRJMOD}/ESP32-DEVKIT-V1/ESP32-DEVKIT-V1.kicad_sym")(options "")(descr ""))
 )
