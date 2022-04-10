@@ -3,4 +3,4 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
-./hardware/PCB/Mezmerize_B1_Controller-backups/*.zip
+hardware/
