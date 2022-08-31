@@ -1,0 +1,35 @@
+Source:;F:\Jan\Dokumenter\Visual Studio\Gninnorg-Mezmerize-B1-ESP32-Controller\hardware\PCB\Mezmerize_B1_Controller.kicad_sch;
+Date:;31-08-2022 20:04;
+Tool:;Eeschema (6.0.4);
+Component Count:;30;
+Ref;Value;Footprint
+C1;0.1uF;Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+D1;CD4148W;Diode_SMD:D_0805_2012Metric
+D2;CD4148W;Diode_SMD:D_0805_2012Metric
+J1;B1 Relays;Connector_JST:JST_XH_B7B-XH-A_1x07_P2.50mm_Vertical
+J2;PWR AMP L 12V TRIGGER;Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical
+J3;PWR AMP L SWITCH;Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical
+J4;PWR AMP R 12V TRIGGER;Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical
+J5;PWR AMP R SWITCH;Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical
+J6;PWR AMP TEMP NTC L;Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical
+J7;PWR AMP TEMP NTC R;Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical
+J8;MUSES 72320 (SPI);Connector_JST:JST_XH_B6B-XH-A_1x06_P2.50mm_Vertical
+J9;I2C DISPLAY (OLED/LCD);Connector_JST:JST_XH_B5B-XH-A_1x05_P2.50mm_Vertical
+J10;I2C (FUTURE USE);Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical
+J11;ROTARY ENC & SWITCH 1;Connector_JST:JST_XH_B5B-XH-A_1x05_P2.50mm_Vertical
+J12;ROTARY ENC & SWITCH 2;Connector_JST:JST_XH_B5B-XH-A_1x05_P2.50mm_Vertical
+J13;IR RECV;Connector_JST:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical
+J14;12V;TerminalBlock:TerminalBlock_bornier-2_P5.08mm
+J15;8V;TerminalBlock:TerminalBlock_bornier-2_P5.08mm
+R1;R;Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal
+R4;R;Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal
+R7;10K;Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R8;10K;Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R9;4K7;Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R10;4K7;Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+U1;AGQ20T03;AGQ20T03_footprint:AGQ20012
+U2;AGQ20T03;AGQ20T03_footprint:AGQ20012
+U3;ULN2803ADWR;ULN2803:ULN2803ADWR
+U4;MCP23008-E_SO;MCP23008:MCP23008-E&slash_SO
+U5;24C02C_SN;Package_SO:SOIC-8-1EP_3.9x4.9mm_P1.27mm_EP2.41x3.3mm
+U6;ESP32-DEVKIT-V1;MODULE_ESP32_DEVKIT_V1
