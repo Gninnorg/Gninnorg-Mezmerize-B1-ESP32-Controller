@@ -153,7 +153,7 @@ typedef union
     byte DisplayTemperature2;      // 0 = do not display the temperature measured by NTC 2, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
     float Version;                 // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
   };
-  byte data[]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
+  byte data[131]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
 } mySettings;
 
 mySettings Settings; // Holds all the current settings
@@ -170,7 +170,7 @@ typedef union
     byte PrevSelectedInput; // Holds the input selected before the current one
     float Version;          // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
   };
-  byte data[]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
+  byte data[14]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
 } myRuntimeSettings;
 
 myRuntimeSettings RuntimeSettings;
@@ -969,7 +969,7 @@ float getTemperature(uint8_t pinNmbr)
   uint16_t sensorValue = 0;
   float Vin = 3.3;   // Input voltage 5V for Arduino Nano V3
   float Vout = 0;    // Measured voltage
-  float Rref = 4700; // Reference resistor's value in ohms
+  float Rref = 10000; // Reference resistor's value in ohms
   float Rntc = 0;    // Measured resistance of NTC
   float Temp;
 
