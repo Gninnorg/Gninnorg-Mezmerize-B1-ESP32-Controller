@@ -8,7 +8,7 @@
 **
 */
 
-#define VERSION (float)0.96
+#define VERSION (float)0.97
 
 //#undef max
 //#define max(a,b) ((a)>(b)?(a):(b))
@@ -39,7 +39,7 @@
 #define ROTARY1_CCW_PIN 26
 #define ROTARY1_SW_PIN 27
 
-#include <irmpSelectMain15Protocols.h>  // This enables 15 main protocols
+#include <irmpSelectMain15Protocols.h> // This enables 15 main protocols
 //#define IRMP_SUPPORT_NEC_PROTOCOL        1 // this enables only one protocol
 
 #include <irmp.hpp>
@@ -134,12 +134,10 @@ typedef union
     struct InputSettings Input[6]; // Settings for all 6 inputs
     byte Trigger1Active;           // 0 = the trigger is not active, 1 = the trigger is active
     byte Trigger1Type;             // 0 = momentary, 1 = latching
-    byte Trigger1Mode;             // 0 = standard, 1 = intelligent/SmartON (with measurement of NTC+LDR value)
     byte Trigger1OnDelay;          // Seconds from controller power up to activation of trigger. The default delay allows time for the output relay of the Mezmerize to be activated before we turn on the power amps. The selection of an input of the Mezmerize will also be delayed.
     byte Trigger1Temp;             // Temperature protection: if the temperature is measured to the set number of degrees Celcius (via the LDRs), the controller will attempt to trigger a shutdown of the connected power amps (if set to 0, the temperature protection is not active
     byte Trigger2Active;           // 0 = the trigger is not active, 1 = the trigger is active
     byte Trigger2Type;             // 0 = momentary, 1 = latching
-    byte Trigger2Mode;             // 0 = standard, 1 = intelligent (with measurement of NTC+LDR value)
     byte Trigger2OnDelay;          // Seconds from controller power up to activation of trigger. The default delay allows time for the output relay of the Mezmerize to be activated before we turn on the power amps. The selection of an input of the Mezmerize will also be delayed.
     byte Trigger2Temp;             // Temperature protection: if the temperature is measured to the set number of degrees Celcius (via the LDRs), the controller will attempt to trigger a shutdown of the connected power amps (if set to 0, the temperature protection is not active)
     byte TriggerInactOffTimer;     // Hours without user interaction before automatic power down (0 = never)
@@ -153,7 +151,7 @@ typedef union
     byte DisplayTemperature2;      // 0 = do not display the temperature measured by NTC 2, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
     float Version;                 // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
   };
-  byte data[131]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
+  byte data[129]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
 } mySettings;
 
 mySettings Settings; // Holds all the current settings
@@ -176,8 +174,6 @@ typedef union
 myRuntimeSettings RuntimeSettings;
 
 // Setup Rotary encoders ------------------------------------------------------
-// REPLACE
-
 ClickEncoder *encoder1 = new ClickEncoder(ROTARY1_CW_PIN, ROTARY1_CCW_PIN, ROTARY1_SW_PIN, ROTARY_ENCODER_STEPS, LOW);
 ClickEncoder::Button button1;
 int16_t e1last, e1value;
@@ -237,8 +233,7 @@ enum AppModeValues
   APP_NORMAL_MODE,
   APP_MENU_MODE,
   APP_PROCESS_MENU_CMD,
-  APP_STANDBY_MODE,
-  APP_POWERLOSS_STATE
+  APP_STANDBY_MODE
 };
 
 byte appMode = APP_NORMAL_MODE;
@@ -321,8 +316,6 @@ byte getUserInput()
 
     totalInterruptCounter++;
 
-    // Serial.print("An interrupt as occurred. Total number: ");
-    // Serial.println(totalInterruptCounter);
   }
 
   byte receivedInput = KEY_NONE;
@@ -345,7 +338,6 @@ byte getUserInput()
   {
   case ClickEncoder::Clicked:
     receivedInput = KEY_SELECT;
-    Serial.println("Encoder 1 - button");
     break;
   default:
     break;
@@ -369,11 +361,9 @@ byte getUserInput()
   {
   case ClickEncoder::Clicked:
     receivedInput = KEY_BACK;
-    Serial.println("Encoder 2 - button");
     break;
   case ClickEncoder::DoubleClicked:
     receivedInput = KEY_ONOFF;
-    Serial.println("Encoder 1 - button*2");
     break;
   default:
     break;
@@ -482,48 +472,19 @@ byte getUserInput()
     toStandbyMode();
   }
 
-  if (receivedInput == KEY_BACK)
-    Serial.println("key_back");
   return (receivedInput);
 }
 
-void Scanner()
-{
-  Serial.println();
-  Serial.println("I2C scanner. Scanning ...");
-  byte count = 0;
-
-  Wire.begin();
-  for (byte i = 8; i < 120; i++)
-  {
-    Wire.beginTransmission(i);       // Begin I2C transmission Address (i)
-    if (Wire.endTransmission() == 0) // Receive 0 = success (ACK response)
-    {
-      Serial.print("Found address: ");
-      Serial.print(i, DEC);
-      Serial.print(" (0x");
-      Serial.print(i, HEX); // PCF8574 7 bit address
-      Serial.println(")");
-      count++;
-    }
-  }
-  Serial.print("Found ");
-  Serial.print(count, DEC); // numbers of devices
-  Serial.println(" device(s).");
-}
 
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
 
-  Serial.begin(115200);
-  Serial.println("Setup()");
   Wire.begin();
 
   setupRotaryEncoders();
-  // REPLACE PINS
-  // pinMode(NTC1_PIN, INPUT);
-  // pinMode(NTC2_PIN, INPUT);
+  pinMode(NTC1_PIN, INPUT);
+  pinMode(NTC2_PIN, INPUT);
 
   relayController.begin();
   muses.begin();
@@ -537,9 +498,7 @@ void setup()
 
 void startUp()
 {
-  Serial.println("startUp start");
   oled.lcdOn();
-  Serial.println("startUp start 2");
   // Define all pins as OUTPUT and disable all relais
   for (byte pin = 0; pin <= 7; pin++)
   {
@@ -553,7 +512,6 @@ void startUp()
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
   if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
   {
-    Serial.println("startUp start 2a");
     oled.clear();
     oled.setCursor(0, 0);
     oled.print("Restoring default");
@@ -562,7 +520,6 @@ void startUp()
     delay(2000);
     writeDefaultSettingsToEEPROM();
   }
-  Serial.println("startUp start 3");
   // Settings read from EEPROM are read and are valid so let's move on!
   mil_On = millis();
   oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
@@ -619,26 +576,11 @@ void setTrigger1On()
 {
   if (Settings.Trigger1Active)
   {
-    if (Settings.Trigger1Mode == 0) // Standard
+    relayController.digitalWrite(6, HIGH);
+    if (Settings.Trigger1Type == 0) // Momentary
     {
-      relayController.digitalWrite(6, HIGH);
-      if (Settings.Trigger1Type == 0) // Momentary
-      {
-        delay(100);
-        relayController.digitalWrite(6, LOW);
-      }
-    }
-    else // SmartON
-    {
-      if (getTemperature(NTC1_PIN) < 0) // Check if device is powered off
-      {
-        relayController.digitalWrite(6, HIGH);
-        if (Settings.Trigger1Type == 0) // Momentary
-        {
-          delay(100);
-          relayController.digitalWrite(6, LOW);
-        }
-      }
+      delay(100);
+      relayController.digitalWrite(6, LOW);
     }
   }
 }
@@ -647,27 +589,11 @@ void setTrigger2On()
 {
   if (Settings.Trigger2Active)
   {
-    if (Settings.Trigger2Mode == 0) // Standard
+    relayController.digitalWrite(7, HIGH);
+    if (Settings.Trigger2Type == 0) // Momentary
     {
-      relayController.digitalWrite(7, HIGH);
-      if (Settings.Trigger2Type == 0) // Momentary
-      {
-        delay(100);
-        relayController.digitalWrite(7, LOW);
-      }
-    }
-    else // SmartON
-    {
-      // REPLACE PIN
-      if (getTemperature(NTC2_PIN) < 0) // Check if device is powered off
-      {
-        relayController.digitalWrite(7, HIGH);
-        if (Settings.Trigger2Type == 0) // Momentary
-        {
-          delay(100);
-          relayController.digitalWrite(7, LOW);
-        }
-      }
+      delay(100);
+      relayController.digitalWrite(7, LOW);
     }
   }
 }
@@ -676,28 +602,12 @@ void setTrigger1Off()
 {
   if (Settings.Trigger1Active)
   {
-    if (Settings.Trigger1Mode == 0) // Standard
+    if (Settings.Trigger1Type == 0) // Momentary
     {
-      if (Settings.Trigger1Type == 0) // Momentary
-      {
-        relayController.digitalWrite(6, HIGH);
-        delay(50);
-      }
-      relayController.digitalWrite(6, LOW);
+      relayController.digitalWrite(6, HIGH);
+      delay(100);
     }
-    else // SmartON
-    {
-      // REPLACE PIN
-      if (getTemperature(NTC1_PIN) > 0) // Check if device is powered on
-      {
-        if (Settings.Trigger1Type == 0) // Momentary
-        {
-          relayController.digitalWrite(6, HIGH);
-          delay(50);
-        }
-        relayController.digitalWrite(6, LOW);
-      }
-    }
+    relayController.digitalWrite(6, LOW);
   }
 }
 
@@ -705,41 +615,20 @@ void setTrigger2Off()
 {
   if (Settings.Trigger2Active)
   {
-    if (Settings.Trigger2Mode == 0) // Standard
+    if (Settings.Trigger2Type == 0) // Momentary
     {
-      if (Settings.Trigger2Type == 0) // Momentary
-      {
-        relayController.digitalWrite(7, HIGH);
-        delay(50);
-      }
-      relayController.digitalWrite(7, LOW);
+      relayController.digitalWrite(7, HIGH);
+      delay(100);
     }
-    else // SmartON
-    {
-      // REPLACE PIN
-      if (getTemperature(NTC2_PIN) > 0) // Check if device is powered on
-      {
-        if (Settings.Trigger2Type == 0) // Momentary
-        {
-          relayController.digitalWrite(7, HIGH);
-          delay(50);
-        }
-        relayController.digitalWrite(7, LOW);
-      }
-    }
+    relayController.digitalWrite(7, LOW);
   }
 }
 
 uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
 {
-  // Serial.print("Antal steps: "); Serial.println(steps);
-  // Serial.print("Valgt steps: "); Serial.println(selStep);
-  // Serial.print("Min dB: "); Serial.println(min_dB);
-  // Serial.print("Max dB: "); Serial.println(max_dB);
   uint8_t att_dB = max_dB - min_dB;
   float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
   uint8_t numberOfSmallSteps = (sizeOfLargeSteps * steps - att_dB) / (sizeOfLargeSteps / 2);
-  // Serial.print("Attenuation: "); Serial.println(min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * 2);
   return min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * -2;
 }
 
@@ -865,7 +754,6 @@ void displayTemperatures()
 {
   if (Settings.DisplayTemperature1)
   {
-    // REPLACE PIN
     float Temp = getTemperature(NTC1_PIN);
     float MaxTemp;
     if (Settings.Trigger1Temp == 0)
@@ -877,7 +765,6 @@ void displayTemperatures()
 
   if (Settings.DisplayTemperature2)
   {
-    // REPLACE PIN
     float Temp = getTemperature(NTC2_PIN);
     float MaxTemp;
     if (Settings.Trigger2Temp == 0)
@@ -969,13 +856,13 @@ float getTemperature(uint8_t pinNmbr)
   uint16_t sensorValue = 0;
   float Vin = 3.3;   // Input voltage 5V for Arduino Nano V3
   float Vout = 0;    // Measured voltage
-  float Rref = 4700; // Reference resistor's value in ohms
+  float Rref = 10000; // Reference resistor's value in ohms
   float Rntc = 0;    // Measured resistance of NTC
   float Temp;
 
-  sensorValue = analogRead(pinNmbr); // Read Vout on analog input pin (Arduino can sense from 0-1023, 1023 is Vin)
+  sensorValue = analogRead(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
 
-  Vout = (sensorValue * Vin) / 4096.0; // Convert Vout to volts
+  Vout = (sensorValue * Vin) / 4095.0; // Convert Vout to volts
   Rntc = Rref / ((Vin / Vout) - 1);    // Formula to calculate the resisatance of the NTC
 
   Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
@@ -986,36 +873,12 @@ void loop()
 {
   UIkey = getUserInput();
 
-  // Detect power off
-  // If low power is detected the RuntimeSettings are written to EEPROM. We only write these data when power down is detected to avoid to write to the EEPROM every time the volume or input is changed (an EEPROM has a limited lifetime of about 100000 write cycles)
-  /* REPLACE
-  if (appMode != APP_POWERLOSS_STATE)
-  {
-    long vcc;
-    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-    delay(2);
-    ADCSRA |= _BV(ADSC);
-    while (bit_is_set(ADCSRA, ADSC))
-      ;
-    vcc = ADCL;
-    vcc |= ADCH << 8;
-    vcc = 1126400L / vcc;
-    if (vcc > 3000 && vcc < 4600)
-    {
-      writeRuntimeSettingsToEEPROM();
-      setTrigger1Off();
-      setTrigger2Off();
-      appMode = APP_POWERLOSS_STATE; // Switch to APP_STATE_OFF and do nothing until power disappears completely
-    }
-  }
-  */
   switch (appMode)
   {
   case APP_NORMAL_MODE:
     if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
     {
       displayTemperatures();
-      // REPLACE PIN
       if (((Settings.Trigger1Temp != 0) && (getTemperature(NTC1_PIN) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(NTC2_PIN) >= Settings.Trigger2Temp)))
       {
         toStandbyMode();
@@ -1130,33 +993,6 @@ void loop()
   case APP_STANDBY_MODE:
     // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart is done by getUserInput(). By the way: you don't need an IR remote: a doubleclick on encoder_2 is also KEY_ONOFF
     break;
-
-  case APP_POWERLOSS_STATE: // Only active if power drop is detected
-  {
-    /* REPLACE
-    oled.lcdOn();
-    oled.clear();
-    oled.setCursor(0, 1);
-    oled.print("ATTENTION:");
-    oled.setCursor(0, 2);
-    oled.print("Check power supply!");
-    delay(2000);
-    oled.clear();
-    long vcc;
-    do
-    {
-      ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-      delay(2);
-      ADCSRA |= _BV(ADSC);
-      while (bit_is_set(ADCSRA, ADSC));
-      vcc = ADCL;
-      vcc |= ADCH << 8;
-      vcc = 1126400L / vcc;
-    } while (vcc < 4700); // Wait until power is completely gone or restart if it returns
-    */
-    startUp();
-    break;
-  }
   }
 }
 
@@ -1182,6 +1018,7 @@ void toStandbyMode()
   oled.lcdOff();
   while (getUserInput() != KEY_ONOFF) // getUserInput will take care of wakeup when KEY_ONOFF is received
     ;
+  ESP.restart();
 }
 
 //----------------------------------------------------------------------
@@ -1427,10 +1264,6 @@ byte processMenuCommand(byte cmdId)
     editOptionValue(Settings.Trigger1Type, 2, "Moment.", "Latching", "", "");
     complete = true;
     break;
-  case mnuCmdTRIGGER1_MODE:
-    editOptionValue(Settings.Trigger1Mode, 2, "Standard", "SmartON", "", "");
-    complete = true;
-    break;
   case mnuCmdTRIGGER1_ON_DELAY:
     editNumericValue(Settings.Trigger1OnDelay, 0, 90, "Secs.");
     complete = true;
@@ -1445,10 +1278,6 @@ byte processMenuCommand(byte cmdId)
     break;
   case mnuCmdTRIGGER2_TYPE:
     editOptionValue(Settings.Trigger2Type, 2, "Moment.", "Latching", "", "");
-    complete = true;
-    break;
-  case mnuCmdTRIGGER2_MODE:
-    editOptionValue(Settings.Trigger2Mode, 2, "Standard", "SmartON", "", "");
     complete = true;
     break;
   case mnuCmdTRIGGER2_ON_DELAY:
@@ -2164,12 +1993,10 @@ void setSettingsToDefault()
   Settings.Input[5].MinVol = 0;
   Settings.Trigger1Active = 1;
   Settings.Trigger1Type = 0;
-  Settings.Trigger1Mode = 1;
   Settings.Trigger1OnDelay = 0;
   Settings.Trigger1Temp = 0;
   Settings.Trigger2Active = 1;
   Settings.Trigger2Type = 0;
-  Settings.Trigger2Mode = 1;
   Settings.Trigger2OnDelay = 0;
   Settings.Trigger2Temp = 00;
   Settings.TriggerInactOffTimer = 0;

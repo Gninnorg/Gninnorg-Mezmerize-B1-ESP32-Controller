@@ -74,13 +74,11 @@ enum ctlMenuCommandId
   mnuCmdTRIG1_MENU,
   mnuCmdTRIGGER1_ACTIVE,
   mnuCmdTRIGGER1_TYPE,
-  mnuCmdTRIGGER1_MODE,
   mnuCmdTRIGGER1_ON_DELAY,
   mnuCmdTRIGGER1_TEMP,
   mnuCmdTRIG2_MENU,
   mnuCmdTRIGGER2_ACTIVE,
   mnuCmdTRIGGER2_TYPE,
-  mnuCmdTRIGGER2_MODE,
   mnuCmdTRIGGER2_ON_DELAY,
   mnuCmdTRIGGER2_TEMP,
   mnuCmdTRIGGER_INACT_TIMER,
@@ -141,17 +139,15 @@ const MenuItem ctlMenu_List_2_6[] = {{mnuCmdINPUT6_ACTIVE, ctlMenu_2_6_1}, {mnuC
 
 const char ctlMenu_4_1_1[] = "Active";
 const char ctlMenu_4_1_2[] = "Moment./Latch";
-const char ctlMenu_4_1_3[] = "Std./SmartON";
-const char ctlMenu_4_1_4[] = "On delay";
-const char ctlMenu_4_1_5[] = "Temp control";
-const MenuItem ctlMenu_List_4_1[] = {{mnuCmdTRIGGER1_ACTIVE, ctlMenu_4_1_1}, {mnuCmdTRIGGER1_TYPE, ctlMenu_4_1_2}, {mnuCmdTRIGGER1_MODE, ctlMenu_4_1_3}, {mnuCmdTRIGGER1_ON_DELAY, ctlMenu_4_1_4}, {mnuCmdTRIGGER1_TEMP, ctlMenu_4_1_5}, {mnuCmdBack, ctlMenu_back}};
+const char ctlMenu_4_1_3[] = "On delay";
+const char ctlMenu_4_1_4[] = "Temp control";
+const MenuItem ctlMenu_List_4_1[] = {{mnuCmdTRIGGER1_ACTIVE, ctlMenu_4_1_1}, {mnuCmdTRIGGER1_TYPE, ctlMenu_4_1_2}, {mnuCmdTRIGGER1_ON_DELAY, ctlMenu_4_1_3}, {mnuCmdTRIGGER1_TEMP, ctlMenu_4_1_4}, {mnuCmdBack, ctlMenu_back}};
 
 const char ctlMenu_4_2_1[] = "Active";
 const char ctlMenu_4_2_2[] = "Moment./Latch";
-const char ctlMenu_4_2_3[] = "Std./SmartON";
-const char ctlMenu_4_2_4[] = "On delay";
-const char ctlMenu_4_2_5[] = "Temp control";
-const MenuItem ctlMenu_List_4_2[] = {{mnuCmdTRIGGER2_ACTIVE, ctlMenu_4_2_1}, {mnuCmdTRIGGER2_TYPE, ctlMenu_4_2_2}, {mnuCmdTRIGGER2_MODE, ctlMenu_4_2_3}, {mnuCmdTRIGGER2_ON_DELAY, ctlMenu_4_2_4}, {mnuCmdTRIGGER2_TEMP, ctlMenu_4_2_5}, {mnuCmdBack, ctlMenu_back}};
+const char ctlMenu_4_2_3[] = "On delay";
+const char ctlMenu_4_2_4[] = "Temp control";
+const MenuItem ctlMenu_List_4_2[] = {{mnuCmdTRIGGER2_ACTIVE, ctlMenu_4_2_1}, {mnuCmdTRIGGER2_TYPE, ctlMenu_4_2_2}, {mnuCmdTRIGGER2_ON_DELAY, ctlMenu_4_2_3}, {mnuCmdTRIGGER2_TEMP, ctlMenu_4_2_4}, {mnuCmdBack, ctlMenu_back}};
 
 const char ctlMenu_1_1[] = "Volume steps";
 const char ctlMenu_1_2[] = "Min attenuation";
@@ -313,8 +309,6 @@ case mnuCmdTRIGGER1_ACTIVE :
 	break;
 case mnuCmdTRIGGER1_TYPE :
 	break;
-case mnuCmdTRIGGER1_MODE :
-	break;
 case mnuCmdTRIGGER1_ON_DELAY :
 	break;
 case mnuCmdTRIGGER1_TEMP :
@@ -322,8 +316,6 @@ case mnuCmdTRIGGER1_TEMP :
 case mnuCmdTRIGGER2_ACTIVE :
 	break;
 case mnuCmdTRIGGER2_TYPE :
-	break;
-case mnuCmdTRIGGER2_MODE :
 	break;
 case mnuCmdTRIGGER2_ON_DELAY :
 	break;
@@ -451,7 +443,6 @@ case mnuCmdLOAD_DEFAULT :
                     <MenuItems>
                         <Item Id="TRIGGER1_ACTIVE" Name="Active"/>
                         <Item Id="TRIGGER1_TYPE" Name="Moment./Latch"/>
-                        <Item Id="TRIGGER1_MODE" Name="Std./SmartON"/>
                         <Item Id="TRIGGER1_ON_DELAY" Name="On delay"/>
                         <Item Id="TRIGGER1_TEMP" Name="Temp control"/>
                     </MenuItems>
@@ -460,7 +451,6 @@ case mnuCmdLOAD_DEFAULT :
                     <MenuItems>
                         <Item Id="TRIGGER2_ACTIVE" Name="Active"/>
                         <Item Id="TRIGGER2_TYPE" Name="Moment./Latch"/>
-                        <Item Id="TRIGGER2_MODE" Name="Std./SmartON"/>
                         <Item Id="TRIGGER2_ON_DELAY" Name="On delay"/>
                         <Item Id="TRIGGER2_TEMP" Name="Temp control"/>
                     </MenuItems>
@@ -491,5 +481,6 @@ case mnuCmdLOAD_DEFAULT :
         </Item>
     </MenuItems>
 </RootMenu>
+
 */
 #endif
