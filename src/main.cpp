@@ -969,7 +969,7 @@ float getTemperature(uint8_t pinNmbr)
   uint16_t sensorValue = 0;
   float Vin = 3.3;   // Input voltage 5V for Arduino Nano V3
   float Vout = 0;    // Measured voltage
-  float Rref = 10000; // Reference resistor's value in ohms
+  float Rref = 4700; // Reference resistor's value in ohms
   float Rntc = 0;    // Measured resistance of NTC
   float Temp;
 
