@@ -13,10 +13,7 @@
 //#undef max
 //#define max(a,b) ((a)>(b)?(a):(b))
 
-#undef min
-#ifndef min
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#endif // min
+
 
 #include <Wire.h>
 #include <Adafruit_MCP23008.h>
@@ -25,6 +22,21 @@
 #include <Muses72320.h>
 #include <MenuManager.h>
 #include <MenuData.h>
+
+// OTA TEST
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <AsyncElegantOTA.h>
+const char* ssid = "Waoo4920_RH9K";
+const char* password = "ypyr7994";
+AsyncWebServer server(80);
+// OTA TEST SLUT
+
+#undef min
+#ifndef min
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#endif // min
 
 #include <ClickEncoder.h>
 #define ROTARY_ENCODER_STEPS 4
@@ -476,11 +488,47 @@ byte getUserInput()
 }
 
 
+String getRuntimeSettings() 
+{
+  String text = "<DOCTYPE html><html><head></meta></head><body>";
+  text.concat("<h2>Mezmerize B1 preamlifier</h2>");
+  text = text + "Volume: " + String((int)RuntimeSettings.CurrentVolume) + "</p>";
+  text = text + "Input : " + String(Settings.Input[RuntimeSettings.CurrentInput].Name) + "</p>";
+  text = text + "</body></html>";
+  return text;
+}
+
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
 
   Wire.begin();
+
+  // OTA - TEST
+  Serial.begin(115200);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.println("");
+
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("Connected to ");
+  Serial.println(ssid);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/html", getRuntimeSettings());
+  });
+
+  AsyncElegantOTA.begin(&server);    // Start ElegantOTA
+  server.begin();
+  Serial.println("HTTP server started");
+  // OTA - END
 
   setupRotaryEncoders();
   pinMode(NTC1_PIN, INPUT);
