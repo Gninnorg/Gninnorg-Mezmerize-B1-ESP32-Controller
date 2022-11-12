@@ -28,8 +28,8 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
-const char* ssid = "Waoo4920_RH9K";
-const char* password = "ypyr7994";
+const char* ssid = "######";
+const char* password = "#####";
 AsyncWebServer server(80);
 // OTA TEST SLUT
 
