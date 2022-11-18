@@ -8,7 +8,7 @@
 **
 */
 
-#define VERSION (float)0.97
+#define VERSION (float)0.98
 
 //#undef max
 //#define max(a,b) ((a)>(b)?(a):(b))
@@ -23,21 +23,11 @@
 #include <MenuManager.h>
 #include <MenuData.h>
 
-// OTA TEST
-#include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <AsyncElegantOTA.h>
-const char* ssid = "######";
-const char* password = "#####";
-AsyncWebServer server(80);
-// OTA TEST SLUT
-
-#undef min
-#ifndef min
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#endif // min
-
+#undef minimum
+#ifndef minimum
+#define minimum(a, b) ((a) < (b) ? (a) : (b))
+#endif 
+ 
 #include <ClickEncoder.h>
 #define ROTARY_ENCODER_STEPS 4
 
@@ -65,9 +55,9 @@ void setTrigger2Off(void);
 void displayTemperatures(void);
 void displayTempDetails(float, uint8_t, uint8_t, uint8_t);
 float getTemperature(uint8_t);
-void displayInput(void);
 void displayVolume(void);
 void displayMute(void);
+void displayInput(void);
 uint8_t getAttenuation(uint8_t, uint8_t, uint8_t, uint8_t);
 void setVolume(int16_t);
 void mute(void);
@@ -120,6 +110,11 @@ typedef union
 {
   struct
   {
+    char ssid[33];
+    char pass[33];
+    char ip[16];
+    char gateway[16];
+
     byte VolumeSteps;    // The number of steps of the volume control
     byte MinAttenuation; // Minimum attenuation in -dB (as 0 db equals no attenuation this is equal to the highest volume allowed)
     byte MaxAttenuation; // Maximum attenuation in -dB (as -111.5 db is the limit of the Muses72320 this is equal to the lowest volume possible). We only keep this setting as a positive number, and we do also only allow the user to set the value in 1 dB steps
@@ -163,7 +158,7 @@ typedef union
     byte DisplayTemperature2;      // 0 = do not display the temperature measured by NTC 2, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
     float Version;                 // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
   };
-  byte data[129]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
+  byte data[227]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
 } mySettings;
 
 mySettings Settings; // Holds all the current settings
@@ -449,7 +444,7 @@ byte getUserInput()
         toStandbyMode();
       }
       else // wake from standby
-        startUp();
+        ESP.restart();
     }
   }
 
@@ -498,37 +493,238 @@ String getRuntimeSettings()
   return text;
 }
 
+// OTA TEST
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <AsyncElegantOTA.h>
+#include "SPIFFS.h"
+
+AsyncWebServer server(80);
+
+// Search for parameter in HTTP POST request
+const char* PARAM_INPUT_1 = "ssid";
+const char* PARAM_INPUT_2 = "pass";
+const char* PARAM_INPUT_3 = "ip";
+const char* PARAM_INPUT_4 = "gateway";
+
+
+
+//Variables to save values from HTML form
+/*String ssid;
+String pass;
+String ip;
+String gateway;
+*/
+
+// File paths to save input values permanently
+/*const char* ssidPath = "/ssid.txt";
+const char* passPath = "/pass.txt";
+const char* ipPath = "/ip.txt";
+const char* gatewayPath = "/gateway.txt";
+*/
+
+IPAddress localIP;
+//IPAddress localIP(192, 168, 1, 200); // hardcoded
+
+// Set your Gateway IP address
+IPAddress localGateway;
+//IPAddress localGateway(192, 168, 1, 1); //hardcoded
+IPAddress subnet(255, 255, 0, 0);
+
+// Timer variables
+unsigned long previousMillis = 0;
+const long interval = 10000;  // interval to wait for Wi-Fi connection (milliseconds)
+
+
+// Initialize SPIFFS
+void initSPIFFS() {
+  if (!SPIFFS.begin(true)) {
+    Serial.println("An error has occurred while mounting SPIFFS");
+  }
+  Serial.println("SPIFFS mounted successfully");
+}
+
+// Read File from SPIFFS
+String readFile(fs::FS &fs, const char * path){
+  Serial.printf("Reading file: %s\r\n", path);
+
+  File file = fs.open(path);
+  if(!file || file.isDirectory()){
+    Serial.println("- failed to open file for reading");
+    return String();
+  }
+  
+  String fileContent;
+  while(file.available()){
+    fileContent = file.readStringUntil('\n');
+    break;     
+  }
+  return fileContent;
+}
+
+// Write file to SPIFFS
+void writeFile(fs::FS &fs, const char * path, const char * message){
+  Serial.printf("Writing file: %s\r\n", path);
+
+  File file = fs.open(path, FILE_WRITE);
+  if(!file){
+    Serial.println("- failed to open file for writing");
+    return;
+  }
+  if(file.print(message)){
+    Serial.println("- file written");
+  } else {
+    Serial.println("- write failed");
+  }
+}
+
+// Initialize WiFi
+bool initWiFi() {
+  if(Settings.ssid=="" || Settings.ip==""){
+    Serial.println("Undefined SSID or IP address.");
+    return false;
+  }
+
+  WiFi.mode(WIFI_STA);
+  localIP.fromString(Settings.ip);
+  localGateway.fromString(Settings.gateway);
+
+
+  if (!WiFi.config(localIP, localGateway, subnet)){
+    Serial.println("STA Failed to configure");
+    return false;
+  }
+  WiFi.begin(Settings.ssid, Settings.pass);
+  Serial.println("Connecting to WiFi...");
+
+  unsigned long currentMillis = millis();
+  previousMillis = currentMillis;
+
+  while(WiFi.status() != WL_CONNECTED) {
+    currentMillis = millis();
+    if (currentMillis - previousMillis >= interval) {
+      Serial.println("Failed to connect.");
+      return false;
+    }
+  }
+
+  Serial.println(WiFi.localIP());
+  return true;
+}
+
+// Replaces placeholder with LED state value
+String processor(const String& var) {
+  return String("Hej");
+}
+
+void setupWIFIsupport() {
+  // Serial port for debugging purposes
+  Serial.begin(115200);
+
+  initSPIFFS();
+
+  // Load values saved in SPIFFS
+  /*
+  ssid = readFile(SPIFFS, ssidPath);
+  pass = readFile(SPIFFS, passPath);
+  ip = readFile(SPIFFS, ipPath);
+  gateway = readFile (SPIFFS, gatewayPath);
+  */
+  Serial.println(Settings.ssid);
+  Serial.println(Settings.pass);
+  Serial.println(Settings.ip);
+  Serial.println(Settings.gateway);
+
+  if(initWiFi()) {
+    // Route for root / web page
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+      request->send(SPIFFS, "/index.html", "text/html", false, processor);
+    });
+    server.serveStatic("/", SPIFFS, "/");
+    
+    AsyncElegantOTA.begin(&server);
+    server.begin();
+  }
+  else {
+    // Connect to Wi-Fi network with SSID and password
+    Serial.println("Setting AP (Access Point)");
+    // NULL sets an open Access Point
+    WiFi.softAP("ESP-WIFI-MANAGER", NULL);
+
+    IPAddress IP = WiFi.softAPIP();
+    Serial.print("AP IP address: ");
+    Serial.println(IP); 
+
+    // Web Server Root URL
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send(SPIFFS, "/wifimanager.html", "text/html");
+    });
+    
+    server.serveStatic("/", SPIFFS, "/");
+    
+    server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
+      int params = request->params();
+      for(int i=0;i<params;i++){
+        AsyncWebParameter* p = request->getParam(i);
+        if(p->isPost()){
+          // HTTP POST ssid value
+          if (p->name() == PARAM_INPUT_1) {
+            strcpy(Settings.ssid, p->value().c_str()); /* String copy*/
+            Serial.print("SSID set to: ");
+            Serial.println(Settings.ssid);
+            // Write file to save value
+            //writeFile(SPIFFS, ssidPath, ssid.c_str());
+          }
+          // HTTP POST pass value
+          if (p->name() == PARAM_INPUT_2) {
+            strcpy(Settings.pass, p->value().c_str()); /* String copy */
+            Serial.print("Password set to: ");
+            Serial.println(Settings.pass);
+            // Write file to save value
+            // writeFile(SPIFFS, passPath, pass.c_str());
+          }
+          // HTTP POST ip value
+          if (p->name() == PARAM_INPUT_3) {
+            strcpy(Settings.ip, p->value().c_str()); /* String copy*/
+            Serial.print("IP Address set to: ");
+            Serial.println(Settings.ip);
+            // Write file to save value
+            //writeFile(SPIFFS, ipPath, ip.c_str());
+          }
+          // HTTP POST gateway value
+          if (p->name() == PARAM_INPUT_4) {
+            strcpy(Settings.gateway, p->value().c_str()); /* String copy */
+            Serial.print("Gateway set to: ");
+            Serial.println(Settings.gateway);
+            // Write file to save value
+            //writeFile(SPIFFS, gatewayPath, gateway.c_str());
+          }
+          //Serial.printf("POST[%s]: %s\n", p->name().c_str(), p->value().c_str());
+        }
+      }
+
+      writeSettingsToEEPROM();
+      request->send(200, "text/plain", "Done. ESP will restart, connect to your router and go to IP address: " + String(Settings.ip));
+      delay(3000);
+      ESP.restart();
+    });
+    AsyncElegantOTA.begin(&server);
+    server.begin();
+  }
+}
+
+// OTA TEST SLUT
+
+
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
 
+  readSettingsFromEEPROM();
+  readRuntimeSettingsFromEEPROM();
+  
   Wire.begin();
-
-  // OTA - TEST
-  Serial.begin(115200);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.println("");
-
-  // Wait for connection
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/html", getRuntimeSettings());
-  });
-
-  AsyncElegantOTA.begin(&server);    // Start ElegantOTA
-  server.begin();
-  Serial.println("HTTP server started");
-  // OTA - END
 
   setupRotaryEncoders();
   pinMode(NTC1_PIN, INPUT);
@@ -541,11 +737,15 @@ void setup()
   // Start IR reader
   irmp_init();
 
-  startUp();
-}
+  // OTA - TEST
+  Serial.begin(115200);
+  Serial.print("ssid:");Serial.println(Settings.ssid);
+  Serial.print("pass:");Serial.println(Settings.pass);
+  Serial.print("gateway:");Serial.println(Settings.gateway);
+  Serial.print("ip:");Serial.println(Settings.ip);
+  setupWIFIsupport();
+  // OTA - END
 
-void startUp()
-{
   oled.lcdOn();
   // Define all pins as OUTPUT and disable all relais
   for (byte pin = 0; pin <= 7; pin++)
@@ -554,8 +754,7 @@ void startUp()
     relayController.digitalWrite(pin, LOW);
   }
 
-  readSettingsFromEEPROM();
-  readRuntimeSettingsFromEEPROM();
+  
 
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
   if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
@@ -610,7 +809,7 @@ void startUp()
 
   oled.clear();
   setInput(RuntimeSettings.CurrentInput);
-  RuntimeSettings.CurrentVolume = min(RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput], Settings.MaxStartVolume); // Avoid setting volume higher than MaxStartVol
+  RuntimeSettings.CurrentVolume = minimum(RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput], Settings.MaxStartVolume); // Avoid setting volume higher than MaxStartVol
   unmute();
   displayInput();
   displayTemperatures();
@@ -677,7 +876,7 @@ uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t m
   uint8_t att_dB = max_dB - min_dB;
   float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
   uint8_t numberOfSmallSteps = (sizeOfLargeSteps * steps - att_dB) / (sizeOfLargeSteps / 2);
-  return min((min_dB + min(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * -2;
+  return minimum((min_dB + minimum(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * -2;
 }
 
 void setVolume(int16_t newVolumeStep)
@@ -1410,14 +1609,14 @@ byte processMenuCommand(byte cmdId)
     writeRuntimeSettingsToEEPROM();
     setTrigger1Off();
     setTrigger2Off();
-    startUp();
+    ESP.restart();
     complete = ABANDON;
     break;
   case mnuCmdLOAD_DEFAULT:
     writeDefaultSettingsToEEPROM();
     setTrigger1Off();
     setTrigger2Off();
-    startUp();
+    ESP.restart();
     complete = ABANDON;
     break;
   }
@@ -1977,6 +2176,10 @@ bool editIRCode(IRMP_DATA &Value)
 // Loads default settings into Settings and RuntimeSettings - this is only done when the EEPROM does not contain valid settings or when reset is chosen by user in the menu
 void setSettingsToDefault()
 {
+  strcpy(Settings.ssid, "                                ");
+  strcpy(Settings.pass, "                                ");
+  strcpy(Settings.ip, "               ");
+  strcpy(Settings.gateway, "               ");
   Settings.VolumeSteps = 60;
   Settings.MinAttenuation = 0;
   Settings.MaxAttenuation = 60;
