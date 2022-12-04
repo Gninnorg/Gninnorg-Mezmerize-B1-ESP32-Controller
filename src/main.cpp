@@ -316,13 +316,11 @@ byte getUserInput()
 
   if (interruptCounter > 0)
   {
-
     portENTER_CRITICAL(&timerMux);
     interruptCounter--;
     portEXIT_CRITICAL(&timerMux);
 
     totalInterruptCounter++;
-
   }
 
   byte receivedInput = KEY_NONE;
