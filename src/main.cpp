@@ -742,6 +742,8 @@ void setup()
   relayController.begin();
   muses.begin();
   oled.begin();
+  oled.lcdOn();
+  oled.clear();
 
   // Start IR reader
   irmp_init();
@@ -752,18 +754,19 @@ void setup()
   Serial.print("pass:");Serial.println(Settings.pass);
   Serial.print("gateway:");Serial.println(Settings.gateway);
   Serial.print("ip:");Serial.println(Settings.ip);
+  oled.clear();
+  oled.setCursor(0, 0);
+  oled.print("Connecting to Wifi");
   setupWIFIsupport();
+  oled.clear();
   // OTA - END
 
-  oled.lcdOn();
   // Define all pins as OUTPUT and disable all relais
   for (byte pin = 0; pin <= 7; pin++)
   {
     relayController.pinMode(pin, OUTPUT);
     relayController.digitalWrite(pin, LOW);
   }
-
-  
 
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
   if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
@@ -780,43 +783,43 @@ void setup()
   mil_On = millis();
   oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
   // If triggers are active then wait for the set number of seconds and turn them on
-  unsigned long delayTrigger1 = (Settings.Trigger1Active) ? (mil_On + Settings.Trigger1OnDelay * 1000) : 0;
-  unsigned long delayTrigger2 = (Settings.Trigger2Active) ? (mil_On + Settings.Trigger2OnDelay * 1000) : 0;
-
+  unsigned long delayTrigger1 = (Settings.Trigger1Active && Settings.Trigger1OnDelay) ? (mil_On + Settings.Trigger1OnDelay * 1000) : 0;
+  unsigned long delayTrigger2 = (Settings.Trigger2Active && Settings.Trigger2OnDelay) ? (mil_On + Settings.Trigger2OnDelay * 1000) : 0;
+  
   if (delayTrigger1 || delayTrigger2)
   {
     oled.clear();
     oled.print(F("Wait..."));
+  
+    while (delayTrigger1 || delayTrigger2)
+    {
+      if (millis() > delayTrigger1 && delayTrigger1 != 0)
+      {
+        setTrigger1On();
+        delayTrigger1 = 0;
+        oled.print3x3Number(2, 1, 0, false);
+      }
+      else
+      {
+        if (Settings.Trigger1Active && delayTrigger1 != 0)
+          oled.print3x3Number(2, 1, (delayTrigger1 - millis()) / 1000, false);
+      }
+
+      if (millis() > delayTrigger2 && delayTrigger2 != 0)
+      {
+        setTrigger2On();
+        delayTrigger2 = 0;
+        oled.print3x3Number(11, 1, 0, false);
+      }
+      else
+      {
+        if (Settings.Trigger2Active && delayTrigger2 != 0)
+          oled.print3x3Number(11, 1, (delayTrigger2 - millis()) / 1000, false);
+      }
+    }
+    oled.clear();
   }
 
-  while (delayTrigger1 || delayTrigger2)
-  {
-    if (millis() > delayTrigger1 && delayTrigger1 != 0)
-    {
-      setTrigger1On();
-      delayTrigger1 = 0;
-      oled.print3x3Number(2, 1, 0, false);
-    }
-    else
-    {
-      if (Settings.Trigger1Active && delayTrigger1 != 0)
-        oled.print3x3Number(2, 1, (delayTrigger1 - millis()) / 1000, false);
-    }
-
-    if (millis() > delayTrigger2 && delayTrigger2 != 0)
-    {
-      setTrigger2On();
-      delayTrigger2 = 0;
-      oled.print3x3Number(11, 1, 0, false);
-    }
-    else
-    {
-      if (Settings.Trigger2Active && delayTrigger2 != 0)
-        oled.print3x3Number(11, 1, (delayTrigger2 - millis()) / 1000, false);
-    }
-  }
-
-  oled.clear();
   setInput(RuntimeSettings.CurrentInput);
   RuntimeSettings.CurrentVolume = minimum(RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput], Settings.MaxStartVolume); // Avoid setting volume higher than MaxStartVol
   unmute();
@@ -1112,16 +1115,19 @@ float getTemperature(uint8_t pinNmbr)
   uint16_t sensorValue = 0;
   float Vin = 3.3;   // Input voltage 5V for Arduino Nano V3
   float Vout = 0;    // Measured voltage
-  float Rref = 4700; // Reference resistor's value in ohms
+  float Rref = 10000; // Reference resistor's value in ohms
   float Rntc = 0;    // Measured resistance of NTC
   float Temp;
 
-  sensorValue = analogRead(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
+  for (uint8_t i = 0; i < 8; i++) 
+    sensorValue = sensorValue + analogRead(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
+  sensorValue = sensorValue / 8;
 
   Vout = (sensorValue * Vin) / 4095.0; // Convert Vout to volts
   Rntc = Rref / ((Vin / Vout) - 1);    // Formula to calculate the resisatance of the NTC
 
   Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
+  Serial.print("Sensor: "); Serial.print(sensorValue); Serial.print("  Temp: "); Serial.println(Temp);
   return (Temp);
 }
 
