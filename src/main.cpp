@@ -654,6 +654,12 @@ void setupWIFIsupport() {
     Serial.print("AP IP address: ");
     Serial.println(IP); 
 
+    oled.clear();
+    oled.setCursor(0, 1);
+    oled.print(F("Configure Wifi:"));
+    oled.setCursor(0, 3);
+    oled.print(IP);
+
     // Web Server Root URL
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
       request->send(SPIFFS, "/wifimanager.html", "text/html");
@@ -704,6 +710,11 @@ void setupWIFIsupport() {
 
       writeSettingsToEEPROM();
       request->send(200, "text/plain", "Done. ESP will restart, connect to your router and go to IP address: " + String(Settings.ip));
+      oled.clear();
+      oled.setCursor(0, 1);
+      oled.print(F("Wifi is configured"));
+      oled.setCursor(0, 3);
+      oled.print(F("Restarting..."));
       delay(3000);
       ESP.restart();
     });
