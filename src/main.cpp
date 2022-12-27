@@ -2,18 +2,13 @@
 **
 **    Controller for Mezmerize B1 Buffer using Muses72320 potentiometer
 **
-**    Copyright (c) 2020 Carsten Grønning, Jan Abkjer Tofft
+**    Copyright (c) 2019-2022 Carsten Grønning, Jan Abkjer Tofft
 **
-**    2019-2020
+**    2019-2022
 **
 */
 
 #define VERSION (float)0.98
-
-//#undef max
-//#define max(a,b) ((a)>(b)?(a):(b))
-
-
 
 #include <Wire.h>
 #include <Adafruit_MCP23008.h>
@@ -42,7 +37,7 @@
 #define ROTARY1_SW_PIN 27
 
 #include <irmpSelectMain15Protocols.h> // This enables 15 main protocols
-//#define IRMP_SUPPORT_NEC_PROTOCOL        1 // this enables only one protocol
+#define IRMP_SUPPORT_NEC_PROTOCOL   1  // this enables only one protocol
 
 #include <irmp.hpp>
 
@@ -1207,6 +1202,10 @@ void loop()
         displayMute();
       }
       break;
+    case KEY_SELECT:
+      // Set channel balance
+      // TO DO Insert new code here
+      break;
     }
     break;
 
@@ -2201,38 +2200,38 @@ void setSettingsToDefault()
   Settings.MaxStartVolume = Settings.VolumeSteps;
   Settings.MuteLevel = 0;
   Settings.RecallSetLevel = true;
-  Settings.IR_UP.address = 0x24;
-  Settings.IR_UP.command = 0x0;
-  Settings.IR_DOWN.address = 0x24;
-  Settings.IR_DOWN.command = 0x0;
+  Settings.IR_UP.address = 0x2;
+  Settings.IR_UP.command = 0xA;
+  Settings.IR_DOWN.address = 0x2;
+  Settings.IR_DOWN.command = 0xB;
   Settings.IR_REPEAT.address = 0x00;
   Settings.IR_REPEAT.command = 0x00;
-  Settings.IR_LEFT.address = 0x24;
-  Settings.IR_LEFT.command = 0x0;
-  Settings.IR_RIGHT.address = 0x24;
-  Settings.IR_RIGHT.command = 0x0;
-  Settings.IR_SELECT.address = 0x24;
-  Settings.IR_SELECT.command = 0x0;
-  Settings.IR_BACK.address = 0x24;
-  Settings.IR_BACK.command = 0x0;
-  Settings.IR_MUTE.address = 0x24;
-  Settings.IR_MUTE.command = 0x0;
-  Settings.IR_PREVIOUS.address = 0x24;
-  Settings.IR_PREVIOUS.command = 0x0;
-  Settings.IR_ONOFF.address = 0x24;
-  Settings.IR_ONOFF.command = 0x0;
-  Settings.IR_1.address = 0x24;
+  Settings.IR_LEFT.address = 0x2;
+  Settings.IR_LEFT.command = 0x1D;
+  Settings.IR_RIGHT.address = 0x2;
+  Settings.IR_RIGHT.command = 0x1B;
+  Settings.IR_SELECT.address = 0x2;
+  Settings.IR_SELECT.command = 0x19;
+  Settings.IR_BACK.address = 0x2;
+  Settings.IR_BACK.command = 0x1F;
+  Settings.IR_MUTE.address = 0x2;
+  Settings.IR_MUTE.command = 0x1C;
+  Settings.IR_PREVIOUS.address = 0x00;
+  Settings.IR_PREVIOUS.command = 0x00;
+  Settings.IR_ONOFF.address = 0x2;
+  Settings.IR_ONOFF.command = 0xF;
+  Settings.IR_1.address = 0x2;
   Settings.IR_1.command = 0x0;
-  Settings.IR_2.address = 0x24;
-  Settings.IR_2.command = 0x0;
-  Settings.IR_3.address = 0x24;
-  Settings.IR_3.command = 0x0;
-  Settings.IR_4.address = 0x24;
-  Settings.IR_4.command = 0x0;
-  Settings.IR_5.address = 0x24;
-  Settings.IR_5.command = 0x0;
-  Settings.IR_6.address = 0x24;
-  Settings.IR_6.command = 0x0;
+  Settings.IR_2.address = 0x2;
+  Settings.IR_2.command = 0x1;
+  Settings.IR_3.address = 0x2;
+  Settings.IR_3.command = 0x2;
+  Settings.IR_4.address = 0x2;
+  Settings.IR_4.command = 0x3;
+  Settings.IR_5.address = 0x2;
+  Settings.IR_5.command = 0x4;
+  Settings.IR_6.address = 0x2;
+  Settings.IR_6.command = 0x5;
   Settings.Input[0].Active = INPUT_NORMAL;
   strcpy(Settings.Input[0].Name, "Input 1   ");
   Settings.Input[0].MaxVol = Settings.VolumeSteps;
@@ -2264,7 +2263,7 @@ void setSettingsToDefault()
   Settings.Trigger2Active = 1;
   Settings.Trigger2Type = 0;
   Settings.Trigger2OnDelay = 0;
-  Settings.Trigger2Temp = 00;
+  Settings.Trigger2Temp = 0;
   Settings.TriggerInactOffTimer = 0;
   Settings.ScreenSaverActive = true;
   Settings.DisplayOnLevel = 3;
