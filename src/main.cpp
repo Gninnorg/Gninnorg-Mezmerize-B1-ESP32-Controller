@@ -8,7 +8,7 @@
 **
 */
 
-#define VERSION (float)0.98
+#define VERSION (float)0.99
 
 #include <Wire.h>
 #include <Adafruit_MCP23008.h>
@@ -35,6 +35,7 @@
 #define ROTARY1_CW_PIN 25
 #define ROTARY1_CCW_PIN 26
 #define ROTARY1_SW_PIN 27
+#define POWER_RELAY 4
 
 #include <irmpSelectMain15Protocols.h> // This enables 15 main protocols
 #define IRMP_SUPPORT_NEC_PROTOCOL   1  // this enables only one protocol
@@ -643,7 +644,7 @@ void setupWIFIsupport() {
     // Connect to Wi-Fi network with SSID and password
     Serial.println("Setting AP (Access Point)");
     // NULL sets an open Access Point
-    WiFi.softAP("PreAmp Controller", NULL);
+    WiFi.softAP("PreAmp", NULL);
 
     IPAddress IP = WiFi.softAPIP();
     Serial.print("AP IP address: ");
@@ -651,13 +652,15 @@ void setupWIFIsupport() {
 
     oled.clear();
     oled.setCursor(0, 1);
-    oled.print(F("Configure Wifi:"));
-    oled.setCursor(0, 3);
+    oled.print(F("WiFi: PreAmp"));
+    oled.setCursor(0, 2);
     oled.print(IP);
+    delay(10000);
+
 
     // Web Server Root URL
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/wifimanager.html", "text/html");
+      request->send(SPIFFS, "/wifi.html", "text/html");
     });
     
     server.serveStatic("/", SPIFFS, "/");
@@ -734,6 +737,10 @@ void setup()
   pinMode(NTC1_PIN, INPUT);
   pinMode(NTC2_PIN, INPUT);
 
+  // Turn on Mezmerize B1 Buffer
+  pinMode(POWER_RELAY, OUTPUT);
+  digitalWrite(POWER_RELAY, HIGH);
+  
   relayController.begin();
   muses.begin();
   oled.begin();
@@ -750,6 +757,7 @@ void setup()
   Serial.print("gateway:");Serial.println(Settings.gateway);
   Serial.print("ip:");Serial.println(Settings.ip);
   oled.clear();
+  oled.setCursor(0, 1);
   oled.setCursor(0, 1);
   oled.print("Connecting to Wifi");
   setupWIFIsupport();
@@ -773,6 +781,7 @@ void setup()
     oled.print(F("settings..."));
     delay(2000);
     writeDefaultSettingsToEEPROM();
+    ESP.restart();
   }
   // Settings read from EEPROM are read and are valid so let's move on!
   mil_On = millis();
@@ -1287,8 +1296,7 @@ void toStandbyMode()
   mute();
   setTrigger1Off();
   setTrigger2Off();
-  // Turn off Mezmerize
-  digitalWrite(4, LOW);
+  digitalWrite(POWER_RELAY, LOW);
   delay(3000);
   oled.lcdOff();
   while (getUserInput() != KEY_ONOFF) // getUserInput will take care of wakeup when KEY_ONOFF is received
@@ -2271,12 +2279,12 @@ void setSettingsToDefault()
   Settings.Input[5].MaxVol = Settings.VolumeSteps;
   Settings.Input[5].MinVol = 0;
   Settings.Trigger1Active = 1;
-  Settings.Trigger1Type = 0;
-  Settings.Trigger1OnDelay = 0;
+  Settings.Trigger1Type = 1;
+  Settings.Trigger1OnDelay = 1;
   Settings.Trigger1Temp = 0;
   Settings.Trigger2Active = 1;
-  Settings.Trigger2Type = 0;
-  Settings.Trigger2OnDelay = 0;
+  Settings.Trigger2Type = 1;
+  Settings.Trigger2OnDelay = 1;
   Settings.Trigger2Temp = 0;
   Settings.TriggerInactOffTimer = 0;
   Settings.ScreenSaverActive = true;
