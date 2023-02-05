@@ -750,7 +750,7 @@ void setup()
   Serial.print("gateway:");Serial.println(Settings.gateway);
   Serial.print("ip:");Serial.println(Settings.ip);
   oled.clear();
-  oled.setCursor(0, 0);
+  oled.setCursor(0, 1);
   oled.print("Connecting to Wifi");
   setupWIFIsupport();
   oled.clear();
@@ -767,16 +767,22 @@ void setup()
   if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
   {
     oled.clear();
-    oled.setCursor(0, 0);
-    oled.print("Restoring default");
     oled.setCursor(0, 1);
+    oled.print("Restoring default");
+    oled.setCursor(0, 2);
     oled.print(F("settings..."));
     delay(2000);
     writeDefaultSettingsToEEPROM();
   }
   // Settings read from EEPROM are read and are valid so let's move on!
   mil_On = millis();
+
   oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
+  
+  // Turn on Mezmerize
+  pinMode(4, OUTPUT);
+  digitalWrite(4, HIGH);
+  
   // If triggers are active then wait for the set number of seconds and turn them on
   unsigned long delayTrigger1 = (Settings.Trigger1Active && Settings.Trigger1OnDelay) ? (mil_On + Settings.Trigger1OnDelay * 1000) : 0;
   unsigned long delayTrigger2 = (Settings.Trigger2Active && Settings.Trigger2OnDelay) ? (mil_On + Settings.Trigger2OnDelay * 1000) : 0;
@@ -1275,6 +1281,8 @@ void toStandbyMode()
   mute();
   setTrigger1Off();
   setTrigger2Off();
+  // Turn off Mezmerize
+  digitalWrite(4, LOW);
   delay(3000);
   oled.lcdOff();
   while (getUserInput() != KEY_ONOFF) // getUserInput will take care of wakeup when KEY_ONOFF is received
