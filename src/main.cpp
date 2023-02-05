@@ -783,7 +783,8 @@ void setup()
   pinMode(4, OUTPUT);
   digitalWrite(4, HIGH);
   
-  // If triggers are active then wait for the set number of seconds and turn them on
+ /* TO DO
+ // If triggers are active then wait for the set number of seconds and turn them on
   unsigned long delayTrigger1 = (Settings.Trigger1Active && Settings.Trigger1OnDelay) ? (mil_On + Settings.Trigger1OnDelay * 1000) : 0;
   unsigned long delayTrigger2 = (Settings.Trigger2Active && Settings.Trigger2OnDelay) ? (mil_On + Settings.Trigger2OnDelay * 1000) : 0;
   
@@ -820,6 +821,9 @@ void setup()
     }
     oled.clear();
   }
+  */
+ setTrigger1On();
+ setTrigger2On();
 
   setInput(RuntimeSettings.CurrentInput);
   RuntimeSettings.CurrentVolume = minimum(RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput], Settings.MaxStartVolume); // Avoid setting volume higher than MaxStartVol
@@ -1005,7 +1009,9 @@ void displayInput()
 {
   if (Settings.DisplaySelectedInput)
   {
-    oled.setCursor(0, 0);
+    // Move Input display one line down if display of temperatures has been disabled
+    if (!Settings.DisplayTemperature1 && !Settings.DisplayTemperature2)
+      oled.setCursor(0, 1); else oled.setCursor(0, 0);
     oled.print(Settings.Input[RuntimeSettings.CurrentInput].Name);
   }
 }
