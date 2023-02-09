@@ -8,7 +8,7 @@
 **
 */
 
-#define VERSION (float)0.99
+#define VERSION (float)0.98
 
 #include <Wire.h>
 #include <Adafruit_MCP23008.h>
@@ -17,6 +17,7 @@
 #include <Muses72320.h>
 #include <MenuManager.h>
 #include <MenuData.h>
+#include <esp_adc_cal.h>
 
 #undef minimum
 #ifndef minimum
@@ -609,7 +610,7 @@ bool initWiFi() {
 
 // Replaces placeholder with LED state value
 String processor(const String& var) {
-  return String("Hej");
+  return String(getTemperature(NTC1_PIN)) + " " + String(getTemperature(NTC2_PIN));
 }
 
 void setupWIFIsupport() {
@@ -617,18 +618,6 @@ void setupWIFIsupport() {
   Serial.begin(115200);
 
   initSPIFFS();
-
-  // Load values saved in SPIFFS
-  /*
-  ssid = readFile(SPIFFS, ssidPath);
-  pass = readFile(SPIFFS, passPath);
-  ip = readFile(SPIFFS, ipPath);
-  gateway = readFile (SPIFFS, gatewayPath);
-  */
-  Serial.println(Settings.ssid);
-  Serial.println(Settings.pass);
-  Serial.println(Settings.ip);
-  Serial.println(Settings.gateway);
 
   if(initWiFi()) {
     // Route for root / web page
@@ -792,47 +781,43 @@ void setup()
   pinMode(4, OUTPUT);
   digitalWrite(4, HIGH);
   
- /* TO DO
- // If triggers are active then wait for the set number of seconds and turn them on
-  unsigned long delayTrigger1 = (Settings.Trigger1Active && Settings.Trigger1OnDelay) ? (mil_On + Settings.Trigger1OnDelay * 1000) : 0;
-  unsigned long delayTrigger2 = (Settings.Trigger2Active && Settings.Trigger2OnDelay) ? (mil_On + Settings.Trigger2OnDelay * 1000) : 0;
-  
+   // If triggers are active then wait for the set number of seconds and turn them on
+  unsigned long delayTrigger1 = (Settings.Trigger1Active) ? (mil_On + Settings.Trigger1OnDelay * 1000) : 0;
+  unsigned long delayTrigger2 = (Settings.Trigger2Active) ? (mil_On + Settings.Trigger2OnDelay * 1000) : 0;
+
   if (delayTrigger1 || delayTrigger2)
   {
     oled.clear();
     oled.print(F("Wait..."));
-  
-    while (delayTrigger1 || delayTrigger2)
-    {
-      if (millis() > delayTrigger1 && delayTrigger1 != 0)
-      {
-        setTrigger1On();
-        delayTrigger1 = 0;
-        oled.print3x3Number(2, 1, 0, false);
-      }
-      else
-      {
-        if (Settings.Trigger1Active && delayTrigger1 != 0)
-          oled.print3x3Number(2, 1, (delayTrigger1 - millis()) / 1000, false);
-      }
-
-      if (millis() > delayTrigger2 && delayTrigger2 != 0)
-      {
-        setTrigger2On();
-        delayTrigger2 = 0;
-        oled.print3x3Number(11, 1, 0, false);
-      }
-      else
-      {
-        if (Settings.Trigger2Active && delayTrigger2 != 0)
-          oled.print3x3Number(11, 1, (delayTrigger2 - millis()) / 1000, false);
-      }
-    }
-    oled.clear();
   }
-  */
- setTrigger1On();
- setTrigger2On();
+
+  while (delayTrigger1 || delayTrigger2)
+  {
+    if (millis() > delayTrigger1 && delayTrigger1 != 0)
+    {
+      setTrigger1On();
+      delayTrigger1 = 0;
+      oled.print3x3Number(2, 1, 0, false);
+    }
+    else
+    {
+      if (Settings.Trigger1Active && delayTrigger1 != 0)
+        oled.print3x3Number(2, 1, (delayTrigger1 - millis()) / 1000, false);
+    }
+
+    if (millis() > delayTrigger2 && delayTrigger2 != 0)
+    {
+      setTrigger2On();
+      delayTrigger2 = 0;
+      oled.print3x3Number(11, 1, 0, false);
+    }
+    else
+    {
+      if (Settings.Trigger2Active && delayTrigger2 != 0)
+        oled.print3x3Number(11, 1, (delayTrigger2 - millis()) / 1000, false);
+    }
+  }
+  oled.clear();
 
   setInput(RuntimeSettings.CurrentInput);
   RuntimeSettings.CurrentVolume = minimum(RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput], Settings.MaxStartVolume); // Avoid setting volume higher than MaxStartVol
@@ -852,7 +837,7 @@ void setTrigger1On()
     relayController.digitalWrite(6, HIGH);
     if (Settings.Trigger1Type == 0) // Momentary
     {
-      delay(100);
+      delay(200);
       relayController.digitalWrite(6, LOW);
     }
   }
@@ -865,7 +850,7 @@ void setTrigger2On()
     relayController.digitalWrite(7, HIGH);
     if (Settings.Trigger2Type == 0) // Momentary
     {
-      delay(100);
+      delay(200);
       relayController.digitalWrite(7, LOW);
     }
   }
@@ -878,7 +863,7 @@ void setTrigger1Off()
     if (Settings.Trigger1Type == 0) // Momentary
     {
       relayController.digitalWrite(6, HIGH);
-      delay(100);
+      delay(200);
     }
     relayController.digitalWrite(6, LOW);
   }
@@ -891,7 +876,7 @@ void setTrigger2Off()
     if (Settings.Trigger2Type == 0) // Momentary
     {
       relayController.digitalWrite(7, HIGH);
-      delay(100);
+      delay(200);
     }
     relayController.digitalWrite(7, LOW);
   }
@@ -1125,25 +1110,34 @@ void displayTempDetails(float Temp, uint8_t TriggerTemp, uint8_t DispTemp, uint8
   mil_onRefreshTemperatureDisplay = millis();
 }
 
+// Read analog with improved accuracy - see https://github.com/G6EJD/ESP32-ADC-Accuracy-Improvement/blob/main/ESP32_ADC_Read_Voltage_Accuracy_V2.ino
+float ReadVoltage(byte ADC_Pin) {
+  float calibration  = 1.000; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  float vref = 1100;
+  esp_adc_cal_characteristics_t adc_chars;
+  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
+  vref = adc_chars.vref; // Obtain the device ADC reference voltage
+  return (analogRead(ADC_Pin) / 4095.0) * 3.3 * (1100 / vref) * calibration;  // ESP by design reference voltage in mV
+}
+
 // Return measured temperature from 4.7K NTC connected to pinNmbr
 float getTemperature(uint8_t pinNmbr)
 {
-  uint16_t sensorValue = 0;
-  float Vin = 3.3;   // Input voltage 5V for Arduino Nano V3
+  float Vin = 3.3;   // Input voltage 3.3V for ESP32
   float Vout = 0;    // Measured voltage
   float Rref = 2200; // Reference resistor's value in ohms
   float Rntc = 0;    // Measured resistance of NTC+
   float Temp;
 
-  for (uint8_t i = 0; i < 8; i++) 
-    sensorValue = sensorValue + analogRead(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
-  sensorValue = sensorValue / 8;
+  for (uint8_t i = 0; i < 128; i++) 
+    Vout = Vout + ReadVoltage(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
+  Vout = Vout / 128;
 
-  Vout = (sensorValue * Vin) / 4095.0; // Convert Vout to volts
-  Rntc = Rref / ((Vin / Vout) - 1);    // Formula to calculate the resisatance of the NTC
+  //Rntc = Rref / ((Vin / Vout) - 1);    // Formula to calculate the resistance of the NTC
+  Rntc = Rref * (1 / ((Vin / Vout) - 1));
 
   Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
-  Serial.print("Sensor: "); Serial.print(sensorValue); Serial.print("  Temp: "); Serial.println(Temp);
+  Serial.print("Voltage: "); Serial.print(Vout); Serial.print("  Temp: "); Serial.println(Temp);
   return (Temp);
 }
 
