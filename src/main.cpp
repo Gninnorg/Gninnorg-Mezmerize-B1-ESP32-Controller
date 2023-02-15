@@ -797,7 +797,7 @@ void setup()
     {
       setTrigger1On();
       delayTrigger1 = 0;
-      oled.print3x3Number(2, 1, 0, false);
+      //oled.print3x3Number(2, 1, 0, false);
     }
     else
     {
@@ -809,7 +809,7 @@ void setup()
     {
       setTrigger2On();
       delayTrigger2 = 0;
-      oled.print3x3Number(11, 1, 0, false);
+      //oled.print3x3Number(11, 1, 0, false);
     }
     else
     {
@@ -1048,13 +1048,13 @@ void displayTempDetails(float Temp, uint8_t TriggerTemp, uint8_t DispTemp, uint8
   else
     Col = 5;
   oled.setCursor(Col, 3);
-  if (Temp < 0)
+  if (Temp == 0)
   {
-    oled.print(F("OFF "));
+    oled.print(F("   "));
     if (DispTemp == 3)
     {
       oled.setCursor(Col, 2);
-      oled.print(F("AMP "));
+      oled.print(F("   "));
     }
   }
   else if (Temp > TriggerTemp)
@@ -1112,11 +1112,12 @@ void displayTempDetails(float Temp, uint8_t TriggerTemp, uint8_t DispTemp, uint8
 
 // Read analog with improved accuracy - see https://github.com/G6EJD/ESP32-ADC-Accuracy-Improvement/blob/main/ESP32_ADC_Read_Voltage_Accuracy_V2.ino
 float ReadVoltage(byte ADC_Pin) {
-  float calibration  = 1.000; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  float calibration  = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   float vref = 1100;
   esp_adc_cal_characteristics_t adc_chars;
   esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
   vref = adc_chars.vref; // Obtain the device ADC reference voltage
+  Serial.print("vref: "); Serial.print(vref);
   return (analogRead(ADC_Pin) / 4095.0) * 3.3 * (1100 / vref) * calibration;  // ESP by design reference voltage in mV
 }
 
@@ -1129,15 +1130,19 @@ float getTemperature(uint8_t pinNmbr)
   float Rntc = 0;    // Measured resistance of NTC+
   float Temp;
 
-  for (uint8_t i = 0; i < 128; i++) 
+  for (uint8_t i = 0; i < 16; i++) 
     Vout = Vout + ReadVoltage(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
-  Vout = Vout / 128;
+  Vout = Vout / 16;
 
   //Rntc = Rref / ((Vin / Vout) - 1);    // Formula to calculate the resistance of the NTC
   Rntc = Rref * (1 / ((Vin / Vout) - 1));
 
-  Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
-  Serial.print("Voltage: "); Serial.print(Vout); Serial.print("  Temp: "); Serial.println(Temp);
+  if (Rntc < 0) 
+    Temp = 0;
+  else
+    Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
+  
+  Serial.print(" Voltage: "); Serial.print(Vout); Serial.print(" Resistance: "); Serial.print(Rntc); Serial.print("  Temp: "); Serial.println(Temp);
   return (Temp);
 }
 
@@ -1621,7 +1626,7 @@ byte processMenuCommand(byte cmdId)
     oled.setCursor(0, 3);
     oled.print(F("jan"));
     oled.write(160);
-    oled.print(F("tofft.dk (c)2020"));
+    oled.print(F("tofft.dk (c)2023"));
     delay(5000);
     complete = true;
     break;
