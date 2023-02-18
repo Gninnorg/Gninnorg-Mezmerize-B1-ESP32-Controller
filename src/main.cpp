@@ -2,9 +2,9 @@
 **
 **    Controller for Mezmerize B1 Buffer using Muses72320 potentiometer
 **
-**    Copyright (c) 2019-2022 Carsten Grønning, Jan Abkjer Tofft
+**    Copyright (c) 2019-2023 Carsten Grønning, Jan Abkjer Tofft
 **
-**    2019-2022
+**    2019-2023
 **
 */
 
@@ -51,6 +51,7 @@ void setTrigger1Off(void);
 void setTrigger2Off(void);
 void displayTemperatures(void);
 void displayTempDetails(float, uint8_t, uint8_t, uint8_t);
+float readVoltage(byte);
 float getTemperature(uint8_t);
 void displayVolume(void);
 void displayMute(void);
@@ -481,7 +482,7 @@ byte getUserInput()
 String getRuntimeSettings() 
 {
   String text = "<DOCTYPE html><html><head></meta></head><body>";
-  text.concat("<h2>Mezmerize B1 preamlifier</h2>");
+  text.concat("<h2>Mezmerize B1 preamplifier</h2>");
   text = text + "Volume: " + String((int)RuntimeSettings.CurrentVolume) + "</p>";
   text = text + "Input : " + String(Settings.Input[RuntimeSettings.CurrentInput].Name) + "</p>";
   text = text + "</body></html>";
@@ -502,22 +503,6 @@ const char* PARAM_INPUT_1 = "ssid";
 const char* PARAM_INPUT_2 = "pass";
 const char* PARAM_INPUT_3 = "ip";
 const char* PARAM_INPUT_4 = "gateway";
-
-
-
-//Variables to save values from HTML form
-/*String ssid;
-String pass;
-String ip;
-String gateway;
-*/
-
-// File paths to save input values permanently
-/*const char* ssidPath = "/ssid.txt";
-const char* passPath = "/pass.txt";
-const char* ipPath = "/ip.txt";
-const char* gatewayPath = "/gateway.txt";
-*/
 
 IPAddress localIP;
 //IPAddress localIP(192, 168, 1, 200); // hardcoded
@@ -610,6 +595,14 @@ bool initWiFi() {
 
 // Replaces placeholder with LED state value
 String processor(const String& var) {
+  if(var == "STATE"){
+    if (appMode != APP_STANDBY_MODE){
+      return "ON";
+    }
+    else{
+      return "SLEEPING";
+    }
+  }
   return String(getTemperature(NTC1_PIN)) + " " + String(getTemperature(NTC2_PIN));
 }
 
@@ -1111,8 +1104,10 @@ void displayTempDetails(float Temp, uint8_t TriggerTemp, uint8_t DispTemp, uint8
 }
 
 // Read analog with improved accuracy - see https://github.com/G6EJD/ESP32-ADC-Accuracy-Improvement/blob/main/ESP32_ADC_Read_Voltage_Accuracy_V2.ino
-float ReadVoltage(byte ADC_Pin) {
-  float calibration  = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+float readVoltage(byte ADC_Pin) {
+  // Carsten
+  // float calibration  = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  float calibration  = 1.130; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   float vref = 1100;
   esp_adc_cal_characteristics_t adc_chars;
   esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
@@ -1131,7 +1126,7 @@ float getTemperature(uint8_t pinNmbr)
   float Temp;
 
   for (uint8_t i = 0; i < 16; i++) 
-    Vout = Vout + ReadVoltage(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
+    Vout = Vout + readVoltage(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
   Vout = Vout / 16;
 
   //Rntc = Rref / ((Vin / Vout) - 1);    // Formula to calculate the resistance of the NTC
