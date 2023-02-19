@@ -56,7 +56,7 @@ float getTemperature(uint8_t);
 void displayVolume(void);
 void displayMute(void);
 void displayInput(void);
-uint8_t getAttenuation(uint8_t, uint8_t, uint8_t, uint8_t);
+int16_t getAttenuation(uint8_t, uint8_t, uint8_t, uint8_t);
 void setVolume(int16_t);
 void mute(void);
 void unmute(void);
@@ -614,9 +614,9 @@ String processor(const String& var) {
       for (int i=0; i<61; i++)
       {
         if (i != RuntimeSettings.CurrentVolume)
-          text = text + String(i) + " " + String(getAttenuation(Settings.VolumeSteps, i, Settings.MinAttenuation, Settings.MaxAttenuation)) + "<BR>";
+          text = text + String(i) + " " + String(getAttenuation(Settings.VolumeSteps, i, Settings.MinAttenuation, Settings.MaxAttenuation)/2) + " dB <BR>";
         else
-          text = text + "<b>" + String(i) + " " + String(getAttenuation(Settings.VolumeSteps, i, Settings.MinAttenuation, Settings.MaxAttenuation)) + "</b><BR>";
+          text = text + "<b>" + String(i) + " " + String(getAttenuation(Settings.VolumeSteps, i, Settings.MinAttenuation, Settings.MaxAttenuation)/2) + " dB</b><BR>";
       }
       return(text);
       //return String(RuntimeSettings.CurrentVolume) + " (" + String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation)) + " -dB (this is not correct!))";
@@ -905,7 +905,7 @@ void setTrigger2Off()
 
 // TO DO - is this returning the right values????
 // Return the attenuation required by the setvolume function of the Muses72320 based upon the configured number of steps, the selected step and the configured minimum and maximum attenuation in dBs.
-uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
+int16_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
 {
   uint8_t att_dB = max_dB - min_dB;
   float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
@@ -970,7 +970,7 @@ void displayVolume()
       {
         oled.setCursor(17, 0);
         oled.print(F("-dB"));
-        oled.print3x3Number(10, 1, (getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation) / 2) * 10, true); // Display volume as -dB - RuntimeSettings.CurrentAttennuation are converted to -dB and multiplied by 10 to be able to show 0.5 dB steps
+        oled.print3x3Number(10, 1, (getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation) / 2) * -10, true); // Display volume as -dB - RuntimeSettings.CurrentAttennuation are converted to -dB and multiplied by 10 to be able to show 0.5 dB steps
       }
     }
     else
