@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="style.css">
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
   </head>
   <body>
     <div class="topnav">
@@ -14,12 +13,24 @@
     <div class="content">
       <div class="card-grid">
         <div class="card">
-          <p class="card-title"><i class="fa-solid fa-power-off"></i> POWER</p>
+          <p class="card-title">POWER</p>
           <p>
             <a href="on"><button class="button-on">ON</button></a>
             <a href="off"><button class="button-off">OFF</button></a>
           </p>
           <p class="state">%STATE%</p>
+        </div>
+        <div class="card">
+          <p class="card-title"></i>INPUT</p>
+          <p class="state">%SELECTEDINPUT%</p>
+        </div>
+        <div class="card">
+          <p class="card-title"></i>VOLUME</p>
+          <p class="state">%VOLUME%</p>
+        </div>
+        <div class="card">
+          <p class="card-title"></i>TEMPERATURES</p>
+          <p class="state">%TEMP1% %TEMP2%</p>
         </div>
       </div>
     </div>

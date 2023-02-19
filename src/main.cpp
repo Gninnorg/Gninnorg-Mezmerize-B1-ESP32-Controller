@@ -593,7 +593,7 @@ bool initWiFi() {
   return true;
 }
 
-// Replaces placeholder with LED state value
+// Replaces placeholders with values
 String processor(const String& var) {
   if(var == "STATE"){
     if (appMode != APP_STANDBY_MODE){
@@ -603,7 +603,35 @@ String processor(const String& var) {
       return "SLEEPING";
     }
   }
-  return String(getTemperature(NTC1_PIN)) + " " + String(getTemperature(NTC2_PIN));
+  if(var == "SELECTEDINPUT"){
+    return String(Settings.Input[RuntimeSettings.CurrentInput].Name);
+  }
+  if(var == "VOLUME"){
+    if (!RuntimeSettings.Muted)
+    {
+      String text;
+      text = "VolumeSteps: " + String(Settings.VolumeSteps) + " MinAttenuation: " + String(Settings.MinAttenuation) + " MaxAttenuation: " + String(Settings.MaxAttenuation) + "<BR>";
+      for (int i=0; i<61; i++)
+      {
+        if (i != RuntimeSettings.CurrentVolume)
+          text = text + String(i) + " " + String(getAttenuation(Settings.VolumeSteps, i, Settings.MinAttenuation, Settings.MaxAttenuation)) + "<BR>";
+        else
+          text = text + "<b>" + String(i) + " " + String(getAttenuation(Settings.VolumeSteps, i, Settings.MinAttenuation, Settings.MaxAttenuation)) + "</b><BR>";
+      }
+      return(text);
+      //return String(RuntimeSettings.CurrentVolume) + " (" + String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation)) + " -dB (this is not correct!))";
+    }
+    else
+      return ("MUTED");
+  }
+  if(var == "TEMP1"){
+    return String(getTemperature(NTC1_PIN));
+  }
+  if(var == "TEMP2"){
+    return String(getTemperature(NTC2_PIN));
+  }
+  // Unknown parameter
+  return ("n/a)");
 }
 
 void setupWIFIsupport() {
@@ -875,6 +903,8 @@ void setTrigger2Off()
   }
 }
 
+// TO DO - is this returning the right values????
+// Return the attenuation required by the setvolume function of the Muses72320 based upon the configured number of steps, the selected step and the configured minimum and maximum attenuation in dBs.
 uint8_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
 {
   uint8_t att_dB = max_dB - min_dB;
