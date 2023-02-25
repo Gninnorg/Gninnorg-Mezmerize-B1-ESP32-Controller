@@ -45,7 +45,7 @@
 
 // Declarations
 void startUp(void);
-void ScreenSaver(bool);
+void ScreenSaverOff(void);
 void setTrigger1On(void);
 void setTrigger2On(void);
 void setTrigger1Off(void);
@@ -446,11 +446,20 @@ byte getUserInput()
   }
 
   // Turn Screen Saver on/off if it is activated and if no user input has been received during the defined number of seconds
-  if ((!ScreenSaverIsOn && (millis() - mil_LastUserInput > (unsigned long)Settings.DisplayTimeout * 1000)))
-    ScreenSaver(true);
+  if (receivedInput == KEY_NONE)
+  {
+    if ((!ScreenSaverIsOn && (millis() - mil_LastUserInput > (unsigned long)Settings.DisplayTimeout * 1000)) && Settings.ScreenSaverActive)
+    {
+      if (Settings.DisplayDimLevel == 0)
+        oled.lcdOff();
+      else
+        oled.backlight(Settings.DisplayDimLevel * 4 - 1);
+      ScreenSaverIsOn = true;
+    }
+  }
   else
-    ScreenSaver(false);
-  
+    ScreenSaverOff();
+
   // If inactivity timer is set, go to standby if the set number of hours have passed since last user input
   if ((appMode != APP_STANDBY_MODE) && (Settings.TriggerInactOffTimer > 0) && ((mil_LastUserInput + Settings.TriggerInactOffTimer * 3600000) < millis()))
   {
@@ -461,29 +470,15 @@ byte getUserInput()
   return (receivedInput);
 }
 
-void ScreenSaver(bool activate)
+void ScreenSaverOff()
 {
-  if (activate = true && Settings.ScreenSaverActive)
+  mil_LastUserInput = millis();
+  if (ScreenSaverIsOn && appMode != APP_STANDBY_MODE)
   {
-    if (!ScreenSaverIsOn && appMode != APP_STANDBY_MODE)
-    {
-      if (Settings.DisplayDimLevel == 0)
-        oled.lcdOff();
-      else
-        oled.backlight(Settings.DisplayDimLevel * 4 - 1);
-      ScreenSaverIsOn = true;
-    }
-  }
-  else
-  {
-    mil_LastUserInput = millis();
-    if (ScreenSaverIsOn && appMode != APP_STANDBY_MODE)
-    {
-      if (Settings.DisplayDimLevel == 0)
-        oled.lcdOn();
-      oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
-      ScreenSaverIsOn = false;
-    }
+    if (Settings.DisplayDimLevel == 0)
+      oled.lcdOn();
+    oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
+    ScreenSaverIsOn = false;
   }
 }
 
@@ -533,8 +528,8 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     data[len] = 0;
     message = (char*)data;
     if (message.indexOf("Volume") >= 0) {
-      ScreenSaver(false); // Disable screen saver
       setVolume(message.substring(7).toInt());
+      ScreenSaverOff(); // Disable screen saver
     }
     // TO DO: Add other functions here: on/off, mute and select input
     if (strcmp((char*)data, "getValues") == 0) {
@@ -658,7 +653,6 @@ bool initWiFi() {
   return true;
 }
 
-// TO DO To be deleted when copied to new Websocket functionality
 // Replaces placeholders with values
 String processor(const String& var) {
   if(var == "STATE"){
