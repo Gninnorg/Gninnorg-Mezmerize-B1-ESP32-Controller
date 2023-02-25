@@ -62,6 +62,11 @@ void setVolume(int16_t);
 void mute(void);
 void unmute(void);
 boolean setInput(uint8_t);
+String getJSONCurrentValues(void);
+String getJSONOnStandbyState(void);
+String getJSONCurrentInput(void);
+String getJSONCurrentVolume(void);
+String getJSONTempValues(void);
 void readSettingsFromEEPROM(void);
 void writeSettingsToEEPROM(void);
 void writeDefaultSettingsToEEPROM(void);
@@ -231,7 +236,7 @@ unsigned long mil_LastUserInput = millis();
 // Used to time how often the display of temperatures is updated
 unsigned long mil_onRefreshTemperatureDisplay;
 // Update interval for the display of temperatures
-#define TEMP_REFRESH_INTERVAL 1000
+#define TEMP_REFRESH_INTERVAL 10000
 
 //  Initialize the menu
 enum AppModeValues
@@ -497,43 +502,62 @@ AsyncWebServer server(80);
 // Create a WebSocket object
 AsyncWebSocket ws("/ws");
 
-// TO DO Clean up/adapt
-String message = "";
-String sliderValue1 = "0";
-String sliderValue2 = "0";
-String sliderValue3 = "0";
+JSONVar JSONValues; //Json variable to hold values
 
-//Json Variable to Hold Slider Values
-JSONVar sliderValues;
-
-//Get current values
-String getCurrentValues(){
-  if (appMode == APP_STANDBY_MODE) sliderValues["OnState"] = "Standby"; else sliderValues["OnState"] = "On";
-  sliderValues["Input"] = String(Settings.Input[RuntimeSettings.CurrentInput].Name);
-  sliderValues["Volume"] = String(RuntimeSettings.CurrentVolume);
-  sliderValues["Temp1"] = String(int(getTemperature(NTC1_PIN)));
-  sliderValues["Temp2"] = String(int(getTemperature(NTC2_PIN)));
-
-  String jsonString = JSON.stringify(sliderValues);
-  return jsonString;
+// Get all current values as JSON
+String getJSONCurrentValues(){
+  if (appMode == APP_STANDBY_MODE) JSONValues["OnState"] = "Standby"; else JSONValues["OnState"] = "On";
+  JSONValues["Input"] = String(Settings.Input[RuntimeSettings.CurrentInput].Name);
+  JSONValues["Volume"] = String(RuntimeSettings.CurrentVolume);
+  JSONValues["Temp1"] = String(int(getTemperature(NTC1_PIN)));
+  JSONValues["Temp2"] = String(int(getTemperature(NTC2_PIN)));
+  return JSON.stringify(JSONValues);
 }
 
-void notifyClients(String sliderValues) {
-  ws.textAll(sliderValues);
+// Get On/Standby state as JSON
+String getJSONOnStandbyState() {
+  if (appMode == APP_STANDBY_MODE) JSONValues["OnState"] = "Standby"; else JSONValues["OnState"] = "On";
+  return JSON.stringify(JSONValues);
+}
+
+// Get selected input name as JSON
+String getJSONCurrentInput(){
+  JSONValues["Input"] = String(Settings.Input[RuntimeSettings.CurrentInput].Name);
+  return JSON.stringify(JSONValues);
+}
+
+// Get current volume as JSON
+String getJSONCurrentVolume(){
+  JSONValues["Volume"] = String(RuntimeSettings.CurrentVolume);
+  JSONValues["Volume_dB"] = String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation)/2);
+  return JSON.stringify(JSONValues);
+}
+
+// Get temperatures as JSON
+String getJSONTempValues() {
+  if (appMode == APP_STANDBY_MODE) JSONValues["OnState"] = "Standby"; else JSONValues["OnState"] = "On";
+  JSONValues["Temp1"] = String(int(getTemperature(NTC1_PIN)));
+  JSONValues["Temp2"] = String(int(getTemperature(NTC2_PIN)));
+  return JSON.stringify(JSONValues);
+}
+
+void notifyClients(String message) {
+  ws.textAll(message);
+  Serial.println("Sent: "+message);
 }
 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     data[len] = 0;
-    message = (char*)data;
-    if (message.indexOf("Volume") >= 0) {
+    String message = (char*)data;
+    if (message.indexOf("Volume:") >= 0) {
       setVolume(message.substring(7).toInt());
       ScreenSaverOff(); // Disable screen saver
     }
     // TO DO: Add other functions here: on/off, mute and select input
     if (strcmp((char*)data, "getValues") == 0) {
-      notifyClients(getCurrentValues());
+      notifyClients(getJSONCurrentValues());
     }
   }
 }
@@ -683,9 +707,6 @@ String processor(const String& var) {
 }
 
 void setupWIFIsupport() {
-  // Serial port for debugging purposes
-  Serial.begin(115200);
-
   initSPIFFS();
 
   if(initWiFi()) {
@@ -785,6 +806,9 @@ void setupWIFIsupport() {
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
+  // Serial port for debugging purposes
+  Serial.begin(115200);
+  
   Wire.begin();
   
   // Read setting from EEPROM
@@ -801,7 +825,6 @@ void setup()
     oled.print(F("settings..."));
     delay(2000);
     writeDefaultSettingsToEEPROM();
-    ESP.restart();
   }
 
   setupRotaryEncoders();
@@ -889,6 +912,8 @@ void setup()
   UIkey = KEY_NONE;
   lastReceivedInput = KEY_NONE;
   appMode = APP_NORMAL_MODE;
+
+  Serial.println("Setup() done!");
 }
 
 void setTrigger1On()
@@ -969,7 +994,7 @@ void setVolume(int16_t newVolumeStep)
     RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput] = RuntimeSettings.CurrentVolume;
     muses.setVolume(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation));
     displayVolume();
-    notifyClients(getCurrentValues());
+    notifyClients(getJSONCurrentVolume());
   }
 }
 
@@ -1056,7 +1081,7 @@ boolean setInput(uint8_t NewInput)
     if (RuntimeSettings.Muted)
       unmute();
     displayInput();
-    notifyClients(getCurrentValues());
+    notifyClients(getJSONCurrentInput());
     return true;
   }
   return false;
@@ -1178,12 +1203,11 @@ void displayTempDetails(float Temp, uint8_t TriggerTemp, uint8_t DispTemp, uint8
 float readVoltage(byte ADC_Pin) {
   // Carsten
   // float calibration  = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
-  float calibration  = 1.130; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  float calibration  = 1.000; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   float vref = 1100;
   esp_adc_cal_characteristics_t adc_chars;
   esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
   vref = adc_chars.vref; // Obtain the device ADC reference voltage
-  Serial.print("vref: "); Serial.print(vref);
   return (analogRead(ADC_Pin) / 4095.0) * 3.3 * (1100 / vref) * calibration;  // ESP by design reference voltage in mV
 }
 
@@ -1196,18 +1220,21 @@ float getTemperature(uint8_t pinNmbr)
   float Rntc = 0;    // Measured resistance of NTC+
   float Temp;
 
-  for (uint8_t i = 0; i < 16; i++) 
+  for (uint8_t i = 0; i < 8; i++) 
     Vout = Vout + readVoltage(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
-  Vout = Vout / 16;
+  Vout = Vout / 8;
 
   Rntc = Rref * (1 / ((Vin / Vout) - 1)); // Formula to calculate the resistance of the NTC
 
   if (Rntc < 0) 
     Temp = 0;
   else
-    Temp = (-25.37 * log(Rntc)) + 239.43; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
+    Temp = (-25.37 * log(Rntc)) + 239.43, 0.0; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
   
-  Serial.print(" Voltage: "); Serial.print(Vout); Serial.print(" Resistance: "); Serial.print(Rntc); Serial.print("  Temp: "); Serial.println(Temp);
+  if (Temp < 0) Temp = 0;
+  else
+    if (Temp > 99) Temp = 99;
+  //Serial.print(" Voltage: "); Serial.print(Vout); Serial.print(" Resistance: "); Serial.print(Rntc); Serial.print("  Temp: "); Serial.println(Temp);
   return (Temp);
 }
 
@@ -1221,7 +1248,7 @@ void loop()
     if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
     {
       displayTemperatures();
-      notifyClients(getCurrentValues());
+      notifyClients(getJSONTempValues());
       if (((Settings.Trigger1Temp != 0) && (getTemperature(NTC1_PIN) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(NTC2_PIN) >= Settings.Trigger2Temp)))
       {
         toStandbyMode();
@@ -1364,6 +1391,7 @@ void toStandbyMode()
   setTrigger1Off();
   setTrigger2Off();
   digitalWrite(POWER_RELAY, LOW);
+  notifyClients(getJSONOnStandbyState());
   delay(3000);
   oled.lcdOff();
   while (getUserInput() != KEY_ONOFF) // getUserInput will take care of wakeup when KEY_ONOFF is received
