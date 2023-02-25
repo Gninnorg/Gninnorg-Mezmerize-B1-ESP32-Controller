@@ -45,6 +45,7 @@
 
 // Declarations
 void startUp(void);
+void ScreenSaver(bool);
 void setTrigger1On(void);
 void setTrigger2On(void);
 void setTrigger1Off(void);
@@ -445,9 +446,26 @@ byte getUserInput()
   }
 
   // Turn Screen Saver on/off if it is activated and if no user input has been received during the defined number of seconds
-  if (receivedInput == KEY_NONE)
+  if ((!ScreenSaverIsOn && (millis() - mil_LastUserInput > (unsigned long)Settings.DisplayTimeout * 1000)))
+    ScreenSaver(true);
+  else
+    ScreenSaver(false);
+  
+  // If inactivity timer is set, go to standby if the set number of hours have passed since last user input
+  if ((appMode != APP_STANDBY_MODE) && (Settings.TriggerInactOffTimer > 0) && ((mil_LastUserInput + Settings.TriggerInactOffTimer * 3600000) < millis()))
   {
-    if ((!ScreenSaverIsOn && (millis() - mil_LastUserInput > (unsigned long)Settings.DisplayTimeout * 1000)) && Settings.ScreenSaverActive)
+    appMode = APP_STANDBY_MODE;
+    toStandbyMode();
+  }
+
+  return (receivedInput);
+}
+
+void ScreenSaver(bool activate)
+{
+  if (activate = true && Settings.ScreenSaverActive)
+  {
+    if (!ScreenSaverIsOn && appMode != APP_STANDBY_MODE)
     {
       if (Settings.DisplayDimLevel == 0)
         oled.lcdOff();
@@ -467,15 +485,6 @@ byte getUserInput()
       ScreenSaverIsOn = false;
     }
   }
-
-  // If inactivity timer is set, go to standby if the set number of hours have passed since last user input
-  if ((appMode != APP_STANDBY_MODE) && (Settings.TriggerInactOffTimer > 0) && ((mil_LastUserInput + Settings.TriggerInactOffTimer * 3600000) < millis()))
-  {
-    appMode = APP_STANDBY_MODE;
-    toStandbyMode();
-  }
-
-  return (receivedInput);
 }
 
 // Webserver & Websocket
@@ -524,9 +533,10 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     data[len] = 0;
     message = (char*)data;
     if (message.indexOf("Volume") >= 0) {
-      sliderValue1 = message.substring(3);
-      notifyClients(getCurrentValues());
+      ScreenSaver(false); // Disable screen saver
+      setVolume(message.substring(7).toInt());
     }
+    // TO DO: Add other functions here: on/off, mute and select input
     if (strcmp((char*)data, "getValues") == 0) {
       notifyClients(getCurrentValues());
     }
@@ -648,6 +658,7 @@ bool initWiFi() {
   return true;
 }
 
+// TO DO To be deleted when copied to new Websocket functionality
 // Replaces placeholders with values
 String processor(const String& var) {
   if(var == "STATE"){

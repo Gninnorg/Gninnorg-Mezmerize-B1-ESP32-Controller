@@ -28,12 +28,11 @@ function onClose(event) {
     setTimeout(initWebSocket, 2000);
 }
 
-function updateSlider(element) {
-    var sliderNumber = element.id;
+function updateVolume(element) {
     var sliderValue = document.getElementById(element.id).value;
     document.getElementById(element.id).innerHTML = sliderValue;
-    console.log("Sent: "+sliderNumber+"s"+sliderValue.toString());
-    websocket.send(sliderNumber+"s"+sliderValue.toString());
+    console.log("Sent: "+element.id+":"+sliderValue);
+    websocket.send(element.id+":"+sliderValue);
 }
 
 function onMessage(event) {
@@ -48,6 +47,7 @@ function onMessage(event) {
         var value = values[i];
         document.getElementById(key).value = myObj[key];
         document.getElementById(key).innerHTML = String(value);
+        // Display the volume setting in text also (uses its own id)
         if (key == "Volume") document.getElementById("VolumeValue").innerHTML = String(value);
     }
 }

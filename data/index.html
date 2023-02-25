@@ -14,10 +14,12 @@
       <div class="card-grid">
         <div class="card">
           <p class="card-title">POWER</p>
+          <!-- 
           <p>
-            <a href="on"><button class="button-on">ON</button></a>
-            <a href="off"><button class="button-off">OFF</button></a>
+            <button class="button-on">ON</button>
+            <button class="button-off">OFF</button>
           </p>
+          -->
           <p class="state" id="OnState"></p>
         </div>
         <div class="card">
@@ -25,9 +27,9 @@
           <p class="state" id="Input"></p>
         </div>
         <div class="card">
-          <p class="card-title">Volume</p>
+          <p class="card-title">VOLUME</p>
           <p class="switch">
-            <input type="range" onchange="updateSlider(this)" id="Volume" min="0" max="100" step="1" value ="0" class="slider">
+            <input type="range" onchange="updateVolume(this)" id="Volume" min="0" max="60" step="1" value ="0" class="slider">
           </p>
           <p class="state">Volume: <span id="VolumeValue"></span></p>
         </div>
