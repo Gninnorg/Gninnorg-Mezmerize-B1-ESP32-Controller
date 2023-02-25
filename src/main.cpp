@@ -17,7 +17,7 @@
 #include <Muses72320.h>
 #include <MenuManager.h>
 #include <MenuData.h>
-#include <esp_adc_cal.h>
+#include <esp_adc_cal.h> // To enable improved accuracy of ADC readings (used for reading NTC's value to calculate temperature)
 
 #undef minimum
 #ifndef minimum
@@ -230,7 +230,7 @@ unsigned long mil_LastUserInput = millis();
 // Used to time how often the display of temperatures is updated
 unsigned long mil_onRefreshTemperatureDisplay;
 // Update interval for the display of temperatures
-#define TEMP_REFRESH_INTERVAL 5000
+#define TEMP_REFRESH_INTERVAL 1000
 
 //  Initialize the menu
 enum AppModeValues
@@ -478,27 +478,83 @@ byte getUserInput()
   return (receivedInput);
 }
 
-
-String getRuntimeSettings() 
-{
-  String text = "<DOCTYPE html><html><head></meta></head><body>";
-  text.concat("<h2>Mezmerize B1 preamplifier</h2>");
-  text = text + "Volume: " + String((int)RuntimeSettings.CurrentVolume) + "</p>";
-  text = text + "Input : " + String(Settings.Input[RuntimeSettings.CurrentInput].Name) + "</p>";
-  text = text + "</body></html>";
-  return text;
-}
-
-// OTA TEST
+// Webserver & Websocket
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
 #include "SPIFFS.h"
+#include <Arduino_JSON.h>
+//#include <ArduinoJson.h>
 
+// Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
-// Search for parameter in HTTP POST request
+// Create a WebSocket object
+AsyncWebSocket ws("/ws");
+
+// TO DO Clean up/adapt
+String message = "";
+String sliderValue1 = "0";
+String sliderValue2 = "0";
+String sliderValue3 = "0";
+
+//Json Variable to Hold Slider Values
+JSONVar sliderValues;
+
+//Get current values
+String getCurrentValues(){
+  if (appMode == APP_STANDBY_MODE) sliderValues["OnState"] = "Standby"; else sliderValues["OnState"] = "On";
+  sliderValues["Input"] = String(Settings.Input[RuntimeSettings.CurrentInput].Name);
+  sliderValues["Volume"] = String(RuntimeSettings.CurrentVolume);
+  sliderValues["Temp1"] = String(int(getTemperature(NTC1_PIN)));
+  sliderValues["Temp2"] = String(int(getTemperature(NTC2_PIN)));
+
+  String jsonString = JSON.stringify(sliderValues);
+  return jsonString;
+}
+
+void notifyClients(String sliderValues) {
+  ws.textAll(sliderValues);
+}
+
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+  AwsFrameInfo *info = (AwsFrameInfo*)arg;
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+    data[len] = 0;
+    message = (char*)data;
+    if (message.indexOf("Volume") >= 0) {
+      sliderValue1 = message.substring(3);
+      notifyClients(getCurrentValues());
+    }
+    if (strcmp((char*)data, "getValues") == 0) {
+      notifyClients(getCurrentValues());
+    }
+  }
+}
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  switch (type) {
+    case WS_EVT_CONNECT:
+      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+      break;
+    case WS_EVT_DISCONNECT:
+      Serial.printf("WebSocket client #%u disconnected\n", client->id());
+      break;
+    case WS_EVT_DATA:
+      handleWebSocketMessage(arg, data, len);
+      break;
+    case WS_EVT_PONG:
+    case WS_EVT_ERROR:
+      break;
+  }
+}
+
+void initWebSocket() {
+  ws.onEvent(onEvent);
+  server.addHandler(&ws);
+}
+
+// Search for parameter in HTTP POST request - used for wifi configuration page
 const char* PARAM_INPUT_1 = "ssid";
 const char* PARAM_INPUT_2 = "pass";
 const char* PARAM_INPUT_3 = "ip";
@@ -515,7 +571,6 @@ IPAddress subnet(255, 255, 0, 0);
 // Timer variables
 unsigned long previousMillis = 0;
 const long interval = 10000;  // interval to wait for Wi-Fi connection (milliseconds)
-
 
 // Initialize SPIFFS
 void initSPIFFS() {
@@ -608,19 +663,7 @@ String processor(const String& var) {
   }
   if(var == "VOLUME"){
     if (!RuntimeSettings.Muted)
-    {
-      String text;
-      text = "VolumeSteps: " + String(Settings.VolumeSteps) + " MinAttenuation: " + String(Settings.MinAttenuation) + " MaxAttenuation: " + String(Settings.MaxAttenuation) + "<BR>";
-      for (int i=0; i<61; i++)
-      {
-        if (i != RuntimeSettings.CurrentVolume)
-          text = text + String(i) + " " + String(getAttenuation(Settings.VolumeSteps, i, Settings.MinAttenuation, Settings.MaxAttenuation)/2) + " dB <BR>";
-        else
-          text = text + "<b>" + String(i) + " " + String(getAttenuation(Settings.VolumeSteps, i, Settings.MinAttenuation, Settings.MaxAttenuation)/2) + " dB</b><BR>";
-      }
-      return(text);
-      //return String(RuntimeSettings.CurrentVolume) + " (" + String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation)) + " -dB (this is not correct!))";
-    }
+      return String(RuntimeSettings.CurrentVolume) + " (" + String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation)/2) + " dB)";
     else
       return ("MUTED");
   }
@@ -641,10 +684,10 @@ void setupWIFIsupport() {
   initSPIFFS();
 
   if(initWiFi()) {
-    // Route for root / web page
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-      request->send(SPIFFS, "/index.html", "text/html", false, processor);
-    });
+    initWebSocket();
+
+    // Web Server Root URL
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){request->send(SPIFFS, "/index.html", "text/html");});
     server.serveStatic("/", SPIFFS, "/");
     
     AsyncElegantOTA.begin(&server);
@@ -731,57 +774,19 @@ void setupWIFIsupport() {
   }
 }
 
-// OTA TEST SLUT
+// Webserver & Websocket - END
 
 
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
-
+  Wire.begin();
+  
+  // Read setting from EEPROM
   readSettingsFromEEPROM();
   readRuntimeSettingsFromEEPROM();
   
-  Wire.begin();
-
-  setupRotaryEncoders();
-  pinMode(NTC1_PIN, INPUT);
-  pinMode(NTC2_PIN, INPUT);
-
-  // Turn on Mezmerize B1 Buffer
-  pinMode(POWER_RELAY, OUTPUT);
-  digitalWrite(POWER_RELAY, HIGH);
-  
-  relayController.begin();
-  muses.begin();
-  oled.begin();
-  oled.lcdOn();
-  oled.clear();
-
-  // Start IR reader
-  irmp_init();
-
-  // OTA - TEST
-  Serial.begin(115200);
-  Serial.print("ssid:");Serial.println(Settings.ssid);
-  Serial.print("pass:");Serial.println(Settings.pass);
-  Serial.print("gateway:");Serial.println(Settings.gateway);
-  Serial.print("ip:");Serial.println(Settings.ip);
-  oled.clear();
-  oled.setCursor(0, 1);
-  oled.setCursor(0, 1);
-  oled.print("Connecting to Wifi");
-  setupWIFIsupport();
-  oled.clear();
-  // OTA - END
-
-  // Define all pins as OUTPUT and disable all relais
-  for (byte pin = 0; pin <= 7; pin++)
-  {
-    relayController.pinMode(pin, OUTPUT);
-    relayController.digitalWrite(pin, LOW);
-  }
-
-  // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
+    // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
   if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
   {
     oled.clear();
@@ -793,16 +798,46 @@ void setup()
     writeDefaultSettingsToEEPROM();
     ESP.restart();
   }
-  // Settings read from EEPROM are read and are valid so let's move on!
+
+  setupRotaryEncoders();
+
+  pinMode(NTC1_PIN, INPUT);
+  pinMode(NTC2_PIN, INPUT);
+
+  relayController.begin();
+    // Define all pins as OUTPUT and disable all relais
+  for (byte pin = 0; pin <= 7; pin++)
+  {
+    relayController.pinMode(pin, OUTPUT);
+    relayController.digitalWrite(pin, LOW);
+  }
+  
+  // Turn on Mezmerize B1 Buffer via power on/off relay
+  pinMode(POWER_RELAY, OUTPUT);
+  digitalWrite(POWER_RELAY, HIGH);
+
+  muses.begin();
+
+  oled.begin();
+  oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
+  oled.lcdOn();
+  oled.clear();
+
+  // Start IR reader
+  irmp_init();
+
+  // Connect to Wifi
+  oled.clear();
+  oled.setCursor(0, 1);
+  oled.setCursor(0, 1);
+  oled.print("Connecting to Wifi");
+  setupWIFIsupport();
+  oled.clear();
+  
+  // The controller is now ready - save the timestamp
   mil_On = millis();
 
-  oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
-  
-  // Turn on Mezmerize
-  pinMode(4, OUTPUT);
-  digitalWrite(4, HIGH);
-  
-   // If triggers are active then wait for the set number of seconds and turn them on
+  // If triggers are active then wait for the set number of seconds and turn them on
   unsigned long delayTrigger1 = (Settings.Trigger1Active) ? (mil_On + Settings.Trigger1OnDelay * 1000) : 0;
   unsigned long delayTrigger2 = (Settings.Trigger2Active) ? (mil_On + Settings.Trigger2OnDelay * 1000) : 0;
 
@@ -903,7 +938,6 @@ void setTrigger2Off()
   }
 }
 
-// TO DO - is this returning the right values????
 // Return the attenuation required by the setvolume function of the Muses72320 based upon the configured number of steps, the selected step and the configured minimum and maximum attenuation in dBs.
 int16_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
 {
@@ -920,7 +954,7 @@ void setVolume(int16_t newVolumeStep)
   else if (newVolumeStep > Settings.Input[RuntimeSettings.CurrentInput].MaxVol)
     newVolumeStep = Settings.Input[RuntimeSettings.CurrentInput].MaxVol;
 
-  // TO DO call muses incl. balance logic
+  // TO DO call Muses with balance logic
   if (!RuntimeSettings.Muted)
   {
     if (Settings.Input[RuntimeSettings.CurrentInput].Active != INPUT_HT_PASSTHROUGH)
@@ -930,6 +964,7 @@ void setVolume(int16_t newVolumeStep)
     RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput] = RuntimeSettings.CurrentVolume;
     muses.setVolume(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation));
     displayVolume();
+    notifyClients(getCurrentValues());
   }
 }
 
@@ -1016,6 +1051,7 @@ boolean setInput(uint8_t NewInput)
     if (RuntimeSettings.Muted)
       unmute();
     displayInput();
+    notifyClients(getCurrentValues());
     return true;
   }
   return false;
@@ -1040,7 +1076,7 @@ void displayTemperatures()
     float Temp = getTemperature(NTC1_PIN);
     float MaxTemp;
     if (Settings.Trigger1Temp == 0)
-      MaxTemp = 60;
+      MaxTemp = 60; // TO DO: Is this the best default value?
     else
       MaxTemp = Settings.Trigger1Temp;
     displayTempDetails(Temp, MaxTemp, Settings.DisplayTemperature1, 1);
@@ -1051,7 +1087,7 @@ void displayTemperatures()
     float Temp = getTemperature(NTC2_PIN);
     float MaxTemp;
     if (Settings.Trigger2Temp == 0)
-      MaxTemp = 60;
+      MaxTemp = 60; // TO DO: Is this the best default value?
     else
       MaxTemp = Settings.Trigger2Temp;
     if (Settings.DisplayTemperature1)
@@ -1159,8 +1195,7 @@ float getTemperature(uint8_t pinNmbr)
     Vout = Vout + readVoltage(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
   Vout = Vout / 16;
 
-  //Rntc = Rref / ((Vin / Vout) - 1);    // Formula to calculate the resistance of the NTC
-  Rntc = Rref * (1 / ((Vin / Vout) - 1));
+  Rntc = Rref * (1 / ((Vin / Vout) - 1)); // Formula to calculate the resistance of the NTC
 
   if (Rntc < 0) 
     Temp = 0;
@@ -1181,6 +1216,7 @@ void loop()
     if (millis() > mil_onRefreshTemperatureDisplay + TEMP_REFRESH_INTERVAL)
     {
       displayTemperatures();
+      notifyClients(getCurrentValues());
       if (((Settings.Trigger1Temp != 0) && (getTemperature(NTC1_PIN) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(NTC2_PIN) >= Settings.Trigger2Temp)))
       {
         toStandbyMode();
@@ -1297,9 +1333,11 @@ void loop()
   }
 
   case APP_STANDBY_MODE:
+  {
     // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart is done by getUserInput(). By the way: you don't need an IR remote: a doubleclick on encoder_2 is also KEY_ONOFF
     break;
   }
+}
 }
 
 void toStandbyMode()
@@ -1329,8 +1367,7 @@ void toStandbyMode()
 }
 
 //----------------------------------------------------------------------
-// Addition or removal of menu items in MenuData.h will require this method
-// to be modified accordingly.
+// Addition or removal of menu items in MenuData.h will require this method to be modified accordingly.
 byte processMenuCommand(byte cmdId)
 {
   byte complete = false; // set to true when menu command processing complete. Set to ABANDON_MENU if a return to APP_MODE_NORMAL must be forced
@@ -1344,6 +1381,7 @@ byte processMenuCommand(byte cmdId)
   {
   case mnuCmdVOL_STEPS:
   {
+    // TO DO: Why did we choose 179 as maximum number of steps? (see also mnuCmdMAX_ATT)
     if (editNumericValue(Settings.VolumeSteps, 1, 179, "Steps"))
     {
       // Update MaxVol for all inputs to VolumeSteps and set MinVol = 0 for all inputs.
@@ -1369,6 +1407,7 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdMAX_ATT:
+    // TO DO: Why did we choose 90 dB as maximum attenuation? Probably just a decision (see also mnuCmdVOL_STEPS)
     editNumericValue(Settings.MaxAttenuation, Settings.MinAttenuation + 1, 90, "  -dB");
     setVolume(0); // Turn the volume down to the minimum (just in case)
     complete = true;
