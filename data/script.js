@@ -11,7 +11,7 @@ function getValues(){
 }
 
 function initWebSocket() {
-    console.log('Trying to open a WebSocket connection…');
+    console.log('Trying to open a WebSocket connection...');
     websocket = new WebSocket(gateway);
     websocket.onopen = onOpen;
     websocket.onclose = onClose;
@@ -40,14 +40,23 @@ function onMessage(event) {
     var keys = Object.keys(myObj);
     var values = Object.values(myObj);
     console.log("Recv:" + event.data);
-    console.log("keys: "+ keys)
-    console.log("values: "+ values)
     for (var i = 0; i < keys.length; i++){
         var key = keys[i];
         var value = values[i];
-        document.getElementById(key).value = myObj[key];
-        document.getElementById(key).innerHTML = String(value);
-        // Display the volume setting in text also (uses its own id)
-        if (key == "Volume") document.getElementById("VolumeValue").innerHTML = String(value);
+        switch(key) {
+            case "Volume":
+                document.getElementById(key).value = String(value);
+                document.getElementById(key).innerHTML = String(value);
+                // Display the volume setting in text also (uses its own id)
+                document.getElementById("VolumeValue").innerHTML = String(value);
+                break;
+            case "VolumeSteps":
+                var myfield = document.getElementById("Volume");
+                myfield.setAttribute("max", String(value));
+                break;
+            default:
+                document.getElementById(key).value = String(value);
+                document.getElementById(key).innerHTML = String(value);
+        }      
     }
 }
