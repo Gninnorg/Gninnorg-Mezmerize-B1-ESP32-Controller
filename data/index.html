@@ -29,9 +29,9 @@
         <div class="card">
           <p class="card-title">VOLUME</p>
           <p class="switch">
-            <input type="range" onchange="updateVolume(this)" id="Volume" min="0" max="60" step="1" value ="0" class="slider">
+            <input type="range" onchange="updateVolume(this)" id="Volume" min="0" max="100" step="1" value="0" class="slider">
           </p>
-          <p class="state">Volume: <span id="VolumeValue"></span></p>
+          <p class="state">Volume: <span id="VolumeValue"></span>  (<span id="Volume_dB"></span>dB)</p>
         </div>
         <div class="card">
           <p class="card-title"></i>TEMPERATURES</p>

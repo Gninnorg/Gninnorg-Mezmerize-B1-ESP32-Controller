@@ -502,13 +502,14 @@ AsyncWebServer server(80);
 // Create a WebSocket object
 AsyncWebSocket ws("/ws");
 
-JSONVar JSONValues; //Json variable to hold values
-
 // Get all current values as JSON
-String getJSONCurrentValues(){
+String getJSONCurrentValues() {
+  JSONVar JSONValues; //Json variable to hold values
   if (appMode == APP_STANDBY_MODE) JSONValues["OnState"] = "Standby"; else JSONValues["OnState"] = "On";
   JSONValues["Input"] = String(Settings.Input[RuntimeSettings.CurrentInput].Name);
+  JSONValues["VolumeSteps"] = String(Settings.VolumeSteps);
   JSONValues["Volume"] = String(RuntimeSettings.CurrentVolume);
+  JSONValues["Volume_dB"] = String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation)/2);
   JSONValues["Temp1"] = String(int(getTemperature(NTC1_PIN)));
   JSONValues["Temp2"] = String(int(getTemperature(NTC2_PIN)));
   return JSON.stringify(JSONValues);
@@ -516,18 +517,21 @@ String getJSONCurrentValues(){
 
 // Get On/Standby state as JSON
 String getJSONOnStandbyState() {
+  JSONVar JSONValues; //Json variable to hold values
   if (appMode == APP_STANDBY_MODE) JSONValues["OnState"] = "Standby"; else JSONValues["OnState"] = "On";
   return JSON.stringify(JSONValues);
 }
 
 // Get selected input name as JSON
-String getJSONCurrentInput(){
+String getJSONCurrentInput() {
+  JSONVar JSONValues; //Json variable to hold values
   JSONValues["Input"] = String(Settings.Input[RuntimeSettings.CurrentInput].Name);
   return JSON.stringify(JSONValues);
 }
 
 // Get current volume as JSON
-String getJSONCurrentVolume(){
+String getJSONCurrentVolume() {
+  JSONVar JSONValues; //Json variable to hold values
   JSONValues["Volume"] = String(RuntimeSettings.CurrentVolume);
   JSONValues["Volume_dB"] = String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation)/2);
   return JSON.stringify(JSONValues);
@@ -535,7 +539,7 @@ String getJSONCurrentVolume(){
 
 // Get temperatures as JSON
 String getJSONTempValues() {
-  if (appMode == APP_STANDBY_MODE) JSONValues["OnState"] = "Standby"; else JSONValues["OnState"] = "On";
+  JSONVar JSONValues; //Json variable to hold values
   JSONValues["Temp1"] = String(int(getTemperature(NTC1_PIN)));
   JSONValues["Temp2"] = String(int(getTemperature(NTC2_PIN)));
   return JSON.stringify(JSONValues);
@@ -543,7 +547,7 @@ String getJSONTempValues() {
 
 void notifyClients(String message) {
   ws.textAll(message);
-  Serial.println("Sent: "+message);
+  //Serial.println("Sent: "+message);
 }
 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
