@@ -14,29 +14,46 @@
       <div class="card-grid">
         <div class="card">
           <p class="card-title">POWER</p>
-          <!-- 
-          <p>
-            <button class="button-on">ON</button>
-            <button class="button-off">OFF</button>
-          </p>
-          -->
-          <p class="state" id="OnState"></p>
+          <div class="container">
+            <button class="button-off" onclick="tooglePower()">Toggle</button>
+            <p class="state">  </p>
+            <p class="state" id="OnState"></p>
+          </div>
         </div>
         <div class="card">
           <p class="card-title"></i>INPUT</p>
-          <p class="state" id="Input"></p>
+          <div class="container">
+            <button class="button-off" onclick="changePrevInput()">-</button>
+            <p class="state">  </p>
+            <p class="state" id="Input"></p>
+            <p class="state">  </p>
+            <button class="button-off" onclick="changeNextInput()">+</button>
+          </div>
+          <p class="state">  </p>
         </div>
         <div class="card">
           <p class="card-title">VOLUME</p>
           <p class="switch">
-            <input type="range" onchange="updateVolume(this)" id="Volume" min="0" max="100" step="1" value="0" class="slider">
+            <input type="range" onchange="changeVolume(this)" id="Volume" min="0" max="100" step="1" value="0" class="slider">
           </p>
-          <p class="state">Volume: <span id="VolumeValue"></span>  (<span id="Volume_dB"></span>dB)</p>
+          <div class="container">
+            <button class="button-off" onclick="changeVolumeDown()">-</button>
+            <p class="state">  </p>
+            <p class="state"><span id="VolumeValue"></span>  (<span id="Volume_dB"></span>dB)</p>
+            <p class="state">  </p>
+            <button class="button-off" onclick="changeVolumeUp()">+</button>
+          </div>
+          <p class="state">  </p>
         </div>
         <div class="card">
           <p class="card-title"></i>TEMPERATURES</p>
-          <p class="state" id="Temp1"></p>
-          <p class="state" id="Temp2"></p>
+          <div class="container">
+            <p class="state"><meter id="Temp1" min="0" low="45" optimum="55" high="65" max="70" value="50"</meter></p>
+            <p class="state"><span id="Temp1Value"> </span></p>
+            <p class="state">  </p>
+            <p class="state"><meter id="Temp2" min="0" low="45" optimum="55" high="65" max="70" value="50"</meter></p>
+            <p class="state"><span id="Temp2Value"> </span></p>
+          </div>
         </div>
       </div>
     </div>

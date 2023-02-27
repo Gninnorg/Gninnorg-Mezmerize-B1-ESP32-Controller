@@ -62,6 +62,8 @@ void setVolume(int16_t);
 void mute(void);
 void unmute(void);
 boolean setInput(uint8_t);
+void setPrevInput(void);
+void setNextInput(void);
 String getJSONCurrentValues(void);
 String getJSONOnStandbyState(void);
 String getJSONCurrentInput(void);
@@ -442,7 +444,6 @@ byte getUserInput()
       last_KEY_ONOFF = millis();
       if (appMode != APP_STANDBY_MODE)
       {
-        appMode = APP_STANDBY_MODE;
         toStandbyMode();
       }
       else // wake from standby
@@ -468,7 +469,6 @@ byte getUserInput()
   // If inactivity timer is set, go to standby if the set number of hours have passed since last user input
   if ((appMode != APP_STANDBY_MODE) && (Settings.TriggerInactOffTimer > 0) && ((mil_LastUserInput + Settings.TriggerInactOffTimer * 3600000) < millis()))
   {
-    appMode = APP_STANDBY_MODE;
     toStandbyMode();
   }
 
@@ -555,14 +555,38 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     data[len] = 0;
     String message = (char*)data;
-    if (message.indexOf("Volume:") >= 0) {
-      setVolume(message.substring(7).toInt());
-      ScreenSaverOff(); // Disable screen saver
+
+    if (message.indexOf("Volume:Up") >= 0) {
+      if (RuntimeSettings.CurrentVolume < Settings.VolumeSteps) (setVolume(RuntimeSettings.CurrentVolume + 1)); else notifyClients(getJSONCurrentVolume());
     }
-    // TO DO: Add other functions here: on/off, mute and select input
+    else if (message.indexOf("Volume:Down") >= 0) {
+      if (RuntimeSettings.CurrentVolume > 0) (setVolume(RuntimeSettings.CurrentVolume - 1)); else notifyClients(getJSONCurrentVolume());
+    }
+    else if (message.indexOf("Volume:") >= 0) {
+      setVolume(message.substring(7).toInt());
+    }
+    
+    if (message.indexOf("Input:Up") >= 0) {
+      setNextInput();
+    }
+    else if (message.indexOf("Input:Down") >= 0) {
+      setPrevInput();
+    }
+
+    if (message.indexOf("Power:Toggle") >= 0) {
+      if (appMode == APP_STANDBY_MODE)
+        ESP.restart();
+      else
+      {
+        toStandbyMode();
+      }
+    }
+    
+    // Default message received when a new Websocket client connects -> Send all values
     if (strcmp((char*)data, "getValues") == 0) {
       notifyClients(getJSONCurrentValues());
     }
+    ScreenSaverOff(); // Disable screen saver
   }
 }
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
@@ -1091,6 +1115,26 @@ boolean setInput(uint8_t NewInput)
   return false;
 }
 
+// Select the next active input (DOWN)
+void setPrevInput()
+{
+  byte nextInput = (RuntimeSettings.CurrentInput == 0) ? 5 : RuntimeSettings.CurrentInput - 1;
+  while (!setInput(nextInput))
+  {
+    nextInput = (nextInput == 0) ? 5 : nextInput - 1;
+  }
+}
+
+// Select the next active input (UP)
+void setNextInput()
+{
+  byte nextInput = (RuntimeSettings.CurrentInput == 5) ? 0 : RuntimeSettings.CurrentInput + 1;
+  while (!setInput(nextInput))
+  {
+    nextInput = (nextInput > 5) ? 0 : nextInput + 1;
+  }
+}
+
 // Display the name of the current input (but only if it has been chosen to be so by the user)
 void displayInput()
 {
@@ -1281,20 +1325,12 @@ void loop()
       break;
     case KEY_LEFT:
     { // add new code here
-      byte nextInput = (RuntimeSettings.CurrentInput == 0) ? 5 : RuntimeSettings.CurrentInput - 1;
-      while (!setInput(nextInput))
-      {
-        nextInput = (nextInput == 0) ? 5 : nextInput - 1;
-      }
+      setPrevInput();
       break;
     }
     case KEY_RIGHT:
     { // add new code here
-      byte nextInput = (RuntimeSettings.CurrentInput == 5) ? 0 : RuntimeSettings.CurrentInput + 1;
-      while (!setInput(nextInput))
-      {
-        nextInput = (nextInput > 5) ? 0 : nextInput + 1;
-      }
+      setNextInput();
       break;
     }
     case KEY_1:
@@ -1306,7 +1342,7 @@ void loop()
       setInput(UIkey - KEY_1);
       break;
     case KEY_PREVIOUS:
-      // Switch to previous selected input if it is not inactivated
+      // Switch to previous selected input
       setInput(RuntimeSettings.PrevSelectedInput);
       break;
     case KEY_MUTE:
@@ -1378,6 +1414,7 @@ void loop()
 
 void toStandbyMode()
 {
+  appMode = APP_STANDBY_MODE;
   writeRuntimeSettingsToEEPROM();
   if (ScreenSaverIsOn)
   {

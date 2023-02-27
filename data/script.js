@@ -28,11 +28,36 @@ function onClose(event) {
     setTimeout(initWebSocket, 2000);
 }
 
-function updateVolume(element) {
+function tooglePower() {
+    console.log("Sent: Power:Toggle");
+    websocket.send("Power:Toggle");
+}
+
+function changeVolume(element) {
     var sliderValue = document.getElementById(element.id).value;
     document.getElementById(element.id).innerHTML = sliderValue;
     console.log("Sent: "+element.id+":"+sliderValue);
     websocket.send(element.id+":"+sliderValue);
+}
+
+function changeVolumeDown() {
+    console.log("Sent: Volume:Down");
+    websocket.send("Volume:Down");
+}
+
+function changeVolumeUp() {
+    console.log("Sent: Volume:Up");
+    websocket.send("Volume:Up");
+}
+
+function changePrevInput() {
+    console.log("Sent: Input:Down");
+    websocket.send("Input:Down");
+}
+
+function changeNextInput() {
+    console.log("Sent: Input:Up");
+    websocket.send("Input:Up");
 }
 
 function onMessage(event) {
@@ -54,6 +79,12 @@ function onMessage(event) {
                 var myfield = document.getElementById("Volume");
                 myfield.setAttribute("max", String(value));
                 break;
+            case "Temp1":
+                document.getElementById(key).value = String(value);
+                document.getElementById("Temp1Value").innerHTML = String(value);
+            case "Temp2":
+                document.getElementById(key).value = String(value);
+                document.getElementById("Temp2Value").innerHTML = String(value);
             default:
                 document.getElementById(key).value = String(value);
                 document.getElementById(key).innerHTML = String(value);
