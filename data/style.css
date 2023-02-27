@@ -52,6 +52,7 @@ html {
   
   .slider {
     -webkit-appearance: none;
+    appearance: none;
     margin: 0 auto;
     width: 100%;
     height: 15px;

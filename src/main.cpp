@@ -447,7 +447,7 @@ byte getUserInput()
         toStandbyMode();
       }
       else // wake from standby
-        ESP.restart();
+        startUp();
     }
   }
 
@@ -464,7 +464,7 @@ byte getUserInput()
     }
   }
   else
-    ScreenSaverOff();
+    if (appMode != APP_STANDBY_MODE) ScreenSaverOff();
 
   // If inactivity timer is set, go to standby if the set number of hours have passed since last user input
   if ((appMode != APP_STANDBY_MODE) && (Settings.TriggerInactOffTimer > 0) && ((mil_LastUserInput + Settings.TriggerInactOffTimer * 3600000) < millis()))
@@ -478,7 +478,7 @@ byte getUserInput()
 void ScreenSaverOff()
 {
   mil_LastUserInput = millis();
-  if (ScreenSaverIsOn && appMode != APP_STANDBY_MODE)
+  if (ScreenSaverIsOn)
   {
     if (Settings.DisplayDimLevel == 0)
       oled.lcdOn();
@@ -557,36 +557,56 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     String message = (char*)data;
 
     if (message.indexOf("Volume:Up") >= 0) {
-      if (RuntimeSettings.CurrentVolume < Settings.VolumeSteps) (setVolume(RuntimeSettings.CurrentVolume + 1)); else notifyClients(getJSONCurrentVolume());
+      if (RuntimeSettings.CurrentVolume < Settings.VolumeSteps && appMode == APP_NORMAL_MODE) {
+        setVolume(RuntimeSettings.CurrentVolume + 1); 
+        ScreenSaverOff();
+      }
+      else 
+        notifyClients(getJSONCurrentVolume());
     }
     else if (message.indexOf("Volume:Down") >= 0) {
-      if (RuntimeSettings.CurrentVolume > 0) (setVolume(RuntimeSettings.CurrentVolume - 1)); else notifyClients(getJSONCurrentVolume());
+      if (RuntimeSettings.CurrentVolume > 0 && appMode == APP_NORMAL_MODE) {
+        setVolume(RuntimeSettings.CurrentVolume - 1); 
+        ScreenSaverOff();
+      }
+      else notifyClients(getJSONCurrentVolume());
     }
     else if (message.indexOf("Volume:") >= 0) {
-      setVolume(message.substring(7).toInt());
+      int16_t newVolume = message.substring(7).toInt();
+      if (newVolume >= 0 && newVolume <= Settings.VolumeSteps && appMode == APP_NORMAL_MODE)
+      {
+        setVolume(message.substring(7).toInt());
+        ScreenSaverOff();
+      }
+      else notifyClients(getJSONCurrentVolume());
     }
     
     if (message.indexOf("Input:Up") >= 0) {
-      setNextInput();
+      if (appMode == APP_NORMAL_MODE) {
+        setNextInput();
+        ScreenSaverOff();
+      } else notifyClients(getJSONCurrentInput());
     }
-    else if (message.indexOf("Input:Down") >= 0) {
-      setPrevInput();
+   
+   if (message.indexOf("Input:Down") >= 0) {
+     if (appMode == APP_NORMAL_MODE) {
+        setPrevInput();
+        ScreenSaverOff();
+      } else notifyClients(getJSONCurrentInput());
     }
 
     if (message.indexOf("Power:Toggle") >= 0) {
       if (appMode == APP_STANDBY_MODE)
-        ESP.restart();
-      else
-      {
+        startUp();
+      else if (appMode == APP_NORMAL_MODE)
         toStandbyMode();
-      }
+      else notifyClients(getJSONOnStandbyState());
     }
     
     // Default message received when a new Websocket client connects -> Send all values
     if (strcmp((char*)data, "getValues") == 0) {
       notifyClients(getJSONCurrentValues());
     }
-    ScreenSaverOff(); // Disable screen saver
   }
 }
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
@@ -821,7 +841,7 @@ void setupWIFIsupport() {
       oled.setCursor(0, 3);
       oled.print(F("Restarting..."));
       delay(3000);
-      ESP.restart();
+      startUp();
     });
     AsyncElegantOTA.begin(&server);
     server.begin();
@@ -839,22 +859,6 @@ void setup()
   
   Wire.begin();
   
-  // Read setting from EEPROM
-  readSettingsFromEEPROM();
-  readRuntimeSettingsFromEEPROM();
-  
-    // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
-  if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
-  {
-    oled.clear();
-    oled.setCursor(0, 1);
-    oled.print("Restoring default");
-    oled.setCursor(0, 2);
-    oled.print(F("settings..."));
-    delay(2000);
-    writeDefaultSettingsToEEPROM();
-  }
-
   setupRotaryEncoders();
 
   pinMode(NTC1_PIN, INPUT);
@@ -868,28 +872,48 @@ void setup()
     relayController.digitalWrite(pin, LOW);
   }
   
-  // Turn on Mezmerize B1 Buffer via power on/off relay
-  pinMode(POWER_RELAY, OUTPUT);
-  digitalWrite(POWER_RELAY, HIGH);
-
   muses.begin();
 
   oled.begin();
   oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
-  oled.lcdOn();
-  oled.clear();
 
   // Start IR reader
   irmp_init();
+  
+  // Read setting from EEPROM
+  readSettingsFromEEPROM();
+  readRuntimeSettingsFromEEPROM();
+  
+  // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
+  if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
+  {
+    oled.clear();
+    oled.setCursor(0, 1);
+    oled.print("Restoring default");
+    oled.setCursor(0, 2);
+    oled.print(F("settings..."));
+    delay(2000);
+    writeDefaultSettingsToEEPROM();
+  }
 
   // Connect to Wifi
   oled.clear();
   oled.setCursor(0, 1);
-  oled.setCursor(0, 1);
   oled.print("Connecting to Wifi");
   setupWIFIsupport();
+
+  startUp();
+}
+
+void startUp()
+{  
+  oled.lcdOn();
   oled.clear();
-  
+
+  // Turn on Mezmerize B1 Buffer via power on/off relay
+  pinMode(POWER_RELAY, OUTPUT);
+  digitalWrite(POWER_RELAY, HIGH);
+
   // The controller is now ready - save the timestamp
   mil_On = millis();
 
@@ -940,8 +964,10 @@ void setup()
   UIkey = KEY_NONE;
   lastReceivedInput = KEY_NONE;
   appMode = APP_NORMAL_MODE;
+  
+  notifyClients(getJSONOnStandbyState());
 
-  Serial.println("Setup() done!");
+  Serial.println("Ready!");
 }
 
 void setTrigger1On()
@@ -1098,6 +1124,7 @@ boolean setInput(uint8_t NewInput)
     // Select new input
     RuntimeSettings.CurrentInput = NewInput;
     relayController.digitalWrite(NewInput, HIGH);
+    notifyClients(getJSONCurrentInput());
 
     if (Settings.RecallSetLevel)
       RuntimeSettings.CurrentVolume = RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput];
@@ -1109,7 +1136,7 @@ boolean setInput(uint8_t NewInput)
     if (RuntimeSettings.Muted)
       unmute();
     displayInput();
-    notifyClients(getJSONCurrentInput());
+    
     return true;
   }
   return false;
@@ -1300,7 +1327,6 @@ void loop()
       if (((Settings.Trigger1Temp != 0) && (getTemperature(NTC1_PIN) >= Settings.Trigger1Temp)) || ((Settings.Trigger2Temp != 0) && (getTemperature(NTC2_PIN) >= Settings.Trigger2Temp)))
       {
         toStandbyMode();
-        UIkey = KEY_NONE;
       }
     }
 
@@ -1416,13 +1442,7 @@ void toStandbyMode()
 {
   appMode = APP_STANDBY_MODE;
   writeRuntimeSettingsToEEPROM();
-  if (ScreenSaverIsOn)
-  {
-    if (Settings.DisplayDimLevel == 0)
-      oled.lcdOn();
-    oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
-    ScreenSaverIsOn = false;
-  }
+  ScreenSaverOff(); // Disable screen saver
   oled.clear();
   oled.setCursor(0, 1);
   oled.print(F("Going to sleep!"));
@@ -1432,12 +1452,10 @@ void toStandbyMode()
   setTrigger1Off();
   setTrigger2Off();
   digitalWrite(POWER_RELAY, LOW);
+  last_KEY_ONOFF = millis();
   notifyClients(getJSONOnStandbyState());
   delay(3000);
   oled.lcdOff();
-  while (getUserInput() != KEY_ONOFF) // getUserInput will take care of wakeup when KEY_ONOFF is received
-    ;
-  ESP.restart();
 }
 
 //----------------------------------------------------------------------
@@ -1782,14 +1800,14 @@ byte processMenuCommand(byte cmdId)
     writeRuntimeSettingsToEEPROM();
     setTrigger1Off();
     setTrigger2Off();
-    ESP.restart();
+    startUp();
     complete = ABANDON;
     break;
   case mnuCmdLOAD_DEFAULT:
     writeDefaultSettingsToEEPROM();
     setTrigger1Off();
     setTrigger2Off();
-    ESP.restart();
+    startUp();
     complete = ABANDON;
     break;
   }
