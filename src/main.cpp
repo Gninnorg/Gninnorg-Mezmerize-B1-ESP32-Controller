@@ -45,6 +45,7 @@
 
 // Declarations
 void startUp(void);
+void toStandbyMode(void);
 void ScreenSaverOff(void);
 void setTrigger1On(void);
 void setTrigger2On(void);
@@ -314,7 +315,7 @@ enum UserInput
 byte UIkey; // holds the last received user input (from rotary encoders or IR)
 byte lastReceivedInput = KEY_NONE;
 unsigned long last_KEY_ONOFF = millis(); // Used to ensure that fast repetition of KEY_ONOFF is not accepted
-void toStandbyMode(void);
+toStandbyMode();
 
 // Returns input from the user - enumerated to be the same value no matter if input is from encoders or IR remote
 byte getUserInput()
@@ -547,7 +548,7 @@ String getJSONTempValues() {
 
 void notifyClients(String message) {
   ws.textAll(message);
-  //Serial.println("Sent: "+message);
+  Serial.println("Sent: "+message);
 }
 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
@@ -841,7 +842,7 @@ void setupWIFIsupport() {
       oled.setCursor(0, 3);
       oled.print(F("Restarting..."));
       delay(3000);
-      startUp();
+      ESP.restart();
     });
     AsyncElegantOTA.begin(&server);
     server.begin();
