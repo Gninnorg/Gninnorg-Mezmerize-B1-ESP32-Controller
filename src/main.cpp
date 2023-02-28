@@ -315,7 +315,6 @@ enum UserInput
 byte UIkey; // holds the last received user input (from rotary encoders or IR)
 byte lastReceivedInput = KEY_NONE;
 unsigned long last_KEY_ONOFF = millis(); // Used to ensure that fast repetition of KEY_ONOFF is not accepted
-toStandbyMode();
 
 // Returns input from the user - enumerated to be the same value no matter if input is from encoders or IR remote
 byte getUserInput()
