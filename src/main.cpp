@@ -1278,7 +1278,7 @@ void displayTempDetails(float Temp, uint8_t TriggerTemp, uint8_t DispTemp, uint8
 float readVoltage(byte ADC_Pin) {
   // Carsten
   // float calibration  = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
-  float calibration  = 1.000; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  float calibration  = 1.085; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   float vref = 1100;
   esp_adc_cal_characteristics_t adc_chars;
   esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
@@ -1300,7 +1300,7 @@ float getTemperature(uint8_t pinNmbr)
   Vout = Vout / 8;
 
   Rntc = Rref * (1 / ((Vin / Vout) - 1)); // Formula to calculate the resistance of the NTC
-
+  
   if (Rntc < 0) 
     Temp = 0;
   else
