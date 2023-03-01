@@ -142,8 +142,8 @@ typedef union
     IRMP_DATA IR_1;                // IR data to be interpreted as 1 (to select input 1 directly)
     IRMP_DATA IR_2;                // IR data to be interpreted as 2
     IRMP_DATA IR_3;                // IR data to be interpreted as 3
-    IRMP_DATA IR_4;                // IR data to be interpreted as 4
     IRMP_DATA IR_5;                // IR data to be interpreted as 5
+    IRMP_DATA IR_4;                // IR data to be interpreted as 4
     IRMP_DATA IR_6;                // IR data to be interpreted as 6
     struct InputSettings Input[6]; // Settings for all 6 inputs
     byte Trigger1Active;           // 0 = the trigger is not active, 1 = the trigger is active
@@ -547,7 +547,7 @@ String getJSONTempValues() {
 
 void notifyClients(String message) {
   ws.textAll(message);
-  Serial.println("Sent: "+message);
+  //Serial.println("Sent: "+message);
 }
 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
@@ -556,45 +556,14 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     data[len] = 0;
     String message = (char*)data;
 
-    if (message.indexOf("Volume:Up") >= 0) {
-      if (RuntimeSettings.CurrentVolume < Settings.VolumeSteps && appMode == APP_NORMAL_MODE) {
-        setVolume(RuntimeSettings.CurrentVolume + 1); 
-        ScreenSaverOff();
-      }
-      else 
-        notifyClients(getJSONCurrentVolume());
-    }
-    else if (message.indexOf("Volume:Down") >= 0) {
-      if (RuntimeSettings.CurrentVolume > 0 && appMode == APP_NORMAL_MODE) {
-        setVolume(RuntimeSettings.CurrentVolume - 1); 
-        ScreenSaverOff();
-      }
-      else notifyClients(getJSONCurrentVolume());
-    }
-    else if (message.indexOf("Volume:") >= 0) {
-      int16_t newVolume = message.substring(7).toInt();
-      if (newVolume >= 0 && newVolume <= Settings.VolumeSteps && appMode == APP_NORMAL_MODE)
-      {
-        setVolume(message.substring(7).toInt());
-        ScreenSaverOff();
-      }
-      else notifyClients(getJSONCurrentVolume());
-    }
-    
-    if (message.indexOf("Input:Up") >= 0) {
-      if (appMode == APP_NORMAL_MODE) {
-        setNextInput();
-        ScreenSaverOff();
-      } else notifyClients(getJSONCurrentInput());
-    }
-   
-   if (message.indexOf("Input:Down") >= 0) {
-     if (appMode == APP_NORMAL_MODE) {
-        setPrevInput();
-        ScreenSaverOff();
-      } else notifyClients(getJSONCurrentInput());
-    }
-
+    if (message.indexOf("Volume:Up") >= 0) setVolume(RuntimeSettings.CurrentVolume + 1); 
+    else if (message.indexOf("Volume:Down") >= 0) setVolume(RuntimeSettings.CurrentVolume - 1); 
+    else if (message.indexOf("Volume:") >= 0) setVolume(message.substring(7).toInt());
+        
+    if (message.indexOf("Input:Up") >= 0) setNextInput();
+    else if (message.indexOf("Input:Down") >= 0) setPrevInput();
+    else if (message.indexOf("Input:") >= 0) setInput(message.substring(7).toInt());
+  
     if (message.indexOf("Power:Toggle") >= 0) {
       if (appMode == APP_STANDBY_MODE)
         startUp();
@@ -608,7 +577,9 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       notifyClients(getJSONCurrentValues());
     }
   }
+  mil_LastUserInput = millis();
 }
+
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
   switch (type) {
     case WS_EVT_CONNECT:
@@ -955,15 +926,16 @@ void startUp()
   }
   oled.clear();
 
+  appMode = APP_NORMAL_MODE;
+  // Keep start volume for current input lower hand max allowed start volume
+  RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput] = minimum(RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput], Settings.MaxStartVolume); // Avoid setting volume higher than MaxStartVol
   setInput(RuntimeSettings.CurrentInput);
-  RuntimeSettings.CurrentVolume = minimum(RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput], Settings.MaxStartVolume); // Avoid setting volume higher than MaxStartVol
-  setVolume(RuntimeSettings.CurrentVolume);
   displayTemperatures();
   unmute();
 
   UIkey = KEY_NONE;
   lastReceivedInput = KEY_NONE;
-  appMode = APP_NORMAL_MODE;
+  
   
   notifyClients(getJSONOnStandbyState());
 
@@ -1033,23 +1005,26 @@ int16_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t m
 
 void setVolume(int16_t newVolumeStep)
 {
-  if (newVolumeStep < Settings.Input[RuntimeSettings.CurrentInput].MinVol)
-    newVolumeStep = Settings.Input[RuntimeSettings.CurrentInput].MinVol;
-  else if (newVolumeStep > Settings.Input[RuntimeSettings.CurrentInput].MaxVol)
-    newVolumeStep = Settings.Input[RuntimeSettings.CurrentInput].MaxVol;
-
-  // TO DO call Muses with balance logic
-  if (!RuntimeSettings.Muted)
+  if (appMode == APP_NORMAL_MODE)
   {
-    if (Settings.Input[RuntimeSettings.CurrentInput].Active != INPUT_HT_PASSTHROUGH)
-      RuntimeSettings.CurrentVolume = newVolumeStep;
-    else
-      RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MaxVol; // Set to max volume
-    RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput] = RuntimeSettings.CurrentVolume;
-    muses.setVolume(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation));
+    if (newVolumeStep < Settings.Input[RuntimeSettings.CurrentInput].MinVol)
+      newVolumeStep = Settings.Input[RuntimeSettings.CurrentInput].MinVol;
+    else if (newVolumeStep > Settings.Input[RuntimeSettings.CurrentInput].MaxVol)
+      newVolumeStep = Settings.Input[RuntimeSettings.CurrentInput].MaxVol;
+
+    // TO DO call Muses with balance logic
+    if (!RuntimeSettings.Muted)
+    {
+      if (Settings.Input[RuntimeSettings.CurrentInput].Active != INPUT_HT_PASSTHROUGH)
+        RuntimeSettings.CurrentVolume = newVolumeStep;
+      else
+        RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MaxVol; // Set to max volume
+      RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput] = RuntimeSettings.CurrentVolume;
+      muses.setVolume(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation));
+    }
     displayVolume();
-    notifyClients(getJSONCurrentVolume());
   }
+  notifyClients(getJSONCurrentVolume());
 }
 
 void mute()
@@ -1112,10 +1087,10 @@ void displayMute()
 
 boolean setInput(uint8_t NewInput)
 {
-  if (Settings.Input[NewInput].Active != INPUT_INACTIVATED && NewInput >= 0 && NewInput <= 5)
+  boolean result = false;
+  if (Settings.Input[NewInput].Active != INPUT_INACTIVATED && NewInput >= 0 && NewInput <= 5 && appMode == APP_NORMAL_MODE)
   {
-    if (!RuntimeSettings.Muted)
-      mute();
+    if (!RuntimeSettings.Muted) mute();
 
     // Unselect currently selected input
     relayController.digitalWrite(RuntimeSettings.CurrentInput, LOW);
@@ -1126,8 +1101,7 @@ boolean setInput(uint8_t NewInput)
     // Select new input
     RuntimeSettings.CurrentInput = NewInput;
     relayController.digitalWrite(NewInput, HIGH);
-    notifyClients(getJSONCurrentInput());
-
+    
     if (Settings.RecallSetLevel)
       RuntimeSettings.CurrentVolume = RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput];
     else if (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MaxVol)
@@ -1137,31 +1111,36 @@ boolean setInput(uint8_t NewInput)
     setVolume(RuntimeSettings.CurrentVolume);
     if (RuntimeSettings.Muted)
       unmute();
+
     displayInput();
-    
-    return true;
+    result=true;
   }
-  return false;
+
+  notifyClients(getJSONCurrentInput());
+  return result;
 }
 
 // Select the next active input (DOWN)
 void setPrevInput()
 {
   byte nextInput = (RuntimeSettings.CurrentInput == 0) ? 5 : RuntimeSettings.CurrentInput - 1;
-  while (!setInput(nextInput))
+  
+  while (Settings.Input[nextInput].Active == INPUT_INACTIVATED)
   {
     nextInput = (nextInput == 0) ? 5 : nextInput - 1;
   }
+  setInput(nextInput);
 }
 
 // Select the next active input (UP)
 void setNextInput()
 {
   byte nextInput = (RuntimeSettings.CurrentInput == 5) ? 0 : RuntimeSettings.CurrentInput + 1;
-  while (!setInput(nextInput))
+  while (Settings.Input[nextInput].Active == INPUT_INACTIVATED)
   {
     nextInput = (nextInput > 5) ? 0 : nextInput + 1;
   }
+   setInput(nextInput);
 }
 
 // Display the name of the current input (but only if it has been chosen to be so by the user)
@@ -1283,8 +1262,10 @@ void displayTempDetails(float Temp, uint8_t TriggerTemp, uint8_t DispTemp, uint8
 // Read analog with improved accuracy - see https://github.com/G6EJD/ESP32-ADC-Accuracy-Improvement/blob/main/ESP32_ADC_Read_Voltage_Accuracy_V2.ino
 float readVoltage(byte ADC_Pin) {
   // Carsten
-  // float calibration  = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
-  float calibration  = 1.085; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  float calibration  = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  
+  // Jan
+  //float calibration  = 1.085; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   float vref = 1100;
   esp_adc_cal_characteristics_t adc_chars;
   esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
