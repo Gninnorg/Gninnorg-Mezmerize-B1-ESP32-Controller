@@ -480,9 +480,9 @@ void ScreenSaverOff()
   mil_LastUserInput = millis();
   if (ScreenSaverIsOn)
   {
-    if (Settings.DisplayDimLevel == 0)
-      oled.lcdOn();
-    oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
+    oled.lcdOn();
+    if (Settings.DisplayDimLevel != 0)
+      oled.backlight((Settings.DisplayOnLevel + 1) * 64 - 1);
     ScreenSaverIsOn = false;
   }
 }
@@ -957,9 +957,9 @@ void startUp()
 
   setInput(RuntimeSettings.CurrentInput);
   RuntimeSettings.CurrentVolume = minimum(RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput], Settings.MaxStartVolume); // Avoid setting volume higher than MaxStartVol
-  unmute();
-  displayInput();
+  setVolume(RuntimeSettings.CurrentVolume);
   displayTemperatures();
+  unmute();
 
   UIkey = KEY_NONE;
   lastReceivedInput = KEY_NONE;
@@ -1071,6 +1071,7 @@ void displayVolume()
 {
   if (Settings.DisplayVolume)
   {
+    if (ScreenSaverIsOn) ScreenSaverOff();
     if (!RuntimeSettings.Muted)
     {
       // If show volume in steps
@@ -1100,6 +1101,7 @@ void displayVolume()
 // Clear previously displayed volume steps/-dB to indicate that mute is selected
 void displayMute()
 {
+  if (ScreenSaverIsOn) ScreenSaverOff();
   for (int8_t i = 0; i < 4; i++)
   {
     oled.setCursor(10, i);
@@ -1167,6 +1169,7 @@ void displayInput()
 {
   if (Settings.DisplaySelectedInput)
   {
+    if (ScreenSaverIsOn) ScreenSaverOff();
     // Move Input display one line down if display of temperatures has been disabled
     if (!Settings.DisplayTemperature1 && !Settings.DisplayTemperature2)
       oled.setCursor(0, 1); else oled.setCursor(0, 0);
@@ -1176,21 +1179,24 @@ void displayInput()
 
 void displayTemperatures()
 {
-  if (Settings.DisplayTemperature1)
+  if (ScreenSaverIsOn == false) // Only update display if screen saver is not on
   {
-    float Temp = getTemperature(NTC1_PIN);
-    float MaxTemp;
-    if (Settings.Trigger1Temp == 0)
-      MaxTemp = 60; // TO DO: Is this the best default value?
-    else
-      MaxTemp = Settings.Trigger1Temp;
-    displayTempDetails(Temp, MaxTemp, Settings.DisplayTemperature1, 1);
-  }
+  
+    if (Settings.DisplayTemperature1)
+    {
+      float Temp = getTemperature(NTC1_PIN);
+      float MaxTemp;
+      if (Settings.Trigger1Temp == 0)
+        MaxTemp = 60; // TO DO: Is this the best default value?
+      else
+        MaxTemp = Settings.Trigger1Temp;
+      displayTempDetails(Temp, MaxTemp, Settings.DisplayTemperature1, 1);
+    }
 
-  if (Settings.DisplayTemperature2)
-  {
-    float Temp = getTemperature(NTC2_PIN);
-    float MaxTemp;
+    if (Settings.DisplayTemperature2)
+    {
+      float Temp = getTemperature(NTC2_PIN);
+      float MaxTemp;
     if (Settings.Trigger2Temp == 0)
       MaxTemp = 60; // TO DO: Is this the best default value?
     else
@@ -1199,8 +1205,8 @@ void displayTemperatures()
       displayTempDetails(Temp, MaxTemp, Settings.DisplayTemperature1, 2);
     else
       displayTempDetails(Temp, MaxTemp, Settings.DisplayTemperature1, 1);
+    }
   }
-
   mil_onRefreshTemperatureDisplay = millis();
 }
 
