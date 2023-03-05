@@ -8,7 +8,7 @@
 **
 */
 
-#define VERSION (float)0.98
+#define VERSION (float)0.99
 
 #include <Wire.h>
 #include <Adafruit_MCP23008.h>
@@ -36,7 +36,7 @@
 #define ROTARY1_CW_PIN 25
 #define ROTARY1_CCW_PIN 26
 #define ROTARY1_SW_PIN 27
-#define POWER_RELAY 4
+#define POWER_RELAY_PIN 4
 
 #include <irmpSelectMain15Protocols.h> // This enables 15 main protocols
 #define IRMP_SUPPORT_NEC_PROTOCOL   1  // this enables only one protocol
@@ -117,17 +117,19 @@ typedef union
 {
   struct
   {
-    char ssid[33];
-    char pass[33];
-    char ip[16];
-    char gateway[16];
+    char ssid[33];                 // Wifi network SSDI
+    char pass[33];                 // Wifi network password
+    char ip[16];                   // Wifi network assigned IP address
+    char gateway[16];              // Wifi network gateway IP address
 
-    byte VolumeSteps;    // The number of steps of the volume control
-    byte MinAttenuation; // Minimum attenuation in -dB (as 0 db equals no attenuation this is equal to the highest volume allowed)
-    byte MaxAttenuation; // Maximum attenuation in -dB (as -111.5 db is the limit of the Muses72320 this is equal to the lowest volume possible). We only keep this setting as a positive number, and we do also only allow the user to set the value in 1 dB steps
-    byte MaxStartVolume; // If StoreSetLevel is true, then limit the volume to the specified value when the controller is powered on
-    byte MuteLevel;      // The level to be set when Mute is activated by the user. The Mute function of the Muses72320 is activated if 0 is specified
-    byte RecallSetLevel; // Remember/store the volume level for each separate input
+    byte VolumeSteps;              // The number of steps of the volume control
+    byte MinAttenuation;           // Minimum attenuation in -dB (as 0 db equals no attenuation this is equal to the highest volume allowed)
+    byte MaxAttenuation;           // Maximum attenuation in -dB (as -111.5 db is the limit of the Muses72320 this is equal to the lowest volume possible). We only keep this setting as a positive number, and we do also only allow the user to set the value in 1 dB steps
+    byte MaxStartVolume;           // If StoreSetLevel is true, then limit the volume to the specified value when the controller is powered on
+    byte MuteLevel;                // The level to be set when Mute is activated by the user. The Mute function of the Muses72320 is activated if 0 is specified
+    byte RecallSetLevel;           // Remember/store the volume level for each separate input
+
+    float ADC_Calibration;         // Used for calibration of the ADC readings when reading temperatures from the attached NTCs. The value differs (quite a lot) between ESP32's
 
     IRMP_DATA IR_ONOFF;            // IR data to be interpreted as ON/OFF - switch between running and suspend mode (and turn triggers off)
     IRMP_DATA IR_UP;               // IR data to be interpreted as UP
@@ -146,6 +148,7 @@ typedef union
     IRMP_DATA IR_4;                // IR data to be interpreted as 4
     IRMP_DATA IR_6;                // IR data to be interpreted as 6
     struct InputSettings Input[6]; // Settings for all 6 inputs
+    bool ExtPowerRelayTrigger;     // Enable triggering of relay for external power (we use it to control the power of the Mezmerize)
     byte Trigger1Active;           // 0 = the trigger is not active, 1 = the trigger is active
     byte Trigger1Type;             // 0 = momentary, 1 = latching
     byte Trigger1OnDelay;          // Seconds from controller power up to activation of trigger. The default delay allows time for the output relay of the Mezmerize to be activated before we turn on the power amps. The selection of an input of the Mezmerize will also be delayed.
@@ -163,9 +166,9 @@ typedef union
     byte DisplaySelectedInput;     // 0 = the name of the active input is not shown on the display (ie. if only one input is used), 1 = the name of the selected input is shown on the display
     byte DisplayTemperature1;      // 0 = do not display the temperature measured by NTC 1, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
     byte DisplayTemperature2;      // 0 = do not display the temperature measured by NTC 2, 1 = display in number of degrees Celcious, 2 = display as graphical representation, 3 = display both
-    float Version;                 // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
+    float Version;                 // Used to check if data read from the EEPROM is valid with the compiled version of the code - if not a reset to default settings is necessary and they must be written to the EEPROM
   };
-  byte data[227]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
+  byte data[232]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
 } mySettings;
 
 mySettings Settings; // Holds all the current settings
@@ -178,11 +181,12 @@ typedef union
     byte CurrentInput;      // The number of the currently set input
     byte CurrentVolume;     // The currently set volume
     bool Muted;             // Indicates if we are in mute mode or not
-    byte InputLastVol[6];   // The last volume set for each input
-    byte PrevSelectedInput; // Holds the input selected before the current one
+    byte InputLastVol[6];   // The last set volume for each input
+    byte InputLastBal[6];   // The last set balance for each input: 127 = no balance shift (values < 127 = shift balance to the left channel, values > 127 = shift balance to the right channel)
+    byte PrevSelectedInput; // Holds the input selected before the current one (enables switching back and forth between two inputs, eg. while A-B testing)
     float Version;          // Used to check if data read from the EEPROM is valid with the compiled version of the compiled code - if not a reset to defaults is necessary and they must be written to the EEPROM
   };
-  byte data[14]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
+  byte data[20]; // Allows us to be able to write/read settings from EEPROM byte-by-byte (to avoid specific serialization/deserialization code)
 } myRuntimeSettings;
 
 myRuntimeSettings RuntimeSettings;
@@ -238,8 +242,9 @@ bool ScreenSaverIsOn = false;
 unsigned long mil_LastUserInput = millis();
 // Used to time how often the display of temperatures is updated
 unsigned long mil_onRefreshTemperatureDisplay;
-// Update interval for the display of temperatures
-#define TEMP_REFRESH_INTERVAL 10000
+// Update interval for the display/notification of temperatures
+#define TEMP_REFRESH_INTERVAL 10000          // Interval while on
+#define TEMP_REFRESH_INTERVAL_STANDBY 60000  // Interval while in standby
 
 //  Initialize the menu
 enum AppModeValues
@@ -873,6 +878,9 @@ void setup()
   oled.print("Connecting to Wifi");
   setupWIFIsupport();
 
+  // Set pin mode for control of power relay
+  pinMode(POWER_RELAY_PIN, OUTPUT);
+
   startUp();
 }
 
@@ -882,8 +890,9 @@ void startUp()
   oled.clear();
 
   // Turn on Mezmerize B1 Buffer via power on/off relay
-  pinMode(POWER_RELAY, OUTPUT);
-  digitalWrite(POWER_RELAY, HIGH);
+  if (Settings.ExtPowerRelayTrigger) {
+    digitalWrite(POWER_RELAY_PIN, HIGH);
+  }
 
   // The controller is now ready - save the timestamp
   mil_On = millis();
@@ -935,11 +944,10 @@ void startUp()
 
   UIkey = KEY_NONE;
   lastReceivedInput = KEY_NONE;
-  
-  
+    
   notifyClients(getJSONOnStandbyState());
 
-  Serial.println("Ready!");
+  // Serial.println("Ready!");
 }
 
 void setTrigger1On()
@@ -1256,21 +1264,15 @@ void displayTempDetails(float Temp, uint8_t TriggerTemp, uint8_t DispTemp, uint8
       }
     }
   }
-  mil_onRefreshTemperatureDisplay = millis();
 }
 
 // Read analog with improved accuracy - see https://github.com/G6EJD/ESP32-ADC-Accuracy-Improvement/blob/main/ESP32_ADC_Read_Voltage_Accuracy_V2.ino
 float readVoltage(byte ADC_Pin) {
-  // Carsten
-  float calibration  = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
-  
-  // Jan
-  //float calibration  = 1.085; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   float vref = 1100;
   esp_adc_cal_characteristics_t adc_chars;
   esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
   vref = adc_chars.vref; // Obtain the device ADC reference voltage
-  return (analogRead(ADC_Pin) / 4095.0) * 3.3 * (1100 / vref) * calibration;  // ESP by design reference voltage in mV
+  return (analogRead(ADC_Pin) / 4095.0) * 3.3 * (1100 / vref) * Settings.ADC_Calibration;  // ESP by design reference voltage in mV
 }
 
 // Return measured temperature from 4.7K NTC connected to pinNmbr
@@ -1420,6 +1422,13 @@ void loop()
   case APP_STANDBY_MODE:
   {
     // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart is done by getUserInput(). By the way: you don't need an IR remote: a doubleclick on encoder_2 is also KEY_ONOFF
+    
+    // Send temperature notification via websocket while in standby mode
+    if (millis() > mil_onRefreshTemperatureDisplay + (TEMP_REFRESH_INTERVAL_STANDBY))
+    {
+      notifyClients(getJSONTempValues());
+      mil_onRefreshTemperatureDisplay = millis(); 
+    }
     break;
   }
 }
@@ -1438,7 +1447,9 @@ void toStandbyMode()
   mute();
   setTrigger1Off();
   setTrigger2Off();
-  digitalWrite(POWER_RELAY, LOW);
+  if (Settings.ExtPowerRelayTrigger) {
+    digitalWrite(POWER_RELAY_PIN, LOW);
+  }
   last_KEY_ONOFF = millis();
   notifyClients(getJSONOnStandbyState());
   delay(3000);
@@ -2358,6 +2369,11 @@ void setSettingsToDefault()
   strcpy(Settings.pass, "                                ");
   strcpy(Settings.ip, "               ");
   strcpy(Settings.gateway, "               ");
+  Settings.ExtPowerRelayTrigger = true;
+  // Carsten
+  // Settings.ADC_Calibration = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  // Jan
+  Settings.ADC_Calibration  = 1.085; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   Settings.VolumeSteps = 60;
   Settings.MinAttenuation = 0;
   Settings.MaxAttenuation = 60;
@@ -2421,12 +2437,12 @@ void setSettingsToDefault()
   Settings.Input[5].MaxVol = Settings.VolumeSteps;
   Settings.Input[5].MinVol = 0;
   Settings.Trigger1Active = 1;
-  Settings.Trigger1Type = 1;
-  Settings.Trigger1OnDelay = 1;
+  Settings.Trigger1Type = 0;
+  Settings.Trigger1OnDelay = 0;
   Settings.Trigger1Temp = 0;
   Settings.Trigger2Active = 1;
-  Settings.Trigger2Type = 1;
-  Settings.Trigger2OnDelay = 1;
+  Settings.Trigger2Type = 0;
+  Settings.Trigger2OnDelay = 0;
   Settings.Trigger2Temp = 0;
   Settings.TriggerInactOffTimer = 0;
   Settings.ScreenSaverActive = true;
@@ -2448,6 +2464,12 @@ void setSettingsToDefault()
   RuntimeSettings.InputLastVol[3] = 0;
   RuntimeSettings.InputLastVol[4] = 0;
   RuntimeSettings.InputLastVol[5] = 0;
+  RuntimeSettings.InputLastBal[0] = 127;  // 127 = no balance shift (values < 127 = shift balance to the left channel, values > 127 = shift balance to the right channel)
+  RuntimeSettings.InputLastBal[1] = 127;
+  RuntimeSettings.InputLastBal[2] = 127;
+  RuntimeSettings.InputLastBal[3] = 127;
+  RuntimeSettings.InputLastBal[4] = 127;
+  RuntimeSettings.InputLastBal[5] = 127;
   RuntimeSettings.PrevSelectedInput = 0;
   RuntimeSettings.Version = VERSION;
 }
