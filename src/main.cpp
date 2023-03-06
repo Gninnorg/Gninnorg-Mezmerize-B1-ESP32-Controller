@@ -10,6 +10,15 @@
 
 #define VERSION (float)0.99
 
+#define DEBUG 1
+#if DEBUG == 1
+#define debug(x) Serial.print(x)
+#define debugln(x) Serial.println(x)
+#else
+#define debug(x)
+#define debugln(x)
+#endif
+
 #include <Wire.h>
 #include <Adafruit_MCP23008.h>
 #include <OLedI2C.h>
@@ -552,7 +561,7 @@ String getJSONTempValues() {
 
 void notifyClients(String message) {
   ws.textAll(message);
-  //Serial.println("Sent: "+message);
+  //debugln("Sent: "+message);
 }
 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
@@ -628,9 +637,9 @@ const long interval = 10000;  // interval to wait for Wi-Fi connection (millisec
 // Initialize SPIFFS
 void initSPIFFS() {
   if (!SPIFFS.begin(true)) {
-    Serial.println("An error has occurred while mounting SPIFFS");
+    debugln("An error has occurred while mounting SPIFFS");
   }
-  Serial.println("SPIFFS mounted successfully");
+  debugln("SPIFFS mounted successfully");
 }
 
 // Read File from SPIFFS
@@ -639,7 +648,7 @@ String readFile(fs::FS &fs, const char * path){
 
   File file = fs.open(path);
   if(!file || file.isDirectory()){
-    Serial.println("- failed to open file for reading");
+    debugln("- failed to open file for reading");
     return String();
   }
   
@@ -657,20 +666,20 @@ void writeFile(fs::FS &fs, const char * path, const char * message){
 
   File file = fs.open(path, FILE_WRITE);
   if(!file){
-    Serial.println("- failed to open file for writing");
+    debugln("- failed to open file for writing");
     return;
   }
   if(file.print(message)){
-    Serial.println("- file written");
+    debugln("- file written");
   } else {
-    Serial.println("- write failed");
+    debugln("- write failed");
   }
 }
 
 // Initialize WiFi
 bool initWiFi() {
   if(Settings.ssid=="" || Settings.ip==""){
-    Serial.println("Undefined SSID or IP address.");
+    debugln("Undefined SSID or IP address.");
     return false;
   }
 
@@ -680,11 +689,11 @@ bool initWiFi() {
 
 
   if (!WiFi.config(localIP, localGateway, subnet)){
-    Serial.println("STA Failed to configure");
+    debugln("STA Failed to configure");
     return false;
   }
   WiFi.begin(Settings.ssid, Settings.pass);
-  Serial.println("Connecting to WiFi...");
+  debugln("Connecting to WiFi...");
 
   unsigned long currentMillis = millis();
   previousMillis = currentMillis;
@@ -692,12 +701,12 @@ bool initWiFi() {
   while(WiFi.status() != WL_CONNECTED) {
     currentMillis = millis();
     if (currentMillis - previousMillis >= interval) {
-      Serial.println("Failed to connect.");
+      debugln("Failed to connect.");
       return false;
     }
   }
 
-  Serial.println(WiFi.localIP());
+  debugln(WiFi.localIP());
   return true;
 }
 
@@ -745,13 +754,13 @@ void setupWIFIsupport() {
   }
   else {
     // Connect to Wi-Fi network with SSID and password
-    Serial.println("Setting AP (Access Point)");
+    debugln("Setting AP (Access Point)");
     // NULL sets an open Access Point
     WiFi.softAP("PreAmp", NULL);
 
     IPAddress IP = WiFi.softAPIP();
-    Serial.print("AP IP address: ");
-    Serial.println(IP); 
+    debug("AP IP address: ");
+    debugln(IP); 
 
     oled.clear();
     oled.setCursor(0, 1);
@@ -776,32 +785,32 @@ void setupWIFIsupport() {
           // HTTP POST ssid value
           if (p->name() == PARAM_INPUT_1) {
             strcpy(Settings.ssid, p->value().c_str()); /* String copy*/
-            Serial.print("SSID set to: ");
-            Serial.println(Settings.ssid);
+            debug("SSID set to: ");
+            debugln(Settings.ssid);
             // Write file to save value
             //writeFile(SPIFFS, ssidPath, ssid.c_str());
           }
           // HTTP POST pass value
           if (p->name() == PARAM_INPUT_2) {
             strcpy(Settings.pass, p->value().c_str()); /* String copy */
-            Serial.print("Password set to: ");
-            Serial.println(Settings.pass);
+            debug("Password set to: ");
+            debugln(Settings.pass);
             // Write file to save value
             // writeFile(SPIFFS, passPath, pass.c_str());
           }
           // HTTP POST ip value
           if (p->name() == PARAM_INPUT_3) {
             strcpy(Settings.ip, p->value().c_str()); /* String copy*/
-            Serial.print("IP Address set to: ");
-            Serial.println(Settings.ip);
+            debug("IP Address set to: ");
+            debugln(Settings.ip);
             // Write file to save value
             //writeFile(SPIFFS, ipPath, ip.c_str());
           }
           // HTTP POST gateway value
           if (p->name() == PARAM_INPUT_4) {
             strcpy(Settings.gateway, p->value().c_str()); /* String copy */
-            Serial.print("Gateway set to: ");
-            Serial.println(Settings.gateway);
+            debug("Gateway set to: ");
+            debugln(Settings.gateway);
             // Write file to save value
             //writeFile(SPIFFS, gatewayPath, gateway.c_str());
           }
@@ -947,7 +956,7 @@ void startUp()
     
   notifyClients(getJSONOnStandbyState());
 
-  // Serial.println("Ready!");
+  // debugln("Ready!");
 }
 
 void setTrigger1On()
@@ -1298,7 +1307,7 @@ float getTemperature(uint8_t pinNmbr)
   if (Temp < 0) Temp = 0;
   else
     if (Temp > 99) Temp = 99;
-  //Serial.print(" Voltage: "); Serial.print(Vout); Serial.print(" Resistance: "); Serial.print(Rntc); Serial.print("  Temp: "); Serial.println(Temp);
+  //debug(" Voltage: "); debug(Vout); debug(" Resistance: "); debug(Rntc); debug("  Temp: "); debugln(Temp);
   return (Temp);
 }
 
