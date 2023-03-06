@@ -10,6 +10,8 @@
 
 #define VERSION (float)0.99
 
+// To enable debug define DEBUG 1
+// To disable debug define DEBUG 2
 #define DEBUG 1
 #if DEBUG == 1
 #define debug(x) Serial.print(x)
