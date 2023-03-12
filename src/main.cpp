@@ -55,6 +55,7 @@
 // Declarations
 void startUp(void);
 void toStandbyMode(void);
+void toAppNormalMode(void);
 void ScreenSaverOff(void);
 void setTrigger1On(void);
 void setTrigger2On(void);
@@ -69,6 +70,8 @@ void displayMute(void);
 void displayInput(void);
 int16_t getAttenuation(uint8_t, uint8_t, uint8_t, uint8_t);
 void setVolume(int16_t);
+bool changeBalance(void);
+void displayBalance(byte);
 void mute(void);
 void unmute(void);
 boolean setInput(uint8_t);
@@ -259,6 +262,7 @@ unsigned long mil_onRefreshTemperatureDisplay;
 enum AppModeValues
 {
   APP_NORMAL_MODE,
+  APP_BALANCE_MODE,
   APP_MENU_MODE,
   APP_PROCESS_MENU_CMD,
   APP_STANDBY_MODE
@@ -1022,7 +1026,7 @@ int16_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t m
 
 void setVolume(int16_t newVolumeStep)
 {
-  if (appMode == APP_NORMAL_MODE)
+  if (appMode == APP_NORMAL_MODE || appMode == APP_BALANCE_MODE)
   {
     if (newVolumeStep < Settings.Input[RuntimeSettings.CurrentInput].MinVol)
       newVolumeStep = Settings.Input[RuntimeSettings.CurrentInput].MinVol;
@@ -1078,7 +1082,7 @@ void displayVolume()
         else
           oled.print4x4Number(11, RuntimeSettings.CurrentVolume); // Display volume from 00-99 with 4x4 digits
       }
-      else // Show volume in -dB (-99.9 to 0)
+      else // Show volume in -dB (-99.5 to 0)
       {
         oled.setCursor(17, 0);
         oled.print(F("-dB"));
@@ -1339,21 +1343,23 @@ void loop()
       break;
     case KEY_UP:
       // Turn volume up if we're not muted and we'll not exceed the maximum volume set for the currently selected input
+      // TO DO: The checks for mute and MaxVol are done in setVolume so can be deleted here?
       if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume < Settings.Input[RuntimeSettings.CurrentInput].MaxVol))
         setVolume(RuntimeSettings.CurrentVolume + 1);
       break;
     case KEY_DOWN:
       // Turn volume down if we're not muted and we'll not get below the minimum volume set for the currently selected input
+      // TO DO: The checks for mute and MinVol are done in setVolume so can be deleted here?
       if (!RuntimeSettings.Muted && (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MinVol))
         setVolume(RuntimeSettings.CurrentVolume - 1);
       break;
     case KEY_LEFT:
-    { // add new code here
+    { 
       setPrevInput();
       break;
     }
     case KEY_RIGHT:
-    { // add new code here
+    { 
       setNextInput();
       break;
     }
@@ -1366,7 +1372,7 @@ void loop()
       setInput(UIkey - KEY_1);
       break;
     case KEY_PREVIOUS:
-      // Switch to previous selected input
+      // Switch to previous selected input (to allow for A-B comparison)
       setInput(RuntimeSettings.PrevSelectedInput);
       break;
     case KEY_MUTE:
@@ -1381,7 +1387,8 @@ void loop()
       break;
     case KEY_SELECT:
       // Set channel balance
-      // TO DO Insert new code here
+      changeBalance();
+      toAppNormalMode();
       break;
     }
     break;
@@ -1393,11 +1400,7 @@ void loop()
     if (menuMode == MENU_EXIT)
     {
       // Back to APP_NORMAL_MODE
-      oled.clear();
-      displayInput();
-      displayVolume();
-      displayTemperatures();
-      appMode = APP_NORMAL_MODE;
+      toAppNormalMode();
     }
     else if (menuMode == MENU_INVOKE_ITEM) // TO DO MENU_INVOKE_ITEM seems to be superfluous after my other changes
     {
@@ -1413,11 +1416,7 @@ void loop()
     if (processingComplete == ABANDON)
     {
       // Back to APP_NORMAL_MODE
-      oled.clear();
-      displayInput();
-      displayVolume();
-      displayTemperatures();
-      appMode = APP_NORMAL_MODE;
+      toAppNormalMode();
       Menu1.reset();
     }
     else if (processingComplete == true)
@@ -1441,6 +1440,15 @@ void loop()
     break;
   }
 }
+}
+
+void toAppNormalMode()
+{
+  oled.clear();
+  displayInput();
+  displayVolume();
+  displayTemperatures();
+  appMode = APP_NORMAL_MODE;
 }
 
 void toStandbyMode()
@@ -1506,7 +1514,7 @@ byte processMenuCommand(byte cmdId)
     complete = true;
     break;
   case mnuCmdMAX_ATT:
-    // TO DO: Why did we choose 90 dB as maximum attenuation? Probably just a decision (see also mnuCmdVOL_STEPS)
+    // TO DO: Why did we choose 90 dB as maximum attenuation? We can display up to 99.5 dB so it is probably just a decision (see also mnuCmdVOL_STEPS)
     editNumericValue(Settings.MaxAttenuation, Settings.MinAttenuation + 1, 90, "  -dB");
     setVolume(0); // Turn the volume down to the minimum (just in case)
     complete = true;
@@ -1986,6 +1994,77 @@ void refreshMenuDisplay(byte refreshMode)
   }
 }
 
+// Change channel balance for current input
+// The balance between channels can be shifted up to 4.5 dB in 0.5 dB steps
+// 127 = no balance shift (values < 127 = shift balance to the left channel, values > 127 = shift balance to the right channel)
+bool changeBalance()
+{
+  bool complete = false;
+  bool result = false;
+  byte OldValue = RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput];
+  byte NewValue = RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput];
+
+  // Display the screen
+  oled.clear();
+  oled.print("Balance");
+  displayBalance(NewValue);
+
+  while (!complete)
+  {
+    mil_LastUserInput = millis(); // Prevent the screen saver to kick in while editing
+    switch (getUserInput())
+    {
+    case KEY_UP:
+      if (NewValue < 136)
+      {
+        NewValue++;
+        RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] = NewValue;
+        // TO DO Set volume
+        displayBalance(NewValue);
+      }
+      break;
+    case KEY_DOWN:
+      if (NewValue > 118)
+      {
+        NewValue--;
+        RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] = NewValue;
+        // TO DO Set volume
+        displayBalance(NewValue);
+      }
+      break;
+    case KEY_SELECT:
+      if (NewValue != OldValue) {
+        writeRuntimeSettingsToEEPROM();
+        result = true;
+      }
+      complete = true;
+      break;
+    case KEY_BACK:
+      // Exit without saving new value
+      RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] = OldValue;
+        // TO DO Set volume
+      result = false;
+      complete = true;
+      break;
+    default:
+      break;
+    }
+  }
+  return result;
+}
+
+void displayBalance(byte Value)
+{
+  oled.setCursor(1, 1);
+  oled.print("---------=---------");
+  oled.setCursor(Value-117, 1);
+  oled.write(31);
+  oled.setCursor(1, 2);
+  if (Value < 127) oled.printf("L         %.1f dB R", (127 - Value) * -0.5);
+  else if (Value == 127) oled.print("L                 R");
+  else if (Value > 127) oled.printf("L %.1f dB         R", (Value - 127) * -0.5);
+}
+
 //----------------------------------------------------------------------
 // Editing of input names up to ten characters long
 // A name can consist of upper or lower case characters, digits and space characters
@@ -2018,27 +2097,27 @@ void editInputName(uint8_t InputNumber)
     mil_LastUserInput = millis(); // Prevent the screen saver to kick in while editing
     switch (byte UserInput = getUserInput())
     {
-    case KEY_RIGHT:
-    case KEY_LEFT:
+    case KEY_UP:
+    case KEY_DOWN:
       oled.BlinkingCursorOff();
       // Clear current arrow
       oled.setCursor(arrowX, 2);
       oled.write(' ');
 
       // Decide if position or direction of arrow must be changed
-      if (arrowPointingUpDown == 0 && UserInput == KEY_RIGHT)     // The arrow points up and the user input is "turn to the right"
+      if (arrowPointingUpDown == 0 && UserInput == KEY_UP)     // The arrow points up and the user input is "turn to the right"
         arrowPointingUpDown = 1;                                  // Set the arrow to point down but don't change position of ArrowX
-      else if (arrowPointingUpDown == 0 && UserInput == KEY_LEFT) // The arrow points up and the user input is "turn to the left"
+      else if (arrowPointingUpDown == 0 && UserInput == KEY_DOWN) // The arrow points up and the user input is "turn to the left"
       {
         if (arrowX > 0)
           arrowX--; // Move arrow one postion to the left
       }
-      else if (arrowPointingUpDown == 1 && UserInput == KEY_RIGHT) // The arrow points down and the user input is "turn to the right"
+      else if (arrowPointingUpDown == 1 && UserInput == KEY_UP) // The arrow points down and the user input is "turn to the right"
       {
         if (arrowX < 19)
           arrowX++; // Move arrow one postion to the right
       }
-      else if (arrowPointingUpDown == 1 && UserInput == KEY_LEFT) // The arrow points down and the user input is "turn to the left"
+      else if (arrowPointingUpDown == 1 && UserInput == KEY_DOWN) // The arrow points down and the user input is "turn to the left"
         arrowPointingUpDown = 0;                                  // Set the arrow to point up but don't change position of ArrowX
 
       // Display arrow
@@ -2189,14 +2268,14 @@ bool editNumericValue(byte &Value, byte MinValue, byte MaxValue, const char Unit
     mil_LastUserInput = millis(); // Prevent the screen saver to kick in while editing
     switch (getUserInput())
     {
-    case KEY_RIGHT:
+    case KEY_UP:
       if (NewValue < MaxValue)
       {
         NewValue++;
         oled.print3x3Number(11, 1, NewValue, false); // Display number from 000-999 with 3x3 digits
       }
       break;
-    case KEY_LEFT:
+    case KEY_DOWN:
       if (NewValue > MinValue)
       {
         NewValue--;
@@ -2259,7 +2338,7 @@ bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const 
     mil_LastUserInput = millis(); // Prevent the screen saver to kick in while editing
     switch (getUserInput())
     {
-    case KEY_RIGHT:
+    case KEY_UP:
       oled.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
       oled.print(" ");
       if (NewValue < NumOptions - 1)
@@ -2269,7 +2348,7 @@ bool editOptionValue(byte &Value, byte NumOptions, const char Option1[9], const 
       oled.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
       oled.write(16);
       break;
-    case KEY_LEFT:
+    case KEY_DOWN:
       oled.setCursor((NewValue % 2) * 10, (NewValue / 2) + 2);
       oled.print(" ");
       if (NewValue == 0)
