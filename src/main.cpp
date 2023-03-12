@@ -31,8 +31,8 @@
 #undef minimum
 #ifndef minimum
 #define minimum(a, b) ((a) < (b) ? (a) : (b))
-#endif 
- 
+#endif
+
 #include <ClickEncoder.h>
 #define ROTARY_ENCODER_STEPS 4
 
@@ -48,7 +48,7 @@
 #define POWER_RELAY_PIN 4
 
 #include <irmpSelectMain15Protocols.h> // This enables 15 main protocols
-#define IRMP_SUPPORT_NEC_PROTOCOL   1  // this enables only one protocol
+#define IRMP_SUPPORT_NEC_PROTOCOL 1    // this enables only one protocol
 
 #include <irmp.hpp>
 
@@ -129,19 +129,19 @@ typedef union
 {
   struct
   {
-    char ssid[33];                 // Wifi network SSDI
-    char pass[33];                 // Wifi network password
-    char ip[16];                   // Wifi network assigned IP address
-    char gateway[16];              // Wifi network gateway IP address
+    char ssid[33];    // Wifi network SSDI
+    char pass[33];    // Wifi network password
+    char ip[16];      // Wifi network assigned IP address
+    char gateway[16]; // Wifi network gateway IP address
 
-    byte VolumeSteps;              // The number of steps of the volume control
-    byte MinAttenuation;           // Minimum attenuation in -dB (as 0 db equals no attenuation this is equal to the highest volume allowed)
-    byte MaxAttenuation;           // Maximum attenuation in -dB (as -111.5 db is the limit of the Muses72320 this is equal to the lowest volume possible). We only keep this setting as a positive number, and we do also only allow the user to set the value in 1 dB steps
-    byte MaxStartVolume;           // If StoreSetLevel is true, then limit the volume to the specified value when the controller is powered on
-    byte MuteLevel;                // The level to be set when Mute is activated by the user. The Mute function of the Muses72320 is activated if 0 is specified
-    byte RecallSetLevel;           // Remember/store the volume level for each separate input
+    byte VolumeSteps;    // The number of steps of the volume control
+    byte MinAttenuation; // Minimum attenuation in -dB (as 0 db equals no attenuation this is equal to the highest volume allowed)
+    byte MaxAttenuation; // Maximum attenuation in -dB (as -111.5 db is the limit of the Muses72320 this is equal to the lowest volume possible). We only keep this setting as a positive number, and we do also only allow the user to set the value in 1 dB steps
+    byte MaxStartVolume; // If StoreSetLevel is true, then limit the volume to the specified value when the controller is powered on
+    byte MuteLevel;      // The level to be set when Mute is activated by the user. The Mute function of the Muses72320 is activated if 0 is specified
+    byte RecallSetLevel; // Remember/store the volume level for each separate input
 
-    float ADC_Calibration;         // Used for calibration of the ADC readings when reading temperatures from the attached NTCs. The value differs (quite a lot) between ESP32's
+    float ADC_Calibration; // Used for calibration of the ADC readings when reading temperatures from the attached NTCs. The value differs (quite a lot) between ESP32's
 
     IRMP_DATA IR_ONOFF;            // IR data to be interpreted as ON/OFF - switch between running and suspend mode (and turn triggers off)
     IRMP_DATA IR_UP;               // IR data to be interpreted as UP
@@ -255,8 +255,8 @@ unsigned long mil_LastUserInput = millis();
 // Used to time how often the display of temperatures is updated
 unsigned long mil_onRefreshTemperatureDisplay;
 // Update interval for the display/notification of temperatures
-#define TEMP_REFRESH_INTERVAL 10000          // Interval while on
-#define TEMP_REFRESH_INTERVAL_STANDBY 60000  // Interval while in standby
+#define TEMP_REFRESH_INTERVAL 10000         // Interval while on
+#define TEMP_REFRESH_INTERVAL_STANDBY 60000 // Interval while in standby
 
 //  Initialize the menu
 enum AppModeValues
@@ -481,8 +481,8 @@ byte getUserInput()
       ScreenSaverIsOn = true;
     }
   }
-  else
-    if (appMode != APP_STANDBY_MODE) ScreenSaverOff();
+  else if (appMode != APP_STANDBY_MODE)
+    ScreenSaverOff();
 
   // If inactivity timer is set, go to standby if the set number of hours have passed since last user input
   if ((appMode != APP_STANDBY_MODE) && (Settings.TriggerInactOffTimer > 0) && ((mil_LastUserInput + Settings.TriggerInactOffTimer * 3600000) < millis()))
@@ -512,7 +512,7 @@ void ScreenSaverOff()
 #include <AsyncElegantOTA.h>
 #include "SPIFFS.h"
 #include <Arduino_JSON.h>
-//#include <ArduinoJson.h>
+// #include <ArduinoJson.h>
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
@@ -521,168 +521,223 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 // Get all current values as JSON
-String getJSONCurrentValues() {
-  JSONVar JSONValues; //Json variable to hold values
-  if (appMode == APP_STANDBY_MODE) JSONValues["OnState"] = "Standby"; else JSONValues["OnState"] = "On";
+String getJSONCurrentValues()
+{
+  JSONVar JSONValues; // Json variable to hold values
+  if (appMode == APP_STANDBY_MODE)
+    JSONValues["OnState"] = "Standby";
+  else
+    JSONValues["OnState"] = "On";
   JSONValues["Input"] = String(Settings.Input[RuntimeSettings.CurrentInput].Name);
   JSONValues["VolumeSteps"] = String(Settings.VolumeSteps);
   JSONValues["Volume"] = String(RuntimeSettings.CurrentVolume);
-  JSONValues["Volume_dB"] = String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation)/2);
+
+  int Attenuation = getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation);
+
+  JSONValues["Volume"] = String(RuntimeSettings.CurrentVolume);
+  if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] == 127 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 118 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 136)
+    JSONValues["Volume_dB"] = String(float(Attenuation / 2));
+  else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 127) // Balance shifted to the left channel by lowering the right channel
+    JSONValues["Volume_dB"] = String(float(Attenuation / 2)) + String("/") + String(float((Attenuation + (127 - RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput])) / 2));
+  else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 127) // Balance shifted to the right channel by lowering the left channel
+    JSONValues["Volume_dB"] = String(float((Attenuation + (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] - 127)) / 2)) + String("/") + String(float(Attenuation / 2));
+
   JSONValues["Temp1"] = String(int(getTemperature(NTC1_PIN)));
   JSONValues["Temp2"] = String(int(getTemperature(NTC2_PIN)));
   return JSON.stringify(JSONValues);
 }
 
 // Get On/Standby state as JSON
-String getJSONOnStandbyState() {
-  JSONVar JSONValues; //Json variable to hold values
-  if (appMode == APP_STANDBY_MODE) JSONValues["OnState"] = "Standby"; else JSONValues["OnState"] = "On";
+String getJSONOnStandbyState()
+{
+  JSONVar JSONValues; // Json variable to hold values
+  if (appMode == APP_STANDBY_MODE)
+    JSONValues["OnState"] = "Standby";
+  else
+    JSONValues["OnState"] = "On";
   return JSON.stringify(JSONValues);
 }
 
 // Get selected input name as JSON
-String getJSONCurrentInput() {
-  JSONVar JSONValues; //Json variable to hold values
+String getJSONCurrentInput()
+{
+  JSONVar JSONValues; // Json variable to hold values
   JSONValues["Input"] = String(Settings.Input[RuntimeSettings.CurrentInput].Name);
   return JSON.stringify(JSONValues);
 }
 
 // Get current volume as JSON
-String getJSONCurrentVolume() {
-  JSONVar JSONValues; //Json variable to hold values
+String getJSONCurrentVolume()
+{
+  JSONVar JSONValues; // Json variable to hold values
+  int Attenuation = getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation);
+
   JSONValues["Volume"] = String(RuntimeSettings.CurrentVolume);
-  JSONValues["Volume_dB"] = String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation)/2);
+  if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] == 127 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 118 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 136)
+    JSONValues["Volume_dB"] = String(float(Attenuation / 2));
+  else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 127) // Balance shifted to the left channel by lowering the right channel
+    JSONValues["Volume_dB"] = String(float(Attenuation / 2)) + String("/") + String(float((Attenuation + (127 - RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput])) / 2));
+  else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 127) // Balance shifted to the right channel by lowering the left channel
+    JSONValues["Volume_dB"] = String(float((Attenuation + (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] - 127)) / 2)) + String("/") + String(float(Attenuation / 2));
   return JSON.stringify(JSONValues);
 }
 
 // Get temperatures as JSON
-String getJSONTempValues() {
-  JSONVar JSONValues; //Json variable to hold values
+String getJSONTempValues()
+{
+  JSONVar JSONValues; // Json variable to hold values
   JSONValues["Temp1"] = String(int(getTemperature(NTC1_PIN)));
   JSONValues["Temp2"] = String(int(getTemperature(NTC2_PIN)));
   return JSON.stringify(JSONValues);
 }
 
-void notifyClients(String message) {
+void notifyClients(String message)
+{
   ws.textAll(message);
-  debugln("Sent: "+message);
+  debugln("Sent: " + message);
 }
 
-void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
-  AwsFrameInfo *info = (AwsFrameInfo*)arg;
-  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
+{
+  AwsFrameInfo *info = (AwsFrameInfo *)arg;
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
+  {
     data[len] = 0;
-    String message = (char*)data;
+    String message = (char *)data;
 
-    if (message.indexOf("Volume:Up") >= 0) setVolume(RuntimeSettings.CurrentVolume + 1); 
-    else if (message.indexOf("Volume:Down") >= 0) setVolume(RuntimeSettings.CurrentVolume - 1); 
-    else if (message.indexOf("Volume:") >= 0) setVolume(message.substring(7).toInt());
-        
-    if (message.indexOf("Input:Up") >= 0) setNextInput();
-    else if (message.indexOf("Input:Down") >= 0) setPrevInput();
-    else if (message.indexOf("Input:") >= 0) setInput(message.substring(7).toInt());
-  
-    if (message.indexOf("Power:Toggle") >= 0) {
+    if (message.indexOf("Volume:Up") >= 0)
+      setVolume(RuntimeSettings.CurrentVolume + 1);
+    else if (message.indexOf("Volume:Down") >= 0)
+      setVolume(RuntimeSettings.CurrentVolume - 1);
+    else if (message.indexOf("Volume:") >= 0)
+      setVolume(message.substring(7).toInt());
+
+    if (message.indexOf("Input:Up") >= 0)
+      setNextInput();
+    else if (message.indexOf("Input:Down") >= 0)
+      setPrevInput();
+    else if (message.indexOf("Input:") >= 0)
+      setInput(message.substring(7).toInt());
+
+    if (message.indexOf("Power:Toggle") >= 0)
+    {
       if (appMode == APP_STANDBY_MODE)
         startUp();
       else if (appMode == APP_NORMAL_MODE)
         toStandbyMode();
-      else notifyClients(getJSONOnStandbyState());
+      else
+        notifyClients(getJSONOnStandbyState());
     }
-    
+
     // Default message received when a new Websocket client connects -> Send all values
-    if (strcmp((char*)data, "getValues") == 0) {
+    if (strcmp((char *)data, "getValues") == 0)
+    {
       notifyClients(getJSONCurrentValues());
     }
   }
   mil_LastUserInput = millis();
 }
 
-void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
-  switch (type) {
-    case WS_EVT_CONNECT:
-      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-      break;
-    case WS_EVT_DISCONNECT:
-      Serial.printf("WebSocket client #%u disconnected\n", client->id());
-      break;
-    case WS_EVT_DATA:
-      handleWebSocketMessage(arg, data, len);
-      break;
-    case WS_EVT_PONG:
-    case WS_EVT_ERROR:
-      break;
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
+{
+  switch (type)
+  {
+  case WS_EVT_CONNECT:
+    Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+    break;
+  case WS_EVT_DISCONNECT:
+    Serial.printf("WebSocket client #%u disconnected\n", client->id());
+    break;
+  case WS_EVT_DATA:
+    handleWebSocketMessage(arg, data, len);
+    break;
+  case WS_EVT_PONG:
+  case WS_EVT_ERROR:
+    break;
   }
 }
 
-void initWebSocket() {
+void initWebSocket()
+{
   ws.onEvent(onEvent);
   server.addHandler(&ws);
 }
 
 // Search for parameter in HTTP POST request - used for wifi configuration page
-const char* PARAM_INPUT_1 = "ssid";
-const char* PARAM_INPUT_2 = "pass";
-const char* PARAM_INPUT_3 = "ip";
-const char* PARAM_INPUT_4 = "gateway";
+const char *PARAM_INPUT_1 = "ssid";
+const char *PARAM_INPUT_2 = "pass";
+const char *PARAM_INPUT_3 = "ip";
+const char *PARAM_INPUT_4 = "gateway";
 
 IPAddress localIP;
-//IPAddress localIP(192, 168, 1, 200); // hardcoded
+// IPAddress localIP(192, 168, 1, 200); // hardcoded
 
 // Set your Gateway IP address
 IPAddress localGateway;
-//IPAddress localGateway(192, 168, 1, 1); //hardcoded
+// IPAddress localGateway(192, 168, 1, 1); //hardcoded
 IPAddress subnet(255, 255, 0, 0);
 
 // Timer variables
 unsigned long previousMillis = 0;
-const long interval = 10000;  // interval to wait for Wi-Fi connection (milliseconds)
+const long interval = 10000; // interval to wait for Wi-Fi connection (milliseconds)
 
 // Initialize SPIFFS
-void initSPIFFS() {
-  if (!SPIFFS.begin(true)) {
+void initSPIFFS()
+{
+  if (!SPIFFS.begin(true))
+  {
     debugln("An error has occurred while mounting SPIFFS");
   }
   debugln("SPIFFS mounted successfully");
 }
 
 // Read File from SPIFFS
-String readFile(fs::FS &fs, const char * path){
+String readFile(fs::FS &fs, const char *path)
+{
   Serial.printf("Reading file: %s\r\n", path);
 
   File file = fs.open(path);
-  if(!file || file.isDirectory()){
+  if (!file || file.isDirectory())
+  {
     debugln("- failed to open file for reading");
     return String();
   }
-  
+
   String fileContent;
-  while(file.available()){
+  while (file.available())
+  {
     fileContent = file.readStringUntil('\n');
-    break;     
+    break;
   }
   return fileContent;
 }
 
 // Write file to SPIFFS
-void writeFile(fs::FS &fs, const char * path, const char * message){
+void writeFile(fs::FS &fs, const char *path, const char *message)
+{
   Serial.printf("Writing file: %s\r\n", path);
 
   File file = fs.open(path, FILE_WRITE);
-  if(!file){
+  if (!file)
+  {
     debugln("- failed to open file for writing");
     return;
   }
-  if(file.print(message)){
+  if (file.print(message))
+  {
     debugln("- file written");
-  } else {
+  }
+  else
+  {
     debugln("- write failed");
   }
 }
 
 // Initialize WiFi
-bool initWiFi() {
-  if(Settings.ssid=="" || Settings.ip==""){
+bool initWiFi()
+{
+  if (Settings.ssid == "" || Settings.ip == "")
+  {
     debugln("Undefined SSID or IP address.");
     return false;
   }
@@ -691,8 +746,8 @@ bool initWiFi() {
   localIP.fromString(Settings.ip);
   localGateway.fromString(Settings.gateway);
 
-
-  if (!WiFi.config(localIP, localGateway, subnet)){
+  if (!WiFi.config(localIP, localGateway, subnet))
+  {
     debugln("STA Failed to configure");
     return false;
   }
@@ -702,9 +757,11 @@ bool initWiFi() {
   unsigned long currentMillis = millis();
   previousMillis = currentMillis;
 
-  while(WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     currentMillis = millis();
-    if (currentMillis - previousMillis >= interval) {
+    if (currentMillis - previousMillis >= interval)
+    {
       debugln("Failed to connect.");
       return false;
     }
@@ -715,48 +772,60 @@ bool initWiFi() {
 }
 
 // Replaces placeholders with values
-String processor(const String& var) {
-  if(var == "STATE"){
-    if (appMode != APP_STANDBY_MODE){
+String processor(const String &var)
+{
+  if (var == "STATE")
+  {
+    if (appMode != APP_STANDBY_MODE)
+    {
       return "ON";
     }
-    else{
+    else
+    {
       return "SLEEPING";
     }
   }
-  if(var == "SELECTEDINPUT"){
+  if (var == "SELECTEDINPUT")
+  {
     return String(Settings.Input[RuntimeSettings.CurrentInput].Name);
   }
-  if(var == "VOLUME"){
+  if (var == "VOLUME")
+  {
     if (!RuntimeSettings.Muted)
-      return String(RuntimeSettings.CurrentVolume) + " (" + String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation)/2) + " dB)";
+      return String(RuntimeSettings.CurrentVolume) + " (" + String(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation) / 2) + " dB)";
     else
       return ("MUTED");
   }
-  if(var == "TEMP1"){
+  if (var == "TEMP1")
+  {
     return String(getTemperature(NTC1_PIN));
   }
-  if(var == "TEMP2"){
+  if (var == "TEMP2")
+  {
     return String(getTemperature(NTC2_PIN));
   }
   // Unknown parameter
   return ("n/a)");
 }
 
-void setupWIFIsupport() {
+void setupWIFIsupport()
+{
   initSPIFFS();
 
-  if(initWiFi()) {
+  if (initWiFi())
+  {
     initWebSocket();
 
     // Web Server Root URL
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){request->send(SPIFFS, "/index.html", "text/html");});
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(SPIFFS, "/index.html", "text/html"); });
     server.serveStatic("/", SPIFFS, "/");
-    
+
     AsyncElegantOTA.begin(&server);
     server.begin();
   }
-  else {
+  else
+  {
     // Connect to Wi-Fi network with SSID and password
     debugln("Setting AP (Access Point)");
     // NULL sets an open Access Point
@@ -764,7 +833,7 @@ void setupWIFIsupport() {
 
     IPAddress IP = WiFi.softAPIP();
     debug("AP IP address: ");
-    debugln(IP); 
+    debugln(IP);
 
     oled.clear();
     oled.setCursor(0, 1);
@@ -773,15 +842,14 @@ void setupWIFIsupport() {
     oled.print(IP);
     delay(10000);
 
-
     // Web Server Root URL
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/wifi.html", "text/html");
-    });
-    
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(SPIFFS, "/wifi.html", "text/html"); });
+
     server.serveStatic("/", SPIFFS, "/");
-    
-    server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
+
+    server.on("/", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
       int params = request->params();
       for(int i=0;i<params;i++){
         AsyncWebParameter* p = request->getParam(i);
@@ -830,8 +898,7 @@ void setupWIFIsupport() {
       oled.setCursor(0, 3);
       oled.print(F("Restarting..."));
       delay(3000);
-      ESP.restart();
-    });
+      ESP.restart(); });
     AsyncElegantOTA.begin(&server);
     server.begin();
   }
@@ -839,28 +906,27 @@ void setupWIFIsupport() {
 
 // Webserver & Websocket - END
 
-
 // Lets get started ----------------------------------------------------------------------------------------
 void setup()
 {
   // Serial port for debugging purposes
   Serial.begin(115200);
-  
+
   Wire.begin();
-  
+
   setupRotaryEncoders();
 
   pinMode(NTC1_PIN, INPUT);
   pinMode(NTC2_PIN, INPUT);
 
   relayController.begin();
-    // Define all pins as OUTPUT and disable all relais
+  // Define all pins as OUTPUT and disable all relais
   for (byte pin = 0; pin <= 7; pin++)
   {
     relayController.pinMode(pin, OUTPUT);
     relayController.digitalWrite(pin, LOW);
   }
-  
+
   muses.begin();
 
   oled.begin();
@@ -868,11 +934,11 @@ void setup()
 
   // Start IR reader
   irmp_init();
-  
+
   // Read setting from EEPROM
   readSettingsFromEEPROM();
   readRuntimeSettingsFromEEPROM();
-  
+
   // Check if settings stored in EEPROM are INVALID - if so, we write the default settings to the EEPROM and reboots
   if ((Settings.Version != (float)VERSION) || (RuntimeSettings.Version != (float)VERSION))
   {
@@ -898,12 +964,13 @@ void setup()
 }
 
 void startUp()
-{  
+{
   oled.lcdOn();
   oled.clear();
 
   // Turn on Mezmerize B1 Buffer via power on/off relay
-  if (Settings.ExtPowerRelayTrigger) {
+  if (Settings.ExtPowerRelayTrigger)
+  {
     digitalWrite(POWER_RELAY_PIN, HIGH);
   }
 
@@ -926,7 +993,7 @@ void startUp()
     {
       setTrigger1On();
       delayTrigger1 = 0;
-      //oled.print3x3Number(2, 1, 0, false);
+      // oled.print3x3Number(2, 1, 0, false);
     }
     else
     {
@@ -938,7 +1005,7 @@ void startUp()
     {
       setTrigger2On();
       delayTrigger2 = 0;
-      //oled.print3x3Number(11, 1, 0, false);
+      // oled.print3x3Number(11, 1, 0, false);
     }
     else
     {
@@ -957,7 +1024,7 @@ void startUp()
 
   UIkey = KEY_NONE;
   lastReceivedInput = KEY_NONE;
-    
+
   notifyClients(getJSONOnStandbyState());
 
   debugln("Ready!");
@@ -1041,9 +1108,17 @@ void setVolume(int16_t newVolumeStep)
       else
         RuntimeSettings.CurrentVolume = Settings.Input[RuntimeSettings.CurrentInput].MaxVol; // Set to max volume
       RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput] = RuntimeSettings.CurrentVolume;
-      muses.setVolume(getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation));
+
+      int Attenuation = getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation);
+      if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] == 127 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 118 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 136) // Both channels same attenuation
+        muses.setVolume(Attenuation);
+      else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 127) // Shift balance to the left channel by lowering the right channel - TO DO: seems like the channels is reversed in the Muses library??
+        muses.setVolume(Attenuation + (127 - RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput]), Attenuation);
+      else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 127) // Shift balance to the right channel by lowering the left channel - TO DO: seems like the channels is reversed in the Muses library??
+        muses.setVolume(Attenuation, Attenuation + (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] - 127));
     }
-    displayVolume();
+    if (appMode == APP_NORMAL_MODE)
+      displayVolume();
   }
   notifyClients(getJSONCurrentVolume());
 }
@@ -1067,7 +1142,8 @@ void displayVolume()
 {
   if (Settings.DisplayVolume)
   {
-    if (ScreenSaverIsOn) ScreenSaverOff();
+    if (ScreenSaverIsOn)
+      ScreenSaverOff();
     if (!RuntimeSettings.Muted)
     {
       // If show volume in steps
@@ -1097,7 +1173,8 @@ void displayVolume()
 // Clear previously displayed volume steps/-dB to indicate that mute is selected
 void displayMute()
 {
-  if (ScreenSaverIsOn) ScreenSaverOff();
+  if (ScreenSaverIsOn)
+    ScreenSaverOff();
   for (int8_t i = 0; i < 4; i++)
   {
     oled.setCursor(10, i);
@@ -1111,7 +1188,8 @@ boolean setInput(uint8_t NewInput)
   boolean result = false;
   if (Settings.Input[NewInput].Active != INPUT_INACTIVATED && NewInput >= 0 && NewInput <= 5 && appMode == APP_NORMAL_MODE)
   {
-    if (!RuntimeSettings.Muted) mute();
+    if (!RuntimeSettings.Muted)
+      mute();
 
     // Unselect currently selected input
     relayController.digitalWrite(RuntimeSettings.CurrentInput, LOW);
@@ -1122,7 +1200,7 @@ boolean setInput(uint8_t NewInput)
     // Select new input
     RuntimeSettings.CurrentInput = NewInput;
     relayController.digitalWrite(NewInput, HIGH);
-    
+
     if (Settings.RecallSetLevel)
       RuntimeSettings.CurrentVolume = RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput];
     else if (RuntimeSettings.CurrentVolume > Settings.Input[RuntimeSettings.CurrentInput].MaxVol)
@@ -1134,7 +1212,7 @@ boolean setInput(uint8_t NewInput)
       unmute();
 
     displayInput();
-    result=true;
+    result = true;
   }
 
   notifyClients(getJSONCurrentInput());
@@ -1145,7 +1223,7 @@ boolean setInput(uint8_t NewInput)
 void setPrevInput()
 {
   byte nextInput = (RuntimeSettings.CurrentInput == 0) ? 5 : RuntimeSettings.CurrentInput - 1;
-  
+
   while (Settings.Input[nextInput].Active == INPUT_INACTIVATED)
   {
     nextInput = (nextInput == 0) ? 5 : nextInput - 1;
@@ -1161,7 +1239,7 @@ void setNextInput()
   {
     nextInput = (nextInput > 5) ? 0 : nextInput + 1;
   }
-   setInput(nextInput);
+  setInput(nextInput);
 }
 
 // Display the name of the current input (but only if it has been chosen to be so by the user)
@@ -1169,10 +1247,13 @@ void displayInput()
 {
   if (Settings.DisplaySelectedInput)
   {
-    if (ScreenSaverIsOn) ScreenSaverOff();
+    if (ScreenSaverIsOn)
+      ScreenSaverOff();
     // Move Input display one line down if display of temperatures has been disabled
     if (!Settings.DisplayTemperature1 && !Settings.DisplayTemperature2)
-      oled.setCursor(0, 1); else oled.setCursor(0, 0);
+      oled.setCursor(0, 1);
+    else
+      oled.setCursor(0, 0);
     oled.print(Settings.Input[RuntimeSettings.CurrentInput].Name);
   }
 }
@@ -1181,7 +1262,7 @@ void displayTemperatures()
 {
   if (ScreenSaverIsOn == false) // Only update display if screen saver is not on
   {
-  
+
     if (Settings.DisplayTemperature1)
     {
       float Temp = getTemperature(NTC1_PIN);
@@ -1197,14 +1278,14 @@ void displayTemperatures()
     {
       float Temp = getTemperature(NTC2_PIN);
       float MaxTemp;
-    if (Settings.Trigger2Temp == 0)
-      MaxTemp = 60; // TO DO: Is this the best default value?
-    else
-      MaxTemp = Settings.Trigger2Temp;
-    if (Settings.DisplayTemperature1)
-      displayTempDetails(Temp, MaxTemp, Settings.DisplayTemperature1, 2);
-    else
-      displayTempDetails(Temp, MaxTemp, Settings.DisplayTemperature1, 1);
+      if (Settings.Trigger2Temp == 0)
+        MaxTemp = 60; // TO DO: Is this the best default value?
+      else
+        MaxTemp = Settings.Trigger2Temp;
+      if (Settings.DisplayTemperature1)
+        displayTempDetails(Temp, MaxTemp, Settings.DisplayTemperature1, 2);
+      else
+        displayTempDetails(Temp, MaxTemp, Settings.DisplayTemperature1, 1);
     }
   }
   mil_onRefreshTemperatureDisplay = millis();
@@ -1280,12 +1361,13 @@ void displayTempDetails(float Temp, uint8_t TriggerTemp, uint8_t DispTemp, uint8
 }
 
 // Read analog with improved accuracy - see https://github.com/G6EJD/ESP32-ADC-Accuracy-Improvement/blob/main/ESP32_ADC_Read_Voltage_Accuracy_V2.ino
-float readVoltage(byte ADC_Pin) {
+float readVoltage(byte ADC_Pin)
+{
   float vref = 1100;
   esp_adc_cal_characteristics_t adc_chars;
   esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
-  vref = adc_chars.vref; // Obtain the device ADC reference voltage
-  return (analogRead(ADC_Pin) / 4095.0) * 3.3 * (1100 / vref) * Settings.ADC_Calibration;  // ESP by design reference voltage in mV
+  vref = adc_chars.vref;                                                                  // Obtain the device ADC reference voltage
+  return (analogRead(ADC_Pin) / 4095.0) * 3.3 * (1100 / vref) * Settings.ADC_Calibration; // ESP by design reference voltage in mV
 }
 
 // Return measured temperature from 4.7K NTC connected to pinNmbr
@@ -1297,21 +1379,27 @@ float getTemperature(uint8_t pinNmbr)
   float Rntc = 0;    // Measured resistance of NTC+
   float Temp;
 
-  for (uint8_t i = 0; i < 8; i++) 
+  for (uint8_t i = 0; i < 8; i++)
     Vout = Vout + readVoltage(pinNmbr); // Read Vout on analog input pin (ESP32 can sense from 0-4095, 4095 is Vin)
   Vout = Vout / 8;
 
   Rntc = Rref * (1 / ((Vin / Vout) - 1)); // Formula to calculate the resistance of the NTC
-  
-  if (Rntc < 0) 
+
+  if (Rntc < 0)
     Temp = 0;
   else
     Temp = (-25.37 * log(Rntc)) + 239.43, 0.0; // Formula to calculate the temperature based on the resistance of the NTC - the formula is derived from the datasheet of the NTC
-  
-  if (Temp < 0) Temp = 0;
-  else
-    if (Temp > 99) Temp = 99;
-  debug(" Voltage: "); debug(Vout); debug(" Resistance: "); debug(Rntc); debug("  Temp: "); debugln(Temp);
+
+  if (Temp < 0)
+    Temp = 0;
+  else if (Temp > 99)
+    Temp = 99;
+  debug(" Voltage: ");
+  debug(Vout);
+  debug(" Resistance: ");
+  debug(Rntc);
+  debug("  Temp: ");
+  debugln(Temp);
   return (Temp);
 }
 
@@ -1354,12 +1442,12 @@ void loop()
         setVolume(RuntimeSettings.CurrentVolume - 1);
       break;
     case KEY_LEFT:
-    { 
+    {
       setPrevInput();
       break;
     }
     case KEY_RIGHT:
-    { 
+    {
       setNextInput();
       break;
     }
@@ -1430,16 +1518,16 @@ void loop()
   case APP_STANDBY_MODE:
   {
     // Do nothing if in APP_STANDBY_MODE - if the user presses KEY_ONOFF a restart is done by getUserInput(). By the way: you don't need an IR remote: a doubleclick on encoder_2 is also KEY_ONOFF
-    
+
     // Send temperature notification via websocket while in standby mode
     if (millis() > mil_onRefreshTemperatureDisplay + (TEMP_REFRESH_INTERVAL_STANDBY))
     {
       notifyClients(getJSONTempValues());
-      mil_onRefreshTemperatureDisplay = millis(); 
+      mil_onRefreshTemperatureDisplay = millis();
     }
     break;
   }
-}
+  }
 }
 
 void toAppNormalMode()
@@ -1464,7 +1552,8 @@ void toStandbyMode()
   mute();
   setTrigger1Off();
   setTrigger2Off();
-  if (Settings.ExtPowerRelayTrigger) {
+  if (Settings.ExtPowerRelayTrigger)
+  {
     digitalWrite(POWER_RELAY_PIN, LOW);
   }
   last_KEY_ONOFF = millis();
@@ -2004,6 +2093,8 @@ bool changeBalance()
   byte OldValue = RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput];
   byte NewValue = RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput];
 
+  appMode = APP_BALANCE_MODE;
+
   // Display the screen
   oled.clear();
   oled.print("Balance");
@@ -2019,7 +2110,7 @@ bool changeBalance()
       {
         NewValue++;
         RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] = NewValue;
-        // TO DO Set volume
+        setVolume(RuntimeSettings.CurrentVolume);
         displayBalance(NewValue);
       }
       break;
@@ -2028,12 +2119,13 @@ bool changeBalance()
       {
         NewValue--;
         RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] = NewValue;
-        // TO DO Set volume
+        setVolume(RuntimeSettings.CurrentVolume);
         displayBalance(NewValue);
       }
       break;
     case KEY_SELECT:
-      if (NewValue != OldValue) {
+      if (NewValue != OldValue)
+      {
         writeRuntimeSettingsToEEPROM();
         result = true;
       }
@@ -2042,7 +2134,7 @@ bool changeBalance()
     case KEY_BACK:
       // Exit without saving new value
       RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] = OldValue;
-        // TO DO Set volume
+      // TO DO Set volume
       result = false;
       complete = true;
       break;
@@ -2057,12 +2149,15 @@ void displayBalance(byte Value)
 {
   oled.setCursor(1, 1);
   oled.print("---------=---------");
-  oled.setCursor(Value-117, 1);
+  oled.setCursor(Value - 117, 1);
   oled.write(31);
   oled.setCursor(1, 2);
-  if (Value < 127) oled.printf("L         %.1f dB R", (127 - Value) * -0.5);
-  else if (Value == 127) oled.print("L                 R");
-  else if (Value > 127) oled.printf("L %.1f dB         R", (Value - 127) * -0.5);
+  if (Value < 127)
+    oled.printf("L         %.1f dB R", (127 - Value) * -0.5);
+  else if (Value == 127)
+    oled.print("L                 R");
+  else if (Value > 127)
+    oled.printf("L %.1f dB         R", (Value - 127) * -0.5);
 }
 
 //----------------------------------------------------------------------
@@ -2105,7 +2200,7 @@ void editInputName(uint8_t InputNumber)
       oled.write(' ');
 
       // Decide if position or direction of arrow must be changed
-      if (arrowPointingUpDown == 0 && UserInput == KEY_UP)     // The arrow points up and the user input is "turn to the right"
+      if (arrowPointingUpDown == 0 && UserInput == KEY_UP)        // The arrow points up and the user input is "turn to the right"
         arrowPointingUpDown = 1;                                  // Set the arrow to point down but don't change position of ArrowX
       else if (arrowPointingUpDown == 0 && UserInput == KEY_DOWN) // The arrow points up and the user input is "turn to the left"
       {
@@ -2461,7 +2556,7 @@ void setSettingsToDefault()
   // Carsten
   // Settings.ADC_Calibration = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   // Jan
-  Settings.ADC_Calibration  = 1.085; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  Settings.ADC_Calibration = 1.085; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   Settings.VolumeSteps = 60;
   Settings.MinAttenuation = 0;
   Settings.MaxAttenuation = 60;
@@ -2552,7 +2647,7 @@ void setSettingsToDefault()
   RuntimeSettings.InputLastVol[3] = 0;
   RuntimeSettings.InputLastVol[4] = 0;
   RuntimeSettings.InputLastVol[5] = 0;
-  RuntimeSettings.InputLastBal[0] = 127;  // 127 = no balance shift (values < 127 = shift balance to the left channel, values > 127 = shift balance to the right channel)
+  RuntimeSettings.InputLastBal[0] = 127; // 127 = no balance shift (values < 127 = shift balance to the left channel, values > 127 = shift balance to the right channel)
   RuntimeSettings.InputLastBal[1] = 127;
   RuntimeSettings.InputLastBal[2] = 127;
   RuntimeSettings.InputLastBal[3] = 127;
