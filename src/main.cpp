@@ -563,7 +563,7 @@ String getJSONTempValues() {
 
 void notifyClients(String message) {
   ws.textAll(message);
-  //debugln("Sent: "+message);
+  debugln("Sent: "+message);
 }
 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
@@ -958,7 +958,7 @@ void startUp()
     
   notifyClients(getJSONOnStandbyState());
 
-  // debugln("Ready!");
+  debugln("Ready!");
 }
 
 void setTrigger1On()
@@ -1362,7 +1362,7 @@ float getTemperature(uint8_t pinNmbr)
   if (Temp < 0) Temp = 0;
   else
     if (Temp > 99) Temp = 99;
-  //debug(" Voltage: "); debug(Vout); debug(" Resistance: "); debug(Rntc); debug("  Temp: "); debugln(Temp);
+  debug(" Voltage: "); debug(Vout); debug(" Resistance: "); debug(Rntc); debug("  Temp: "); debugln(Temp);
   return (Temp);
 }
 
