@@ -1043,7 +1043,7 @@ int16_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t m
   **
   */
 
-  if (max_dB >= min_dB ||
+  if (min_dB >= max_dB ||
       selStep > steps ||
       steps < 10 ||
       steps <= ((max_dB - min_dB) / 2)) return 223;
