@@ -10,6 +10,8 @@
 
 #define VERSION (float)0.99
 
+// To enable debug define DEBUG 1
+// To disable debug define DEBUG 2
 #define DEBUG 1
 #if DEBUG == 1
 #define debug(x) Serial.print(x)
@@ -1082,13 +1084,66 @@ void setTrigger2Off()
   }
 }
 
-// Return the attenuation required by the setvolume function of the Muses72320 based upon the configured number of steps, the selected step and the configured minimum and maximum attenuation in dBs.
 int16_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t max_dB)
 {
+  /*
+  ** Return the attenuation required by the setvolume function of the Muses72320 based upon the configured 
+  ** number of steps, the selected step and the configured minimum and maximum attenuation in dBs.
+  **
+  ** The purpose of the algoritm is the divide the potentionmeter into to sections. To get a more even step
+  ** size in terms of the experienced sound preassure. One section will have larger attenuation step sizes.
+  ** This will be in section starting from the maximum attenuation. Another section will have smaller step sizes.
+  ** This will be in section closer to the minimum attenuation.
+  ** 
+  ** Parameters
+  **   steps   : Number of desired step for you potentiometer. 
+  **             Maximum number of step = (max_dB-min_dB) * 2 
+  **   selStep : Selected step in potentiometer ladder from which you wan't the attenuation calculated
+  **             selStep = 0      (equals max_dB attenuation)
+  **             selStep = steps  (equals min_db attenuation)
+  **   min_dB  : Minimum attenuation for the potentiometer      0 dB = absolute minimum 
+  **   max_dB  : Maximum attenuation for the potentionmeter   111 dB = absolute maximum
+  **
+  ** Constraints
+  **   max_dB < min_dB
+  **   selStep <= steps
+  **   steps >= 10 
+  **   steps <= (max_dB - min_dB) / 2
+  **
+  ** If the above constraints are not meet the getAttenuation() will return 223 (111.5 max attenuation);
+  **
+  */
+
+  if (min_dB >= max_dB ||
+      selStep > steps ||
+      steps < 10 ||
+      steps <= ((max_dB - min_dB) / 2)) return 223;
+
+  // Calculate attenuation range in dB
   uint8_t att_dB = max_dB - min_dB;
-  float sizeOfLargeSteps = round(pow(2.0, att_dB / steps) - 0.5);
-  uint8_t numberOfSmallSteps = (sizeOfLargeSteps * steps - att_dB) / (sizeOfLargeSteps / 2);
-  return minimum((min_dB + minimum(steps - selStep, numberOfSmallSteps) * (sizeOfLargeSteps / 2) + max(steps - numberOfSmallSteps - selStep, 0) * sizeOfLargeSteps), max_dB) * -2;
+
+  // Calculate step size in DB for attenuation steps
+  float sizeOfMajorSteps = round(pow(2.0, att_dB / steps) - 0.5);
+  float sizeOfMinorSteps = sizeOfMajorSteps / 2;
+
+  // Calculate number of minor steps for section with minor steps 
+  // Use as many steps as possible for minor steps
+  uint8_t numberOfMinorSteps = (sizeOfMajorSteps * steps - att_dB) / sizeOfMinorSteps;
+
+  // return calculated for total attenuation for selected step off_set equals min_db
+  return minimum((min_dB + 
+                  // total attenuation in dB from number of selected steps in minor step section
+                  // Start using minor steps - we want as many of these as possible.
+                  // Equals when attenuation is close to 0 the steps should be as fine as possible
+                  minimum(steps - selStep, numberOfMinorSteps) * sizeOfMinorSteps +   
+                  // total attenuation in dB from number of selected step in major step section
+                  // When every minor step is used start using large steps
+                  // Equals when attenuation is close to max remaing steps should be the major ones.
+                  max(steps - numberOfMinorSteps - selStep, 0) * sizeOfMajorSteps),
+                  // total attenuation cannot exceed max_db   
+                  max_dB) * 
+                  // Total attenuation in db * 2 to calculation value in 1/2 dB steps 
+                  2;                                           
 }
 
 void setVolume(int16_t newVolumeStep)
@@ -2554,9 +2609,9 @@ void setSettingsToDefault()
   strcpy(Settings.gateway, "               ");
   Settings.ExtPowerRelayTrigger = true;
   // Carsten
-  // Settings.ADC_Calibration = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  Settings.ADC_Calibration = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   // Jan
-  Settings.ADC_Calibration = 1.085; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  //Settings.ADC_Calibration = 1.085; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
   Settings.VolumeSteps = 60;
   Settings.MinAttenuation = 0;
   Settings.MaxAttenuation = 60;
