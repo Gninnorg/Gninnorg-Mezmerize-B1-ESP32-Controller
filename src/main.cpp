@@ -12,7 +12,7 @@
 
 // To enable debug define DEBUG 1
 // To disable debug define DEBUG 2
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG == 1
 #define debug(x) Serial.print(x)
 #define debugln(x) Serial.println(x)
@@ -20,6 +20,12 @@
 #define debug(x)
 #define debugln(x)
 #endif
+
+// ADC calibration factor for ESP32 used:
+// Carsten (1.045)
+// Jan (1.085)
+#define ADC_CALIBRATION 1.045 
+
 
 #include <Wire.h>
 #include <Adafruit_MCP23008.h>
@@ -1113,11 +1119,11 @@ int16_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t m
   ** If the above constraints are not meet the getAttenuation() will return 223 (111.5 max attenuation);
   **
   */
-
+  debug("steps: "); debug(steps); debug(" selectedStep: "); debug(selStep); debug(" min_dB: "); debug(min_dB); debug(" max_dB: "); debugln(max_dB);
   if (min_dB >= max_dB ||
       selStep > steps ||
       steps < 10 ||
-      steps <= ((max_dB - min_dB) / 2)) return 223;
+      steps <= ((max_dB - min_dB) / 2)) return -223;
 
   // Calculate attenuation range in dB
   uint8_t att_dB = max_dB - min_dB;
@@ -1143,7 +1149,7 @@ int16_t getAttenuation(uint8_t steps, uint8_t selStep, uint8_t min_dB, uint8_t m
                   // total attenuation cannot exceed max_db   
                   max_dB) * 
                   // Total attenuation in db * 2 to calculation value in 1/2 dB steps 
-                  2;                                           
+                  -2;                                           
 }
 
 void setVolume(int16_t newVolumeStep)
@@ -1165,13 +1171,16 @@ void setVolume(int16_t newVolumeStep)
       RuntimeSettings.InputLastVol[RuntimeSettings.CurrentInput] = RuntimeSettings.CurrentVolume;
 
       int Attenuation = getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation);
+      debug(" Attenuation: "); debugln(Attenuation);
+
+      muses.setVolume(Attenuation);
       if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] == 127 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 118 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 136) // Both channels same attenuation
         muses.setVolume(Attenuation);
       else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 127) // Shift balance to the left channel by lowering the right channel - TO DO: seems like the channels is reversed in the Muses library??
         muses.setVolume(Attenuation + (127 - RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput]), Attenuation);
       else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 127) // Shift balance to the right channel by lowering the left channel - TO DO: seems like the channels is reversed in the Muses library??
         muses.setVolume(Attenuation, Attenuation + (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] - 127));
-    }
+      }
     if (appMode == APP_NORMAL_MODE)
       displayVolume();
   }
@@ -2608,10 +2617,7 @@ void setSettingsToDefault()
   strcpy(Settings.ip, "               ");
   strcpy(Settings.gateway, "               ");
   Settings.ExtPowerRelayTrigger = true;
-  // Carsten
-  Settings.ADC_Calibration = 1.045; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
-  // Jan
-  //Settings.ADC_Calibration = 1.085; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
+  Settings.ADC_Calibration = ADC_CALIBRATION;
   Settings.VolumeSteps = 60;
   Settings.MinAttenuation = 0;
   Settings.MaxAttenuation = 60;
