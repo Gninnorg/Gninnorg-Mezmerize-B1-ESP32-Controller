@@ -537,12 +537,12 @@ String getJSONCurrentValues()
   else
     JSONValues["OnState"] = "On";
   JSONValues["Input"] = String(Settings.Input[RuntimeSettings.CurrentInput].Name);
-  JSONValues["VolumeSteps"] = String(Settings.VolumeSteps);
-  JSONValues["Volume"] = String(RuntimeSettings.CurrentVolume);
+  JSONValues["VolumeSteps"] = Settings.VolumeSteps;
+  JSONValues["Volume"] = RuntimeSettings.CurrentVolume;
 
   int Attenuation = getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation);
 
-  JSONValues["Volume"] = String(RuntimeSettings.CurrentVolume);
+  JSONValues["Volume"] = RuntimeSettings.CurrentVolume;
   if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] == 127 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 118 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 136)
     JSONValues["Volume_dB"] = String(float(Attenuation / 2));
   else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 127) // Balance shifted to the left channel by lowering the right channel
@@ -550,8 +550,8 @@ String getJSONCurrentValues()
   else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 127) // Balance shifted to the right channel by lowering the left channel
     JSONValues["Volume_dB"] = String(float((Attenuation + (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] - 127)) / 2)) + String("/") + String(float(Attenuation / 2));
 
-  JSONValues["Temp1"] = String(int(getTemperature(NTC1_PIN)));
-  JSONValues["Temp2"] = String(int(getTemperature(NTC2_PIN)));
+  JSONValues["Temp1"] = int(getTemperature(NTC1_PIN));
+  JSONValues["Temp2"] = int(getTemperature(NTC2_PIN));
   return JSON.stringify(JSONValues);
 }
 
@@ -580,7 +580,7 @@ String getJSONCurrentVolume()
   JSONVar JSONValues; // Json variable to hold values
   int Attenuation = getAttenuation(Settings.VolumeSteps, RuntimeSettings.CurrentVolume, Settings.MinAttenuation, Settings.MaxAttenuation);
 
-  JSONValues["Volume"] = String(RuntimeSettings.CurrentVolume);
+  JSONValues["Volume"] = RuntimeSettings.CurrentVolume;
   if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] == 127 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 118 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 136)
     JSONValues["Volume_dB"] = String(float(Attenuation / 2));
   else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 127) // Balance shifted to the left channel by lowering the right channel
@@ -594,8 +594,8 @@ String getJSONCurrentVolume()
 String getJSONTempValues()
 {
   JSONVar JSONValues; // Json variable to hold values
-  JSONValues["Temp1"] = String(int(getTemperature(NTC1_PIN)));
-  JSONValues["Temp2"] = String(int(getTemperature(NTC2_PIN)));
+  JSONValues["Temp1"] = int(getTemperature(NTC1_PIN));
+  JSONValues["Temp2"] = int(getTemperature(NTC2_PIN));
   return JSON.stringify(JSONValues);
 }
 
@@ -627,14 +627,16 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     else if (message.indexOf("Input:") >= 0)
       setInput(message.substring(7).toInt());
 
-    if (message.indexOf("Power:Toggle") >= 0)
+    if (message.indexOf("Power:") >= 0)
     {
-      if (appMode == APP_STANDBY_MODE)
-        startUp();
-      else if (appMode == APP_NORMAL_MODE)
-        toStandbyMode();
-      else
-        notifyClients(getJSONOnStandbyState());
+      if (appMode == APP_STANDBY_MODE && message.indexOf("Power:On") >= 0) startUp();
+      if (appMode == APP_NORMAL_MODE && message.indexOf("Power:Standby") >= 0) toStandbyMode();
+      if (message.indexOf("Power:Toggle") >= 0)
+      {
+        if (appMode == APP_STANDBY_MODE) startUp();
+        else if (appMode == APP_NORMAL_MODE) toStandbyMode();
+      }
+      notifyClients(getJSONOnStandbyState());
     }
 
     // Default message received when a new Websocket client connects -> Send all values
@@ -1034,7 +1036,7 @@ void startUp()
   lastReceivedInput = KEY_NONE;
 
   notifyClients(getJSONOnStandbyState());
-
+  
   debugln("Ready!");
 }
 
@@ -1180,7 +1182,7 @@ void setVolume(int16_t newVolumeStep)
         muses.setVolume(Attenuation + (127 - RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput]), Attenuation);
       else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 127) // Shift balance to the right channel by lowering the left channel - TO DO: seems like the channels is reversed in the Muses library??
         muses.setVolume(Attenuation, Attenuation + (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] - 127));
-      }
+    }
     if (appMode == APP_NORMAL_MODE)
       displayVolume();
   }
