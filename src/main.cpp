@@ -12,7 +12,7 @@
 
 // To enable debug define DEBUG 1
 // To disable debug define DEBUG 2
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG == 1
 #define debug(x) Serial.print(x)
 #define debugln(x) Serial.println(x)
@@ -639,6 +639,8 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       notifyClients(getJSONOnStandbyState());
     }
 
+
+
     // Default message received when a new Websocket client connects -> Send all values
     if (strcmp((char *)data, "getValues") == 0)
     {
@@ -829,6 +831,27 @@ void setupWIFIsupport()
     // Web Server Root URL
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(SPIFFS, "/index.html", "text/html"); });
+    
+    // Web : InputSelector
+    server.on("/INPUT1", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(200, "text/plain", String(setInput(1)));});
+
+    server.on("/INPUT2", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(200, "text/plain", String(setInput(2)));});
+
+    server.on("/INPUT3", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(200, "text/plain", String(setInput(3)));});
+
+    server.on("/INPUT4", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(200, "text/plain", String(setInput(4)));});
+
+    server.on("/INPUT5", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(200, "text/plain", String(setInput(5)));});
+
+    server.on("/INPUT6", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(200, "text/plain", String(setInput(6)));});
+        
+
     server.serveStatic("/", SPIFFS, "/");
 
     AsyncElegantOTA.begin(&server);
@@ -1176,6 +1199,7 @@ void setVolume(int16_t newVolumeStep)
       debug(" Attenuation: "); debugln(Attenuation);
 
       muses.setVolume(Attenuation);
+
       if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] == 127 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 118 || RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] > 136) // Both channels same attenuation
         muses.setVolume(Attenuation);
       else if (RuntimeSettings.InputLastBal[RuntimeSettings.CurrentInput] < 127) // Shift balance to the left channel by lowering the right channel - TO DO: seems like the channels is reversed in the Muses library??
